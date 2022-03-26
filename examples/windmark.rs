@@ -21,12 +21,16 @@
 #[macro_use]
 extern crate log;
 
+use windmark::response::Response;
+
 fn main() -> std::io::Result<()> {
   windmark::Router::new()
     .set_private_key_file("windmark_private.pem")
     .set_certificate_chain_file("windmark_pair.pem")
     .enable_default_logger(true)
-    .set_error_handler(|_, _, _| "error...".to_string())
+    .set_error_handler(|_, _, _| {
+      Response::PermanentFailure("error...".to_string())
+    })
     .set_pre_route_callback(|stream, url| {
       info!(
         "accepted connection from {} to {}",
@@ -43,25 +47,36 @@ fn main() -> std::io::Result<()> {
     .set_header(|_, _, _| "```\nART IS COOL\n```".to_string())
     .set_footer(|_, _, _| "Copyright 2022".to_string())
     .mount("/", |_, _, _| {
-      "# INDEX\n\nWelcome!\n\n=> /test Test Page\n=> /time Unix Epoch\n"
-        .to_string()
+      Response::Success(
+        "# INDEX\n\nWelcome!\n\n=> /test Test Page\n=> /time Unix Epoch\n"
+          .to_string(),
+      )
     })
     .mount("/ip", |stream, _, _| {
-      { format!("Hello, {}", stream.peer_addr().unwrap().ip()) }.into()
+      Response::Success(
+        { format!("Hello, {}", stream.peer_addr().unwrap().ip()) }.into(),
+      )
     })
-    .mount("/test", |_, _, _| "hi there\n=> / back".to_string())
+    .mount("/test", |_, _, _| {
+      Response::Success("hi there\n=> / back".to_string())
+    })
     .mount("/time", |_, _, _| {
-      std::time::UNIX_EPOCH
-        .elapsed()
-        .unwrap()
-        .as_nanos()
-        .to_string()
+      Response::Success(
+        std::time::UNIX_EPOCH
+          .elapsed()
+          .unwrap()
+          .as_nanos()
+          .to_string(),
+      )
     })
     .mount("/query", |_, url, _| {
-      format!("queries: {:?}", windmark::utilities::queries_from_url(&url))
+      Response::Success(format!(
+        "queries: {:?}",
+        windmark::utilities::queries_from_url(&url)
+      ))
     })
     .mount("/param/:lang", |_, _url, dynamic_parameter| {
-      format!("Parameter lang is {:?}", dynamic_parameter)
+      Response::Success(format!("Parameter lang is {:?}", dynamic_parameter))
     })
     .run()
 }
