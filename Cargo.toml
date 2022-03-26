@@ -1,10 +1,30 @@
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
 [package]
 name = "windmark"
 version = "0.0.0"
+authors = ["Fuwn <contact@fuwn.me>"]
 edition = "2021"
 description = "Simple and highly performant Gemini server framework"
+documentation = "https://docs.rs/windmark"
+readme = "README.md"
+homepage = "https://github.com/gemrest/windmark"
+repository = "https://github.com/gemrest/windmark"
 license = "GPL-3.0-only"
+keywords = ["gemini"]
+categories = ["web-programming"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+logger = ["pretty_env_logger", "log"]
 
 [dependencies]
+# TCP
+openssl = "0.10.38"
+# tokio = { version = "1.17.0", features = ["full"] }
+# tokio-openssl = "0.5.0"
+# tokio-uds = "0.2.7"
+url = "2.2.2"
+
+# Logging
+pretty_env_logger = { version = "0.4.0", optional = true }
+log = { version = "0.4.16", optional = true }
