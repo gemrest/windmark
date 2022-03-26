@@ -31,3 +31,26 @@ pub enum Response {
   NotFound(String),
   PermanentFailure(String),
 }
+
+pub(crate) fn to_value_set_status(
+  response: Response,
+  status: &mut i32,
+) -> String {
+  match response {
+    Response::Success(value) => {
+      *status = 20;
+
+      value
+    }
+    Response::NotFound(value) => {
+      *status = 51;
+
+      value
+    }
+    Response::PermanentFailure(value) => {
+      *status = 50;
+
+      value
+    }
+  }
+}
