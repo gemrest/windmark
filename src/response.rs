@@ -16,16 +16,6 @@
 // Copyright (C) 2022-2022 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-pub struct Header {
-  status: crate::status::Code,
-  meta:   String,
-}
-impl ToString for Header {
-  fn to_string(&self) -> String {
-    format!("{} {}\r\n", self.status as u8, self.meta)
-  }
-}
-
 pub enum Response {
   Input(String),
   SensitiveInput(String),
