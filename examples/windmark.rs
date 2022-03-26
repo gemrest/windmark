@@ -24,30 +24,31 @@ fn main() -> std::io::Result<()> {
     .set_private_key_file("windmark_private.pem")
     .set_certificate_chain_file("windmark_pair.pem")
     .enable_default_logger(true)
-    .set_error_handler(|_| "error...".to_string())
-    .set_pre_route_callback(|stream| {
+    .set_error_handler(|_, _| "error...".to_string())
+    .set_pre_route_callback(|stream, url| {
       info!(
-        "accepted connection from {}",
-        stream.peer_addr().unwrap().ip()
+        "accepted connection from {} to {}",
+        stream.peer_addr().unwrap().ip(),
+        url.to_string()
       )
     })
-    .set_post_route_callback(|stream| {
+    .set_post_route_callback(|stream, _url| {
       info!(
         "closed connection from {}",
         stream.peer_addr().unwrap().ip()
       )
     })
-    .set_header(|_| "```\nART IS COOL\n```".to_string())
-    .set_footer(|_| "Copyright 2022".to_string())
-    .mount("/", |_| {
+    .set_header(|_, _| "```\nART IS COOL\n```".to_string())
+    .set_footer(|_, _| "Copyright 2022".to_string())
+    .mount("/", |_, _| {
       "# INDEX\n\nWelcome!\n\n=> /test Test Page\n=> /time Unix Epoch\n"
         .to_string()
     })
-    .mount("/ip", |stream| {
+    .mount("/ip", |stream, _| {
       { format!("Hello, {}", stream.peer_addr().unwrap().ip()) }.into()
     })
-    .mount("/test", |_| "hi there\n=> / back".to_string())
-    .mount("/time", |_| {
+    .mount("/test", |_, _| "hi there\n=> / back".to_string())
+    .mount("/time", |_, _| {
       std::time::UNIX_EPOCH
         .elapsed()
         .unwrap()
