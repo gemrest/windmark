@@ -45,7 +45,7 @@ use url::Url;
 use crate::response::{to_value_set_status, Response};
 
 static DYNAMIC_PARAMETER_REGEX: SyncLazy<Regex> =
-  SyncLazy::new(|| Regex::new(r":[a-zA-Z][0-9a-zA-Z_-]*").unwrap());
+  SyncLazy::new(|| Regex::new(r"<[a-zA-Z][0-9a-zA-Z_-]*>").unwrap());
 
 type RouteResponseHandler = fn(&TcpStream, &Url, Option<String>) -> Response;
 type CallbackHandler = fn(&TcpStream, &Url);
@@ -160,6 +160,14 @@ impl Router {
       .find_iter(route)
       .map(|m| m.as_str().to_string())
       .collect::<Vec<String>>();
+
+    // println!(
+    //   "dyn: {:?}",
+    //   dynamic_parameters
+    //     .iter()
+    //     .map(|p| p.replace('<', "").replace('>', ""))
+    //     .collect::<Vec<String>>()
+    // );
 
     if let Some(dynamic_parameter) = dynamic_parameters.get(0) {
       fixed_route = route.replace(dynamic_parameter, "");
