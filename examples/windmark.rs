@@ -81,5 +81,19 @@ fn main() -> std::io::Result<()> {
     .mount("/param/:lang", |_, _url, dynamic_parameter| {
       Response::Success(format!("Parameter lang is {:?}", dynamic_parameter))
     })
+    .mount("/input", |_, url, _| {
+      if let Some(name) = url.query() {
+        Response::Success(format!("Your name is {}!", name))
+      } else {
+        Response::Input("What is your name?".into())
+      }
+    })
+    .mount("/sensitive-input", |_, url, _| {
+      if let Some(password) = url.query() {
+        Response::Success(format!("Your password is {}!", password))
+      } else {
+        Response::SensitiveInput("What is your password?".into())
+      }
+    })
     .run()
 }
