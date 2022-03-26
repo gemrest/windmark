@@ -29,6 +29,7 @@ impl ToString for Header {
 pub enum Response {
   Success(String),
   NotFound(String),
+  TemporaryFailure(String),
   PermanentFailure(String),
 }
 
@@ -39,6 +40,11 @@ pub(crate) fn to_value_set_status(
   match response {
     Response::Success(value) => {
       *status = 20;
+
+      value
+    }
+    Response::TemporaryFailure(value) => {
+      *status = 40;
 
       value
     }
