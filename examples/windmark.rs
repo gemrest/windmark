@@ -31,14 +31,14 @@ fn main() -> std::io::Result<()> {
     .set_error_handler(|_, _, _| {
       Response::PermanentFailure("error...".to_string())
     })
-    .set_pre_route_callback(|stream, url| {
+    .set_pre_route_callback(|stream, url, _| {
       info!(
         "accepted connection from {} to {}",
         stream.peer_addr().unwrap().ip(),
         url.to_string()
       )
     })
-    .set_post_route_callback(|stream, _url| {
+    .set_post_route_callback(|stream, _url, _| {
       info!(
         "closed connection from {}",
         stream.peer_addr().unwrap().ip()
@@ -78,8 +78,18 @@ fn main() -> std::io::Result<()> {
         windmark::utilities::queries_from_url(&url)
       ))
     })
-    .mount("/param/<lang>", |_, _url, dynamic_parameter| {
-      Response::Success(format!("Parameter lang is {:?}", dynamic_parameter))
+    .mount("/param/:lang", |_, _url, dynamic_parameter| {
+      Response::Success(format!(
+        "Parameter lang is {}",
+        dynamic_parameter.unwrap().get("lang").unwrap()
+      ))
+    })
+    .mount("/names/:first/:last", |_, _url, Some(dynamic_parameter)| {
+      Response::Success(format!(
+        "{} {}",
+        dynamic_parameter.get("first").unwrap(),
+        dynamic_parameter.get("last").unwrap()
+      ))
     })
     .mount("/input", |_, url, _| {
       if let Some(name) = url.query() {

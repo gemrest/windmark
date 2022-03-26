@@ -36,45 +36,22 @@ pub mod utilities;
 #[macro_use]
 extern crate log;
 
-use std::{collections::HashMap, lazy::SyncLazy, net::TcpStream, sync::Arc};
+use std::{net::TcpStream, sync::Arc};
 
+use matchit::Params;
 use openssl::ssl::{self, SslAcceptor, SslMethod};
-use regex::Regex;
 use url::Url;
 
 use crate::response::{to_value_set_status, Response};
 
-static DYNAMIC_PARAMETER_REGEX: SyncLazy<Regex> =
-  SyncLazy::new(|| Regex::new(r"<[a-zA-Z][0-9a-zA-Z_-]*>").unwrap());
-
-type RouteResponseHandler = fn(&TcpStream, &Url, Option<String>) -> Response;
-type CallbackHandler = fn(&TcpStream, &Url);
-type PartialHandler = fn(&TcpStream, &Url, Option<String>) -> String;
-
-#[allow(unused)]
-#[derive(Clone)]
-struct RouteResponse {
-  is_dynamic:          bool,
-  dynamics_parameters: Vec<String>,
-  handler:             RouteResponseHandler,
-}
-impl RouteResponse {
-  pub fn new(
-    is_dynamic: bool,
-    handler: RouteResponseHandler,
-    dynamics_parameters: Vec<String>,
-  ) -> Self {
-    Self {
-      is_dynamic,
-      dynamics_parameters,
-      handler,
-    }
-  }
-}
+type RouteResponseHandler =
+  fn(&TcpStream, &Url, Option<&Params<'_, '_>>) -> Response;
+type CallbackHandler = fn(&TcpStream, &Url, Option<&Params<'_, '_>>);
+type PartialHandler = fn(&TcpStream, &Url, &Params<'_, '_>) -> String;
 
 #[derive(Clone)]
 pub struct Router {
-  routes: HashMap<String, RouteResponse>,
+  routes: matchit::Router<RouteResponseHandler>,
   error_handler: RouteResponseHandler,
   private_key_file_name: String,
   certificate_chain_file_name: String,
@@ -85,7 +62,6 @@ pub struct Router {
   default_logger: bool,
   pre_route_callback: CallbackHandler,
   post_route_callback: CallbackHandler,
-  drop_trailing_slash: bool,
 }
 impl Router {
   /// Create a new `Router`
@@ -149,37 +125,16 @@ impl Router {
   ///     Response::Success("This is a test page!".into())
   ///   });
   /// ```
+  ///
+  /// # Panics
+  ///
+  /// if the route cannot be mounted.
   pub fn mount(
     &mut self,
     route: &str,
     handler: RouteResponseHandler,
   ) -> &mut Self {
-    let mut fixed_route = route.to_string();
-    let mut is_dynamic = false;
-    let dynamic_parameters = DYNAMIC_PARAMETER_REGEX
-      .find_iter(route)
-      .map(|m| m.as_str().to_string())
-      .collect::<Vec<String>>();
-
-    // println!(
-    //   "dyn: {:?}",
-    //   dynamic_parameters
-    //     .iter()
-    //     .map(|p| p.replace('<', "").replace('>', ""))
-    //     .collect::<Vec<String>>()
-    // );
-
-    if let Some(dynamic_parameter) = dynamic_parameters.get(0) {
-      fixed_route = route.replace(dynamic_parameter, "");
-      is_dynamic = true;
-    }
-
-    if !fixed_route.is_empty() {
-      self.routes.insert(
-        fixed_route,
-        RouteResponse::new(is_dynamic, handler, dynamic_parameters),
-      );
-    }
+    self.routes.insert(route, handler).unwrap();
 
     self
   }
@@ -285,8 +240,10 @@ impl Router {
   fn handle(&self, stream: &mut ssl::SslStream<std::net::TcpStream>) {
     let mut buffer = [0u8; 1024];
     let mut url = Url::parse("gemini://fuwn.me/").unwrap();
-    let fixed_url_path;
     let mut response_status = 0;
+    let mut footer = String::new();
+    let mut header = String::new();
+    let content;
 
     while let Ok(size) = stream.ssl_read(&mut buffer) {
       let content = String::from_utf8(buffer[0..size].to_vec()).unwrap();
@@ -298,76 +255,47 @@ impl Router {
       }
     }
 
-    (self.pre_route_callback)(stream.get_ref(), &url);
+    let route = self.routes.at(url.path());
 
-    let header = {
-      let header = (self.header)(stream.get_ref(), &url, None);
-
-      if header.is_empty() {
-        "".to_string()
+    (self.pre_route_callback)(stream.get_ref(), &url, {
+      if let Ok(route) = &route {
+        Some(&route.params)
       } else {
-        format!("{}\n", header)
+        None
       }
-    };
-    let footer = {
-      let footer = (self.footer)(stream.get_ref(), &url, None);
+    });
 
-      if footer.is_empty() {
-        "".to_string()
-      } else {
-        format!("\n{}", footer)
-      }
-    };
-    let content = {
-      if self.drop_trailing_slash
-        && url.path().ends_with('/')
-        && url.path() != "/"
-      {
-        fixed_url_path = url.path().trim_end_matches('/');
-      } else {
-        fixed_url_path = url.path();
-      }
+    if let Ok(ref route) = route {
+      header = {
+        let header = (self.header)(stream.get_ref(), &url, &route.params);
 
-      #[allow(clippy::option_if_let_else)]
-      if let Some(route) = self.routes.get(fixed_url_path) {
+        if header.is_empty() {
+          "".to_string()
+        } else {
+          format!("{}\n", header)
+        }
+      };
+      footer = {
+        let footer = (self.footer)(stream.get_ref(), &url, &route.params);
+
+        if footer.is_empty() {
+          "".to_string()
+        } else {
+          format!("\n{}", footer)
+        }
+      };
+      content = {
         to_value_set_status(
-          (route.handler)(stream.get_ref(), &url, None),
+          (route.value)(stream.get_ref(), &url, Some(&route.params)),
           &mut response_status,
         )
-      } else {
-        let matched_dynamics = self
-          .routes
-          .iter()
-          .filter(|(path, _)| url.path().contains(&(*path).clone()))
-          .map(|(path, _)| path.clone())
-          .filter(|path| path.matches('/').count() == 2)
-          .collect::<Vec<String>>();
-
-        if matched_dynamics.is_empty() {
-          to_value_set_status(
-            (self.error_handler)(stream.get_ref(), &url, None),
-            &mut response_status,
-          )
-        } else {
-          to_value_set_status(
-            (self
-              .routes
-              .get(matched_dynamics[0].as_str())
-              .unwrap()
-              .handler)(stream.get_ref(), &url, {
-              let raw_dynamic = url.path().replace(&matched_dynamics[0], "");
-
-              if raw_dynamic.is_empty() {
-                None
-              } else {
-                Some(raw_dynamic)
-              }
-            }),
-            &mut response_status,
-          )
-        }
-      }
-    };
+      };
+    } else {
+      content = to_value_set_status(
+        (self.error_handler)(stream.get_ref(), &url, None),
+        &mut response_status,
+      );
+    }
 
     stream
       .ssl_write(
@@ -387,7 +315,13 @@ impl Router {
       )
       .unwrap();
 
-    (self.post_route_callback)(stream.get_ref(), &url);
+    (self.post_route_callback)(stream.get_ref(), &url, {
+      if let Ok(route) = &route {
+        Some(&route.params)
+      } else {
+        None
+      }
+    });
 
     stream.shutdown().unwrap();
   }
@@ -453,7 +387,7 @@ impl Router {
   /// ```rust
   /// use log::info;
   ///
-  /// windmark::Router::new().set_pre_route_callback(|stream, _url| {
+  /// windmark::Router::new().set_pre_route_callback(|stream, _url, _| {
   ///   info!(
   ///     "accepted connection from {}",
   ///     stream.peer_addr().unwrap().ip(),
@@ -476,7 +410,7 @@ impl Router {
   /// ```rust
   /// use log::info;
   ///
-  /// windmark::Router::new().set_post_route_callback(|stream, _url| {
+  /// windmark::Router::new().set_post_route_callback(|stream, _url, _| {
   ///   info!(
   ///     "closed connection from {}",
   ///     stream.peer_addr().unwrap().ip(),
@@ -491,29 +425,11 @@ impl Router {
 
     self
   }
-
-  /// Drop the trailing slash on requests.
-  ///
-  /// Defaults to `true`.
-  ///
-  /// # Examples
-  ///
-  /// ```rust
-  /// // A request to `gemini://fuwn.me/test/` will be interpreted as
-  /// // `gemini://fuwn.me/test`. This is the recommended behaviour.
-  ///
-  /// windmark::Router::new().set_drop_trailing_slash(true);
-  /// ```
-  pub fn set_drop_trailing_slash(&mut self, drop: bool) -> &mut Self {
-    self.drop_trailing_slash = drop;
-
-    self
-  }
 }
 impl Default for Router {
   fn default() -> Self {
     Self {
-      routes: HashMap::default(),
+      routes: matchit::Router::new(),
       error_handler: |_, _, _| {
         Response::NotFound(
           "This capsule has not implemented an error handler...".to_string(),
@@ -530,9 +446,8 @@ impl Default for Router {
       ),
       #[cfg(feature = "logger")]
       default_logger: false,
-      pre_route_callback: |_, _| {},
-      post_route_callback: |_, _| {},
-      drop_trailing_slash: true,
+      pre_route_callback: |_, _, _| {},
+      post_route_callback: |_, _, _| {},
     }
   }
 }
