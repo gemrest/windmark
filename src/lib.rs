@@ -42,7 +42,7 @@ use openssl::ssl::{self, SslAcceptor, SslMethod};
 use regex::Regex;
 use url::Url;
 
-use crate::response::Response;
+use crate::response::{to_value_set_status, Response};
 
 static DYNAMIC_PARAMETER_REGEX: SyncLazy<Regex> =
   SyncLazy::new(|| Regex::new(r":[a-zA-Z][0-9a-zA-Z_-]*").unwrap());
@@ -279,7 +279,7 @@ impl Router {
     let mut buffer = [0u8; 1024];
     let mut url = Url::parse("gemini://fuwn.me/").unwrap();
     let fixed_url_path;
-    let response_status;
+    let mut response_status = 0;
 
     while let Ok(size) = stream.ssl_read(&mut buffer) {
       let content = String::from_utf8(buffer[0..size].to_vec()).unwrap();
@@ -323,23 +323,10 @@ impl Router {
 
       #[allow(clippy::option_if_let_else)]
       if let Some(route) = self.routes.get(fixed_url_path) {
-        match (route.handler)(stream.get_ref(), &url, None) {
-          Response::Success(value) => {
-            response_status = 20;
-
-            value
-          }
-          Response::NotFound(value) => {
-            response_status = 51;
-
-            value
-          }
-          Response::PermanentFailure(value) => {
-            response_status = 50;
-
-            value
-          }
-        }
+        to_value_set_status(
+          (route.handler)(stream.get_ref(), &url, None),
+          &mut response_status,
+        )
       } else {
         let matched_dynamics = self
           .routes
@@ -350,23 +337,10 @@ impl Router {
           .collect::<Vec<String>>();
 
         if matched_dynamics.is_empty() {
-          match (self.error_handler)(stream.get_ref(), &url, None) {
-            Response::Success(value) => {
-              response_status = 20;
-
-              value
-            }
-            Response::NotFound(value) => {
-              response_status = 51;
-
-              value
-            }
-            Response::PermanentFailure(value) => {
-              response_status = 50;
-
-              value
-            }
-          }
+          to_value_set_status(
+            (self.error_handler)(stream.get_ref(), &url, None),
+            &mut response_status,
+          )
         } else {
           match (self
             .routes
