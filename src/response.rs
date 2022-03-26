@@ -27,6 +27,8 @@ impl ToString for Header {
 }
 
 pub enum Response {
+  Input(String),
+  SensitiveInput(String),
   Success(String),
   NotFound(String),
   TemporaryFailure(String),
@@ -38,6 +40,16 @@ pub(crate) fn to_value_set_status(
   status: &mut i32,
 ) -> String {
   match response {
+    Response::Input(value) => {
+      *status = 10;
+
+      value
+    }
+    Response::SensitiveInput(value) => {
+      *status = 11;
+
+      value
+    }
     Response::Success(value) => {
       *status = 20;
 
