@@ -16,6 +16,8 @@
 // Copyright (C) 2022-2022 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
+//! `cargo run --example windmark --features logger`
+
 #[macro_use]
 extern crate log;
 
@@ -24,7 +26,7 @@ fn main() -> std::io::Result<()> {
     .set_private_key_file("windmark_private.pem")
     .set_certificate_chain_file("windmark_pair.pem")
     .enable_default_logger(true)
-    .set_error_handler(|_, _| "error...".to_string())
+    .set_error_handler(|_, _, _| "error...".to_string())
     .set_pre_route_callback(|stream, url| {
       info!(
         "accepted connection from {} to {}",
@@ -38,25 +40,28 @@ fn main() -> std::io::Result<()> {
         stream.peer_addr().unwrap().ip()
       )
     })
-    .set_header(|_, _| "```\nART IS COOL\n```".to_string())
-    .set_footer(|_, _| "Copyright 2022".to_string())
-    .mount("/", |_, _| {
+    .set_header(|_, _, _| "```\nART IS COOL\n```".to_string())
+    .set_footer(|_, _, _| "Copyright 2022".to_string())
+    .mount("/", |_, _, _| {
       "# INDEX\n\nWelcome!\n\n=> /test Test Page\n=> /time Unix Epoch\n"
         .to_string()
     })
-    .mount("/ip", |stream, _| {
+    .mount("/ip", |stream, _, _| {
       { format!("Hello, {}", stream.peer_addr().unwrap().ip()) }.into()
     })
-    .mount("/test", |_, _| "hi there\n=> / back".to_string())
-    .mount("/time", |_, _| {
+    .mount("/test", |_, _, _| "hi there\n=> / back".to_string())
+    .mount("/time", |_, _, _| {
       std::time::UNIX_EPOCH
         .elapsed()
         .unwrap()
         .as_nanos()
         .to_string()
     })
-    .mount("/query", |_, url| {
+    .mount("/query", |_, url, _| {
       format!("queries: {:?}", windmark::utilities::queries_from_url(&url))
+    })
+    .mount("/param/:lang", |_, _url, dynamic_parameter| {
+      format!("Parameter lang is {:?}", dynamic_parameter)
     })
     .run()
 }
