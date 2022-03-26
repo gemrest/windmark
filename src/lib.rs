@@ -41,17 +41,17 @@ use url::Url;
 
 #[derive(Clone)]
 pub struct Router {
-  routes: HashMap<String, fn(&TcpStream) -> String>,
-  error_handler: fn(&TcpStream) -> String,
+  routes: HashMap<String, fn(&TcpStream, &Url) -> String>,
+  error_handler: fn(&TcpStream, &Url) -> String,
   private_key_file_name: String,
   certificate_chain_file_name: String,
-  header: fn(&TcpStream) -> String,
-  footer: fn(&TcpStream) -> String,
+  header: fn(&TcpStream, &Url) -> String,
+  footer: fn(&TcpStream, &Url) -> String,
   ssl_acceptor: Arc<SslAcceptor>,
   #[cfg(feature = "logger")]
   default_logger: bool,
-  pre_route_callback: fn(&TcpStream),
-  post_route_callback: fn(&TcpStream),
+  pre_route_callback: fn(&TcpStream, &Url),
+  post_route_callback: fn(&TcpStream, &Url),
 }
 impl Router {
   /// Create a new `Router`
@@ -106,13 +106,13 @@ impl Router {
   ///
   /// ```rust
   /// windmark::Router::new()
-  ///   .mount("/", |_| "This is the index page!".into())
-  ///   .mount("/test", |_| "This is a test page!".into());
+  ///   .mount("/", |_, _| "This is the index page!".into())
+  ///   .mount("/test", |_, _| "This is a test page!".into());
   /// ```
   pub fn mount(
     &mut self,
     route: &str,
-    handler: fn(&TcpStream) -> String,
+    handler: fn(&TcpStream, &Url) -> String,
   ) -> &mut Self {
     self.routes.insert(route.to_string(), handler);
 
@@ -125,11 +125,11 @@ impl Router {
   ///
   /// ```rust
   /// windmark::Router::new()
-  ///   .set_error_handler(|_| "You have encountered an error!".into());
+  ///   .set_error_handler(|_, _| "You have encountered an error!".into());
   /// ```
   pub fn set_error_handler(
     &mut self,
-    handler: fn(&TcpStream) -> String,
+    handler: fn(&TcpStream, &Url) -> String,
   ) -> &mut Self {
     self.error_handler = handler;
 
@@ -141,11 +141,14 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().set_header(|_| {
+  /// windmark::Router::new().set_header(|_, _| {
   ///   "This will be displayed on every route! (at the top)".into()
   /// });
   /// ```
-  pub fn set_header(&mut self, handler: fn(&TcpStream) -> String) -> &mut Self {
+  pub fn set_header(
+    &mut self,
+    handler: fn(&TcpStream, &Url) -> String,
+  ) -> &mut Self {
     self.header = handler;
 
     self
@@ -156,11 +159,14 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().set_footer(|_| {
+  /// windmark::Router::new().set_footer(|_, _| {
   ///   "This will be displayed on every route! (at the bottom)".into()
   /// });
   /// ```
-  pub fn set_footer(&mut self, handler: fn(&TcpStream) -> String) -> &mut Self {
+  pub fn set_footer(
+    &mut self,
+    handler: fn(&TcpStream, &Url) -> String,
+  ) -> &mut Self {
     self.footer = handler;
 
     self
@@ -228,14 +234,14 @@ impl Router {
       }
     }
 
-    (self.pre_route_callback)(stream.get_ref());
+    (self.pre_route_callback)(stream.get_ref(), &url);
 
     stream
       .ssl_write(
         format!(
           "20 text/gemini; charset=utf-8\r\n{}{}{}",
           {
-            let header = (self.header)(stream.get_ref());
+            let header = (self.header)(stream.get_ref(), &url);
 
             if header.is_empty() {
               "".to_string()
@@ -244,10 +250,11 @@ impl Router {
             }
           },
           self.routes.get(url.path()).unwrap_or(&self.error_handler)(
-            stream.get_ref()
+            stream.get_ref(),
+            &url
           ),
           {
-            let footer = (self.footer)(stream.get_ref());
+            let footer = (self.footer)(stream.get_ref(), &url);
 
             if footer.is_empty() {
               "".to_string()
@@ -260,7 +267,7 @@ impl Router {
       )
       .unwrap();
 
-    (self.post_route_callback)(stream.get_ref());
+    (self.post_route_callback)(stream.get_ref(), &url);
 
     stream.shutdown().unwrap();
   }
@@ -326,7 +333,7 @@ impl Router {
   /// ```rust
   /// use log::info;
   ///
-  /// windmark::Router::new().set_pre_route_callback(|stream| {
+  /// windmark::Router::new().set_pre_route_callback(|stream, _url| {
   ///   info!(
   ///     "accepted connection from {}",
   ///     stream.peer_addr().unwrap().ip(),
@@ -335,7 +342,7 @@ impl Router {
   /// ```
   pub fn set_pre_route_callback(
     &mut self,
-    callback: fn(&TcpStream),
+    callback: fn(&TcpStream, &Url),
   ) -> &mut Self {
     self.pre_route_callback = callback;
 
@@ -349,7 +356,7 @@ impl Router {
   /// ```rust
   /// use log::info;
   ///
-  /// windmark::Router::new().set_post_route_callback(|stream| {
+  /// windmark::Router::new().set_post_route_callback(|stream, _url| {
   ///   info!(
   ///     "closed connection from {}",
   ///     stream.peer_addr().unwrap().ip(),
@@ -358,7 +365,7 @@ impl Router {
   /// ```
   pub fn set_post_route_callback(
     &mut self,
-    callback: fn(&TcpStream),
+    callback: fn(&TcpStream, &Url),
   ) -> &mut Self {
     self.post_route_callback = callback;
 
@@ -369,13 +376,13 @@ impl Default for Router {
   fn default() -> Self {
     Self {
       routes: HashMap::default(),
-      error_handler: |_| {
+      error_handler: |_, _| {
         "This capsule has not implemented an error handler...".to_string()
       },
       private_key_file_name: "".to_string(),
       certificate_chain_file_name: "".to_string(),
-      header: |_| "".to_string(),
-      footer: |_| "".to_string(),
+      header: |_, _| "".to_string(),
+      footer: |_, _| "".to_string(),
       ssl_acceptor: Arc::new(
         SslAcceptor::mozilla_intermediate(SslMethod::tls())
           .unwrap()
@@ -383,8 +390,8 @@ impl Default for Router {
       ),
       #[cfg(feature = "logger")]
       default_logger: false,
-      pre_route_callback: |_| {},
-      post_route_callback: |_| {},
+      pre_route_callback: |_, _| {},
+      post_route_callback: |_, _| {},
     }
   }
 }
