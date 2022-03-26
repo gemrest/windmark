@@ -8,6 +8,8 @@ Windmark is a simple and highly performant Gemini server framework.
 
 ## Usage
 
+### Add Windmark as a dependency
+
 ```toml
 # Cargo.toml
 
@@ -16,6 +18,21 @@ windmark = "0.1.0"
 
 # If you would like to use the built-in logger (reccomended)
 # windmark = { version = "0.1.0", features = ["logger"] }
+```
+
+### Implement a Windmark server
+
+```rust
+use windmark::response::Response;
+
+fn main() -> std::io::Result<()> {
+  windmark::Router::new()
+    .mount("/", |_, _, _| Response::Success("Hello, World!".into()))
+    .set_error_handler(|_, _, _| {
+      Response::PermanentFailure("This route does not exist!".into())
+    })
+    .run()
+}
 ```
 
 ## Examples
