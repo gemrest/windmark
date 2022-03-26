@@ -42,11 +42,14 @@ use openssl::ssl::{self, SslAcceptor, SslMethod};
 use regex::Regex;
 use url::Url;
 
+use crate::response::Response;
+
 static DYNAMIC_PARAMETER_REGEX: SyncLazy<Regex> =
   SyncLazy::new(|| Regex::new(r":[a-zA-Z][0-9a-zA-Z_-]*").unwrap());
 
-type RouteResponseHandler = fn(&TcpStream, &Url, Option<String>) -> String;
+type RouteResponseHandler = fn(&TcpStream, &Url, Option<String>) -> Response;
 type CallbackHandler = fn(&TcpStream, &Url);
+type PartialHandler = fn(&TcpStream, &Url, Option<String>) -> String;
 
 #[allow(unused)]
 #[derive(Clone)]
@@ -75,8 +78,8 @@ pub struct Router {
   error_handler: RouteResponseHandler,
   private_key_file_name: String,
   certificate_chain_file_name: String,
-  header: RouteResponseHandler,
-  footer: RouteResponseHandler,
+  header: PartialHandler,
+  footer: PartialHandler,
   ssl_acceptor: Arc<SslAcceptor>,
   #[cfg(feature = "logger")]
   default_logger: bool,
@@ -136,9 +139,15 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
+  /// use windmark::response::Response;
+  ///
   /// windmark::Router::new()
-  ///   .mount("/", |_, _, _| "This is the index page!".into())
-  ///   .mount("/test", |_, _, _| "This is a test page!".into());
+  ///   .mount("/", |_, _, _| {
+  ///     Response::Success("This is the index page!".into())
+  ///   })
+  ///   .mount("/test", |_, _, _| {
+  ///     Response::Success("This is a test page!".into())
+  ///   });
   /// ```
   pub fn mount(
     &mut self,
@@ -172,8 +181,11 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new()
-  ///   .set_error_handler(|_, _, _| "You have encountered an error!".into());
+  /// windmark::Router::new().set_error_handler(|_, _, _| {
+  ///   windmark::response::Response::Success(
+  ///     "You have encountered an error!".into(),
+  ///   )
+  /// });
   /// ```
   pub fn set_error_handler(
     &mut self,
@@ -193,7 +205,7 @@ impl Router {
   ///   "This will be displayed on every route! (at the top)".into()
   /// });
   /// ```
-  pub fn set_header(&mut self, handler: RouteResponseHandler) -> &mut Self {
+  pub fn set_header(&mut self, handler: PartialHandler) -> &mut Self {
     self.header = handler;
 
     self
@@ -208,7 +220,7 @@ impl Router {
   ///   "This will be displayed on every route! (at the bottom)".into()
   /// });
   /// ```
-  pub fn set_footer(&mut self, handler: RouteResponseHandler) -> &mut Self {
+  pub fn set_footer(&mut self, handler: PartialHandler) -> &mut Self {
     self.footer = handler;
 
     self
@@ -262,10 +274,12 @@ impl Router {
     Ok(())
   }
 
+  #[allow(clippy::too_many_lines)]
   fn handle(&self, stream: &mut ssl::SslStream<std::net::TcpStream>) {
     let mut buffer = [0u8; 1024];
     let mut url = Url::parse("gemini://fuwn.me/").unwrap();
     let fixed_url_path;
+    let response_status;
 
     while let Ok(size) = stream.ssl_read(&mut buffer) {
       let content = String::from_utf8(buffer[0..size].to_vec()).unwrap();
@@ -279,72 +293,127 @@ impl Router {
 
     (self.pre_route_callback)(stream.get_ref(), &url);
 
+    let header = {
+      let header = (self.header)(stream.get_ref(), &url, None);
+
+      if header.is_empty() {
+        "".to_string()
+      } else {
+        format!("{}\n", header)
+      }
+    };
+    let footer = {
+      let footer = (self.footer)(stream.get_ref(), &url, None);
+
+      if footer.is_empty() {
+        "".to_string()
+      } else {
+        format!("\n{}", footer)
+      }
+    };
+    let content = {
+      if self.drop_trailing_slash
+        && url.path().ends_with('/')
+        && url.path() != "/"
+      {
+        fixed_url_path = url.path().trim_end_matches('/');
+      } else {
+        fixed_url_path = url.path();
+      }
+
+      #[allow(clippy::option_if_let_else)]
+      if let Some(route) = self.routes.get(fixed_url_path) {
+        match (route.handler)(stream.get_ref(), &url, None) {
+          Response::Success(value) => {
+            response_status = 20;
+
+            value
+          }
+          Response::NotFound(value) => {
+            response_status = 51;
+
+            value
+          }
+          Response::PermanentFailure(value) => {
+            response_status = 50;
+
+            value
+          }
+        }
+      } else {
+        let matched_dynamics = self
+          .routes
+          .iter()
+          .filter(|(path, _)| url.path().contains(&(*path).clone()))
+          .map(|(path, _)| path.clone())
+          .filter(|path| path.matches('/').count() == 2)
+          .collect::<Vec<String>>();
+
+        if matched_dynamics.is_empty() {
+          match (self.error_handler)(stream.get_ref(), &url, None) {
+            Response::Success(value) => {
+              response_status = 20;
+
+              value
+            }
+            Response::NotFound(value) => {
+              response_status = 51;
+
+              value
+            }
+            Response::PermanentFailure(value) => {
+              response_status = 50;
+
+              value
+            }
+          }
+        } else {
+          match (self
+            .routes
+            .get(matched_dynamics[0].as_str())
+            .unwrap()
+            .handler)(stream.get_ref(), &url, {
+            let raw_dynamic = url.path().replace(&matched_dynamics[0], "");
+
+            if raw_dynamic.is_empty() {
+              None
+            } else {
+              Some(raw_dynamic)
+            }
+          }) {
+            Response::Success(value) => {
+              response_status = 20;
+
+              value
+            }
+            Response::NotFound(value) => {
+              response_status = 51;
+
+              value
+            }
+            Response::PermanentFailure(value) => {
+              response_status = 50;
+
+              value
+            }
+          }
+        }
+      }
+    };
+
     stream
       .ssl_write(
         format!(
-          "20 text/gemini; charset=utf-8\r\n{}{}{}",
-          {
-            let header = (self.header)(stream.get_ref(), &url, None);
-
-            if header.is_empty() {
-              "".to_string()
-            } else {
-              format!("{}\n", header)
-            }
+          "{}{}\r\n{}",
+          response_status,
+          match response_status {
+            50 | 51 => &*content,
+            _ => " text/gemini; charset=utf-8",
           },
-          {
-            if self.drop_trailing_slash
-              && url.path().ends_with('/')
-              && url.path() != "/"
-            {
-              fixed_url_path = url.path().trim_end_matches('/');
-            } else {
-              fixed_url_path = url.path();
-            }
-
-            #[allow(clippy::option_if_let_else)]
-            if let Some(route) = self.routes.get(fixed_url_path) {
-              println!("non dynamic");
-
-              (route.handler)(stream.get_ref(), &url, None)
-            } else {
-              let matched_dynamics = self
-                .routes
-                .iter()
-                .filter(|(path, _)| url.path().contains(&(*path).clone()))
-                .map(|(path, _)| path.clone())
-                .filter(|path| path.matches('/').count() == 2)
-                .collect::<Vec<String>>();
-
-              if matched_dynamics.is_empty() {
-                (self.error_handler)(stream.get_ref(), &url, None)
-              } else {
-                (self
-                  .routes
-                  .get(matched_dynamics[0].as_str())
-                  .unwrap()
-                  .handler)(stream.get_ref(), &url, {
-                  let raw_dynamic =
-                    url.path().replace(&matched_dynamics[0], "");
-
-                  if raw_dynamic.is_empty() {
-                    None
-                  } else {
-                    Some(raw_dynamic)
-                  }
-                })
-              }
-            }
-          },
-          {
-            let footer = (self.footer)(stream.get_ref(), &url, None);
-
-            if footer.is_empty() {
-              "".to_string()
-            } else {
-              format!("\n{}", footer)
-            }
-          },
+          match response_status {
+            50 | 51 => "".to_string(),
+            _ => format!("{}{}{}", header, content, footer),
+          }
         )
         .as_bytes(),
       )
@@ -478,7 +547,9 @@ impl Default for Router {
     Self {
       routes: HashMap::default(),
       error_handler: |_, _, _| {
-        "This capsule has not implemented an error handler...".to_string()
+        Response::NotFound(
+          "This capsule has not implemented an error handler...".to_string(),
+        )
       },
       private_key_file_name: "".to_string(),
       certificate_chain_file_name: "".to_string(),

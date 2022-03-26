@@ -25,3 +25,9 @@ impl ToString for Header {
     format!("{} {}\r\n", self.status as u8, self.meta)
   }
 }
+
+pub enum Response {
+  Success(String),
+  NotFound(String),
+  PermanentFailure(String),
+}
