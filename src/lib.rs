@@ -274,7 +274,6 @@ impl Router {
     Ok(())
   }
 
-  #[allow(clippy::too_many_lines)]
   fn handle(&self, stream: &mut ssl::SslStream<std::net::TcpStream>) {
     let mut buffer = [0u8; 1024];
     let mut url = Url::parse("gemini://fuwn.me/").unwrap();
@@ -342,35 +341,22 @@ impl Router {
             &mut response_status,
           )
         } else {
-          match (self
-            .routes
-            .get(matched_dynamics[0].as_str())
-            .unwrap()
-            .handler)(stream.get_ref(), &url, {
-            let raw_dynamic = url.path().replace(&matched_dynamics[0], "");
+          to_value_set_status(
+            (self
+              .routes
+              .get(matched_dynamics[0].as_str())
+              .unwrap()
+              .handler)(stream.get_ref(), &url, {
+              let raw_dynamic = url.path().replace(&matched_dynamics[0], "");
 
-            if raw_dynamic.is_empty() {
-              None
-            } else {
-              Some(raw_dynamic)
-            }
-          }) {
-            Response::Success(value) => {
-              response_status = 20;
-
-              value
-            }
-            Response::NotFound(value) => {
-              response_status = 51;
-
-              value
-            }
-            Response::PermanentFailure(value) => {
-              response_status = 50;
-
-              value
-            }
-          }
+              if raw_dynamic.is_empty() {
+                None
+              } else {
+                Some(raw_dynamic)
+              }
+            }),
+            &mut response_status,
+          )
         }
       }
     };
