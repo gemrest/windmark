@@ -105,10 +105,10 @@ impl Router {
   ///
   /// ```rust
   /// windmark::Router::new()
-  ///   .get("/", |_| "This is the index page!".into())
-  ///   .get("/test", |_| "This is a test page!".into());
+  ///   .mount("/", |_| "This is the index page!".into())
+  ///   .mount("/test", |_| "This is a test page!".into());
   /// ```
-  pub fn get(
+  pub fn mount(
     &mut self,
     route: &str,
     handler: fn(&TcpStream) -> String,
