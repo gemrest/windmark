@@ -28,9 +28,7 @@ fn main() -> std::io::Result<()> {
     .set_private_key_file("windmark_private.pem")
     .set_certificate_chain_file("windmark_pair.pem")
     .enable_default_logger(true)
-    .set_error_handler(|_, _, _| {
-      Response::PermanentFailure("error...".to_string())
-    })
+    .set_error_handler(|_| Response::PermanentFailure("error...".to_string()))
     .set_pre_route_callback(|stream, url, _| {
       info!(
         "accepted connection from {} to {}",
@@ -44,26 +42,26 @@ fn main() -> std::io::Result<()> {
         stream.peer_addr().unwrap().ip()
       )
     })
-    .set_header(|_, _, _| "```\nART IS COOL\n```".to_string())
-    .set_footer(|_, _, _| "Copyright 2022".to_string())
-    .mount("/", |_, _, _| {
+    .set_header(|_| "```\nART IS COOL\n```".to_string())
+    .set_footer(|_| "Copyright 2022".to_string())
+    .mount("/", |_| {
       Response::Success(
         "# INDEX\n\nWelcome!\n\n=> /test Test Page\n=> /time Unix Epoch\n"
           .to_string(),
       )
     })
-    .mount("/ip", |stream, _, _| {
+    .mount("/ip", |context| {
       Response::Success(
-        { format!("Hello, {}", stream.peer_addr().unwrap().ip()) }.into(),
+        { format!("Hello, {}", context.tcp.peer_addr().unwrap().ip()) }.into(),
       )
     })
-    .mount("/test", |_, _, _| {
+    .mount("/test", |_| {
       Response::Success("hi there\n=> / back".to_string())
     })
-    .mount("/temporary-failure", |_, _, _| {
+    .mount("/temporary-failure", |_| {
       Response::TemporaryFailure("Woops, temporarily...".into())
     })
-    .mount("/time", |_, _, _| {
+    .mount("/time", |_| {
       Response::Success(
         std::time::UNIX_EPOCH
           .elapsed()
@@ -72,34 +70,34 @@ fn main() -> std::io::Result<()> {
           .to_string(),
       )
     })
-    .mount("/query", |_, url, _| {
+    .mount("/query", |context| {
       Response::Success(format!(
         "queries: {:?}",
-        windmark::utilities::queries_from_url(&url)
+        windmark::utilities::queries_from_url(&context.url)
       ))
     })
-    .mount("/param/:lang", |_, _url, dynamic_parameter| {
+    .mount("/param/:lang", |context| {
       Response::Success(format!(
         "Parameter lang is {}",
-        dynamic_parameter.unwrap().get("lang").unwrap()
+        context.params.get("lang").unwrap()
       ))
     })
-    .mount("/names/:first/:last", |_, _url, Some(dynamic_parameter)| {
+    .mount("/names/:first/:last", |context| {
       Response::Success(format!(
         "{} {}",
-        dynamic_parameter.get("first").unwrap(),
-        dynamic_parameter.get("last").unwrap()
+        context.params.get("first").unwrap(),
+        context.params.get("last").unwrap()
       ))
     })
-    .mount("/input", |_, url, _| {
-      if let Some(name) = url.query() {
+    .mount("/input", |context| {
+      if let Some(name) = context.url.query() {
         Response::Success(format!("Your name is {}!", name))
       } else {
         Response::Input("What is your name?".into())
       }
     })
-    .mount("/sensitive-input", |_, url, _| {
-      if let Some(password) = url.query() {
+    .mount("/sensitive-input", |context| {
+      if let Some(password) = context.url.query() {
         Response::Success(format!("Your password is {}!", password))
       } else {
         Response::SensitiveInput("What is your password?".into())
