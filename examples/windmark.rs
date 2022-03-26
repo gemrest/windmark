@@ -55,5 +55,8 @@ fn main() -> std::io::Result<()> {
         .as_nanos()
         .to_string()
     })
+    .mount("/query", |_, url| {
+      format!("queries: {:?}", windmark::utilities::queries_from_url(&url))
+    })
     .run()
 }
