@@ -60,6 +60,9 @@ fn main() -> std::io::Result<()> {
     .mount("/test", |_, _, _| {
       Response::Success("hi there\n=> / back".to_string())
     })
+    .mount("/temporary-failure", |_, _, _| {
+      Response::TemporaryFailure("Woops, temporarily...".into())
+    })
     .mount("/time", |_, _, _| {
       Response::Success(
         std::time::UNIX_EPOCH

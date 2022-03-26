@@ -367,11 +367,11 @@ impl Router {
           "{}{}\r\n{}",
           response_status,
           match response_status {
-            50 | 51 => &*content,
+            40 | 50 | 51 => &*content,
             _ => " text/gemini; charset=utf-8",
           },
           match response_status {
-            50 | 51 => "".to_string(),
+            40 | 50 | 51 => "".to_string(),
             _ => format!("{}{}{}", header, content, footer),
           }
         )
