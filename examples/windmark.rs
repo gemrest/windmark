@@ -78,7 +78,7 @@ fn main() -> std::io::Result<()> {
         windmark::utilities::queries_from_url(&url)
       ))
     })
-    .mount("/param/:lang", |_, _url, dynamic_parameter| {
+    .mount("/param/<lang>", |_, _url, dynamic_parameter| {
       Response::Success(format!("Parameter lang is {:?}", dynamic_parameter))
     })
     .mount("/input", |_, url, _| {
