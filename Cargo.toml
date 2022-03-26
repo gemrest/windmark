@@ -23,8 +23,11 @@ openssl = "0.10.38"
 # tokio = { version = "1.17.0", features = ["full"] }
 # tokio-openssl = "0.5.0"
 # tokio-uds = "0.2.7"
-url = "2.2.2"
 
 # Logging
 pretty_env_logger = { version = "0.4.0", optional = true }
 log = { version = "0.4.16", optional = true }
+
+# URL
+url = "2.2.2"
+regex = "1.5.5"
