@@ -29,6 +29,7 @@
 #![recursion_limit = "128"]
 
 pub mod response;
+pub(crate) mod returnable;
 pub mod status;
 pub mod utilities;
 
@@ -42,17 +43,20 @@ use matchit::Params;
 use openssl::ssl::{self, SslAcceptor, SslMethod};
 use url::Url;
 
-use crate::response::{to_value_set_status, Response};
+use crate::{
+  response::{to_value_set_status, Response},
+  returnable::{ErrorContext, RouteContext},
+};
 
-type RouteResponseHandler =
-  fn(&TcpStream, &Url, Option<&Params<'_, '_>>) -> Response;
+type RouteResponseHandler = fn(RouteContext<'_>) -> Response;
+type ErrorResponseHandler = fn(ErrorContext<'_>) -> Response;
 type CallbackHandler = fn(&TcpStream, &Url, Option<&Params<'_, '_>>);
-type PartialHandler = fn(&TcpStream, &Url, &Params<'_, '_>) -> String;
+type PartialHandler = fn(RouteContext<'_>) -> String;
 
 #[derive(Clone)]
 pub struct Router {
   routes: matchit::Router<RouteResponseHandler>,
-  error_handler: RouteResponseHandler,
+  error_handler: ErrorResponseHandler,
   private_key_file_name: String,
   certificate_chain_file_name: String,
   header: PartialHandler,
@@ -118,10 +122,8 @@ impl Router {
   /// use windmark::response::Response;
   ///
   /// windmark::Router::new()
-  ///   .mount("/", |_, _, _| {
-  ///     Response::Success("This is the index page!".into())
-  ///   })
-  ///   .mount("/test", |_, _, _| {
+  ///   .mount("/", |_| Response::Success("This is the index page!".into()))
+  ///   .mount("/test", |_| {
   ///     Response::Success("This is a test page!".into())
   ///   });
   /// ```
@@ -144,7 +146,7 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().set_error_handler(|_, _, _| {
+  /// windmark::Router::new().set_error_handler(|_| {
   ///   windmark::response::Response::Success(
   ///     "You have encountered an error!".into(),
   ///   )
@@ -152,7 +154,7 @@ impl Router {
   /// ```
   pub fn set_error_handler(
     &mut self,
-    handler: RouteResponseHandler,
+    handler: ErrorResponseHandler,
   ) -> &mut Self {
     self.error_handler = handler;
 
@@ -164,8 +166,8 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().set_header(|_, _, _| {
-  ///   "This will be displayed on every route! (at the top)".into()
+  /// windmark::Router::new().set_header(|context| {
+  ///   format!("This is displayed at the top of {}!", context.url.path())
   /// });
   /// ```
   pub fn set_header(&mut self, handler: PartialHandler) -> &mut Self {
@@ -179,8 +181,8 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().set_footer(|_, _, _| {
-  ///   "This will be displayed on every route! (at the bottom)".into()
+  /// windmark::Router::new().set_footer(|context| {
+  ///   format!("This is displayed at the bottom of {}!", context.url.path())
   /// });
   /// ```
   pub fn set_footer(&mut self, handler: PartialHandler) -> &mut Self {
@@ -267,7 +269,11 @@ impl Router {
 
     if let Ok(ref route) = route {
       header = {
-        let header = (self.header)(stream.get_ref(), &url, &route.params);
+        let header = (self.header)(RouteContext::new(
+          stream.get_ref(),
+          &url,
+          &route.params,
+        ));
 
         if header.is_empty() {
           "".to_string()
@@ -276,7 +282,11 @@ impl Router {
         }
       };
       footer = {
-        let footer = (self.footer)(stream.get_ref(), &url, &route.params);
+        let footer = (self.footer)(RouteContext::new(
+          stream.get_ref(),
+          &url,
+          &route.params,
+        ));
 
         if footer.is_empty() {
           "".to_string()
@@ -286,13 +296,17 @@ impl Router {
       };
       content = {
         to_value_set_status(
-          (route.value)(stream.get_ref(), &url, Some(&route.params)),
+          (route.value)(RouteContext::new(
+            stream.get_ref(),
+            &url,
+            &route.params,
+          )),
           &mut response_status,
         )
       };
     } else {
       content = to_value_set_status(
-        (self.error_handler)(stream.get_ref(), &url, None),
+        (self.error_handler)(ErrorContext::new(stream.get_ref(), &url)),
         &mut response_status,
       );
     }
@@ -430,15 +444,15 @@ impl Default for Router {
   fn default() -> Self {
     Self {
       routes: matchit::Router::new(),
-      error_handler: |_, _, _| {
+      error_handler: |_| {
         Response::NotFound(
           "This capsule has not implemented an error handler...".to_string(),
         )
       },
       private_key_file_name: "".to_string(),
       certificate_chain_file_name: "".to_string(),
-      header: |_, _, _| "".to_string(),
-      footer: |_, _, _| "".to_string(),
+      header: |_| "".to_string(),
+      footer: |_| "".to_string(),
       ssl_acceptor: Arc::new(
         SslAcceptor::mozilla_intermediate(SslMethod::tls())
           .unwrap()
