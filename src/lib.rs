@@ -29,6 +29,7 @@
 
 pub mod response;
 pub mod status;
+pub mod utilities;
 
 #[cfg(feature = "logger")]
 #[macro_use]
