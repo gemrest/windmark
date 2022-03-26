@@ -39,15 +39,15 @@ fn main() -> std::io::Result<()> {
     })
     .set_header(|_| "```\nART IS COOL\n```".to_string())
     .set_footer(|_| "Copyright 2022".to_string())
-    .get("/", |_| {
+    .mount("/", |_| {
       "# INDEX\n\nWelcome!\n\n=> /test Test Page\n=> /time Unix Epoch\n"
         .to_string()
     })
-    .get("/ip", |stream| {
+    .mount("/ip", |stream| {
       { format!("Hello, {}", stream.peer_addr().unwrap().ip()) }.into()
     })
-    .get("/test", |_| "hi there\n=> / back".to_string())
-    .get("/time", |_| {
+    .mount("/test", |_| "hi there\n=> / back".to_string())
+    .mount("/time", |_| {
       std::time::UNIX_EPOCH
         .elapsed()
         .unwrap()
