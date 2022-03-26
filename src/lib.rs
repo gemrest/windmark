@@ -48,6 +48,7 @@ pub struct Router {
   header: fn(&TcpStream) -> String,
   footer: fn(&TcpStream) -> String,
   ssl_acceptor: Arc<SslAcceptor>,
+  #[cfg(feature = "logger")]
   default_logger: bool,
   pre_route_callback: fn(&TcpStream),
   post_route_callback: fn(&TcpStream),
@@ -310,6 +311,7 @@ impl Router {
   /// Enabled the default logger (the
   /// [`pretty_env_logger`](https://crates.io/crates/pretty_env_logger) and
   /// [`log`](https://crates.io/crates/log) crates).
+  #[cfg(feature = "logger")]
   pub fn enable_default_logger(&mut self, enable: bool) -> &mut Self {
     self.default_logger = enable;
     std::env::set_var("RUST_LOG", "trace");
@@ -379,6 +381,7 @@ impl Default for Router {
           .unwrap()
           .build(),
       ),
+      #[cfg(feature = "logger")]
       default_logger: false,
       pre_route_callback: |_| {},
       post_route_callback: |_| {},
