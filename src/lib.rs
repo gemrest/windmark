@@ -51,10 +51,10 @@
 //!   windmark::Router::new()
 //!     .set_private_key_file("windmark_private.pem")
 //!     .set_certificate_chain_file("windmark_pair.pem")
-//!     .mount("/", |_| Response::Success("Hello, World!".into()))
-//!     .set_error_handler(|_| {
+//!     .mount("/", Box::new(|_| Response::Success("Hello, World!".into())))
+//!     .set_error_handler(Box::new(|_| {
 //!       Response::PermanentFailure("This route does not exist!".into())
-//!     })
+//!     }))
 //!     .run()
 //!     .await
 //! }
@@ -114,7 +114,7 @@ use crate::{
 /// response generation, panics, logging, and more.
 #[derive(Clone)]
 pub struct Router {
-  routes: matchit::Router<RouteResponse>,
+  routes: matchit::Router<Arc<Mutex<RouteResponse>>>,
   error_handler: Arc<Mutex<ErrorResponse>>,
   private_key_file_name: String,
   certificate_chain_file_name: String,
@@ -183,17 +183,24 @@ impl Router {
   /// use windmark::Response;
   ///
   /// windmark::Router::new()
-  ///   .mount("/", |_| Response::Success("This is the index page!".into()))
-  ///   .mount("/test", |_| {
-  ///     Response::Success("This is a test page!".into())
-  ///   });
+  ///   .mount(
+  ///     "/",
+  ///     Box::new(|_| Response::Success("This is the index page!".into())),
+  ///   )
+  ///   .mount(
+  ///     "/test",
+  ///     Box::new(|_| Response::Success("This is a test page!".into())),
+  ///   );
   /// ```
   ///
   /// # Panics
   ///
   /// if the route cannot be mounted.
   pub fn mount(&mut self, route: &str, handler: RouteResponse) -> &mut Self {
-    self.routes.insert(route, handler).unwrap();
+    self
+      .routes
+      .insert(route, Arc::new(Mutex::new(handler)))
+      .unwrap();
 
     self
   }
@@ -203,9 +210,9 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().set_error_handler(|_| {
+  /// windmark::Router::new().set_error_handler(Box::new(|_| {
   ///   windmark::Response::Success("You have encountered an error!".into())
-  /// });
+  /// }));
   /// ```
   pub fn set_error_handler(&mut self, handler: ErrorResponse) -> &mut Self {
     self.error_handler = Arc::new(Mutex::new(handler));
@@ -218,9 +225,9 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().set_header(|context| {
+  /// windmark::Router::new().set_header(Box::new(|context| {
   ///   format!("This is displayed at the top of {}!", context.url.path())
-  /// });
+  /// }));
   /// ```
   pub fn set_header(&mut self, handler: Partial) -> &mut Self {
     self.header = Arc::new(Mutex::new(handler));
@@ -233,9 +240,9 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().set_footer(|context| {
+  /// windmark::Router::new().set_footer(Box::new(|context| {
   ///   format!("This is displayed at the bottom of {}!", context.url.path())
-  /// });
+  /// }));
   /// ```
   pub fn set_footer(&mut self, handler: Partial) -> &mut Self {
     self.footer = Arc::new(Mutex::new(handler));
@@ -357,11 +364,11 @@ impl Router {
       };
       content = {
         to_value_set_status(
-          (route.value)(RouteContext::new(
+          (*route.value).lock().unwrap().call_mut((RouteContext::new(
             stream.get_ref(),
             &url,
             &route.params,
-          )),
+          ),)),
           &mut response_status,
         )
       };
@@ -518,12 +525,14 @@ impl Router {
   /// ```rust
   /// use log::info;
   ///
-  /// windmark::Router::new().set_pre_route_callback(|stream, _url, _| {
-  ///   info!(
-  ///     "accepted connection from {}",
-  ///     stream.peer_addr().unwrap().ip(),
-  ///   )
-  /// });
+  /// windmark::Router::new().set_pre_route_callback(Box::new(
+  ///   |stream, _url, _| {
+  ///     info!(
+  ///       "accepted connection from {}",
+  ///       stream.peer_addr().unwrap().ip(),
+  ///     )
+  ///   },
+  /// ));
   /// ```
   pub fn set_pre_route_callback(&mut self, callback: Callback) -> &mut Self {
     self.pre_route_callback = Arc::new(Mutex::new(callback));
@@ -538,12 +547,14 @@ impl Router {
   /// ```rust
   /// use log::info;
   ///
-  /// windmark::Router::new().set_post_route_callback(|stream, _url, _| {
-  ///   info!(
-  ///     "closed connection from {}",
-  ///     stream.peer_addr().unwrap().ip(),
-  ///   )
-  /// });
+  /// windmark::Router::new().set_post_route_callback(Box::new(
+  ///   |stream, _url, _| {
+  ///     info!(
+  ///       "closed connection from {}",
+  ///       stream.peer_addr().unwrap().ip(),
+  ///     )
+  ///   },
+  /// ));
   /// ```
   pub fn set_post_route_callback(&mut self, callback: Callback) -> &mut Self {
     self.post_route_callback = Arc::new(Mutex::new(callback));
@@ -562,12 +573,15 @@ impl Router {
   /// use windmark::Response;
   ///
   /// windmark::Router::new().attach(|r| {
-  ///   r.mount("/module", |_| Response::Success("This is a module!".into()));
-  ///   r.set_error_handler(|_| {
+  ///   r.mount(
+  ///     "/module",
+  ///     Box::new(|_| Response::Success("This is a module!".into())),
+  ///   );
+  ///   r.set_error_handler(Box::new(|_| {
   ///     Response::NotFound(
   ///       "This error handler has been implemented by a module!".into(),
   ///     )
-  ///   });
+  ///   }));
   /// });
   /// ```
   pub fn attach<F>(&mut self, mut module: F) -> &mut Self
