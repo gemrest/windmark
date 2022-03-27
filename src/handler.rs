@@ -18,7 +18,8 @@
 
 use crate::{returnable::RouteContext, Response};
 
-pub type RouteResponse = fn(RouteContext<'_>) -> Response<'_>;
+pub type RouteResponse =
+  Box<dyn FnMut(RouteContext<'_>) -> Response<'_> + Send + Sync>;
 pub type ErrorResponse = Box<
   dyn FnMut(crate::returnable::ErrorContext<'_>) -> Response<'_> + Send + Sync,
 >;
