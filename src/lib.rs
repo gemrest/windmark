@@ -250,18 +250,18 @@ impl Router {
   async fn handle(
     &self,
     stream: &mut tokio_openssl::SslStream<tokio::net::TcpStream>,
-  ) -> std::io::Result<()> {
+  ) -> Result<(), Box<dyn std::error::Error>> {
     let mut buffer = [0u8; 1024];
-    let mut url = Url::parse("gemini://fuwn.me/").unwrap();
+    let mut url = Url::parse("gemini://fuwn.me/")?;
     let mut response_status = 0;
     let mut footer = String::new();
     let mut header = String::new();
     let content;
 
     while let Ok(size) = stream.read(&mut buffer).await {
-      let content = String::from_utf8(buffer[0..size].to_vec()).unwrap();
+      let content = String::from_utf8(buffer[0..size].to_vec())?;
 
-      url = url::Url::parse(&content.replace("\r\n", "")).unwrap();
+      url = url::Url::parse(&content.replace("\r\n", ""))?;
 
       if content.contains("\r\n") {
         break;
@@ -348,7 +348,9 @@ impl Router {
       }
     });
 
-    stream.shutdown().await
+    stream.shutdown().await?;
+
+    Ok(())
   }
 
   fn create_acceptor(&mut self) {
