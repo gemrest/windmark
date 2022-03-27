@@ -16,6 +16,9 @@
 // Copyright (C) 2022-2022 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
+//! Content and response handlers
+
+/// The content and response type a handler should reply with.
 pub enum Response<'a> {
   Input(String),
   SensitiveInput(String),

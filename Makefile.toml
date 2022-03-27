@@ -57,3 +57,9 @@ args = [
   "-out",
   "windmark_pair.pem"
 ]
+
+[tasks.docs]
+workspace = false
+toolchain = "nightly"
+command = "cargo"
+args = ["doc", "--open", "--no-deps"]
