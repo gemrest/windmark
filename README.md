@@ -33,10 +33,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   windmark::Router::new()
     .set_private_key_file("windmark_private.pem")
     .set_certificate_chain_file("windmark_pair.pem")
-    .mount("/", |_| Response::Success("Hello, World!".into()))
-    .set_error_handler(|_| {
+    .mount("/", Box::new(|_| Response::Success("Hello, World!".into())))
+    .set_error_handler(Box::new(|_| {
       Response::PermanentFailure("This route does not exist!".into())
-    })
+    }))
     .run()
     .await
 }
