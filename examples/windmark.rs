@@ -24,7 +24,7 @@ extern crate log;
 use windmark::Response;
 
 #[tokio::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
   windmark::Router::new()
     .set_private_key_file("windmark_private.pem")
     .set_certificate_chain_file("windmark_pair.pem")
@@ -107,6 +107,7 @@ async fn main() -> std::io::Result<()> {
         Response::SensitiveInput("What is your password?".into())
       }
     })
+    .mount("/error", |_| Response::CertificateNotValid("no".into()))
     .run()
     .await
 }
