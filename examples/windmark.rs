@@ -54,8 +54,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         stream.peer_addr().unwrap().ip()
       )
     }))
-    .set_header(|_| "```\nART IS COOL\n```".to_string())
-    .set_footer(|_| "Copyright 2022".to_string())
+    .set_header(Box::new(|_| "```\nART IS COOL\n```".to_string()))
+    .set_footer(Box::new(|_| "Copyright 2022".to_string()))
     .mount("/", |_| {
       Response::Success(
         "# INDEX\n\nWelcome!\n\n=> /test Test Page\n=> /time Unix Epoch\n"
