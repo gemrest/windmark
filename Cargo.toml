@@ -33,3 +33,6 @@ log = "0.4.16"
 url = "2.2.2"
 regex = "1.5.5"
 matchit = "0.5.0"
+
+# MIME
+tree_magic = "0.2.3"
