@@ -70,7 +70,7 @@
 //! This project is licensed with the
 //! [GNU General Public License v3.0](https://github.com/gemrest/windmark/blob/main/LICENSE).
 
-#![feature(once_cell)]
+#![feature(once_cell, fn_traits)]
 #![deny(
   warnings,
   nonstandard_style,
@@ -90,7 +90,10 @@ pub mod utilities;
 #[macro_use]
 extern crate log;
 
-use std::{error::Error, sync::Arc};
+use std::{
+  error::Error,
+  sync::{Arc, Mutex},
+};
 
 use openssl::ssl::{self, SslAcceptor, SslMethod};
 pub use response::Response;
@@ -112,7 +115,7 @@ use crate::{
 #[derive(Clone)]
 pub struct Router {
   routes: matchit::Router<RouteResponse>,
-  error_handler: ErrorResponse,
+  error_handler: Arc<Mutex<ErrorResponse>>,
   private_key_file_name: String,
   certificate_chain_file_name: String,
   header: Partial,
@@ -205,7 +208,7 @@ impl Router {
   /// });
   /// ```
   pub fn set_error_handler(&mut self, handler: ErrorResponse) -> &mut Self {
-    self.error_handler = handler;
+    self.error_handler = Arc::new(Mutex::new(handler));
 
     self
   }
@@ -273,7 +276,7 @@ impl Router {
       match stream {
         Ok(stream) => {
           let acceptor = acceptor.clone();
-          let self_clone = self.clone();
+          let mut self_clone = self.clone();
 
           tokio::spawn(async move {
             match tokio_openssl::accept(&acceptor, stream).await {
@@ -293,8 +296,9 @@ impl Router {
     Ok(())
   }
 
+  #[allow(clippy::too_many_lines)]
   async fn handle(
-    &self,
+    &mut self,
     stream: &mut tokio_openssl::SslStream<tokio::net::TcpStream>,
   ) -> Result<(), Box<dyn std::error::Error>> {
     let mut buffer = [0u8; 1024];
@@ -363,7 +367,10 @@ impl Router {
       };
     } else {
       content = to_value_set_status(
-        (self.error_handler)(ErrorContext::new(stream.get_ref(), &url)),
+        (*self.error_handler)
+          .lock()
+          .unwrap()
+          .call_mut((ErrorContext::new(stream.get_ref(), &url),)),
         &mut response_status,
       );
     }
@@ -600,11 +607,11 @@ impl Default for Router {
   fn default() -> Self {
     Self {
       routes: matchit::Router::new(),
-      error_handler: |_| {
+      error_handler: Arc::new(Mutex::new(Box::new(|_| {
         Response::NotFound(
           "This capsule has not implemented an error handler...".to_string(),
         )
-      },
+      }))),
       private_key_file_name: "".to_string(),
       certificate_chain_file_name: "".to_string(),
       header: |_| "".to_string(),

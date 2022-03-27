@@ -25,11 +25,19 @@ use windmark::Response;
 
 #[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+  let mut error_count = 0;
+
   windmark::Router::new()
     .set_private_key_file("windmark_private.pem")
     .set_certificate_chain_file("windmark_pair.pem")
     .enable_default_logger(true)
-    .set_error_handler(|_| Response::PermanentFailure("error...".to_string()))
+    .set_error_handler(Box::new(move |_| {
+      error_count += 1;
+
+      println!("{} errors so far", error_count);
+
+      Response::PermanentFailure("e".into())
+    }))
     .attach(|r| {
       r.mount("/module", |_| Response::Success("This is a module!".into()));
     })
