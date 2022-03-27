@@ -22,6 +22,9 @@ pub type RouteResponse = fn(RouteContext<'_>) -> Response<'_>;
 pub type ErrorResponse = Box<
   dyn FnMut(crate::returnable::ErrorContext<'_>) -> Response<'_> + Send + Sync,
 >;
-pub type Callback =
-  fn(&tokio::net::TcpStream, &url::Url, Option<&matchit::Params<'_, '_>>);
+pub type Callback = Box<
+  dyn FnMut(&tokio::net::TcpStream, &url::Url, Option<&matchit::Params<'_, '_>>)
+    + Send
+    + Sync,
+>;
 pub type Partial = fn(RouteContext<'_>) -> String;

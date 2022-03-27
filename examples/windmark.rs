@@ -41,19 +41,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .attach(|r| {
       r.mount("/module", |_| Response::Success("This is a module!".into()));
     })
-    .set_pre_route_callback(|stream, url, _| {
+    .set_pre_route_callback(Box::new(|stream, url, _| {
       info!(
         "accepted connection from {} to {}",
         stream.peer_addr().unwrap().ip(),
         url.to_string()
       )
-    })
-    .set_post_route_callback(|stream, _url, _| {
+    }))
+    .set_post_route_callback(Box::new(|stream, _url, _| {
       info!(
         "closed connection from {}",
         stream.peer_addr().unwrap().ip()
       )
-    })
+    }))
     .set_header(|_| "```\nART IS COOL\n```".to_string())
     .set_footer(|_| "Copyright 2022".to_string())
     .mount("/", |_| {
