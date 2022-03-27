@@ -4,7 +4,7 @@
 [![docs.rs](https://docs.rs/windmark/badge.svg)](https://docs.rs/windmark)
 [![github.com](https://github.com/gemrest/windmark/actions/workflows/check.yaml/badge.svg?branch=main)](https://github.com/gemrest/windmark/actions/workflows/check.yaml)
 
-Windmark is a simple and highly performant Gemini server framework.
+Windmark is An elegant and highly performant async Gemini server framework.
 
 ## Usage
 
