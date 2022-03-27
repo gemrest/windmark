@@ -40,6 +40,7 @@ use std::{error::Error, sync::Arc};
 
 use openssl::ssl::{self, SslAcceptor, SslMethod};
 pub use response::Response;
+pub use tokio::main;
 use tokio::{
   io::{AsyncReadExt, AsyncWriteExt},
   stream::StreamExt,

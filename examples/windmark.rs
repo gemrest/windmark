@@ -23,7 +23,7 @@ extern crate log;
 
 use windmark::Response;
 
-#[tokio::main]
+#[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
   windmark::Router::new()
     .set_private_key_file("windmark_private.pem")
