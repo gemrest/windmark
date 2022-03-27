@@ -28,6 +28,7 @@
 #![deny(clippy::all, clippy::nursery, clippy::pedantic)]
 #![recursion_limit = "128"]
 
+mod handler;
 pub mod response;
 pub(crate) mod returnable;
 pub mod utilities;
@@ -37,39 +38,33 @@ extern crate log;
 
 use std::{error::Error, sync::Arc};
 
-use matchit::Params;
 use openssl::ssl::{self, SslAcceptor, SslMethod};
 pub use response::Response;
 use tokio::{
   io::{AsyncReadExt, AsyncWriteExt},
-  net::TcpStream,
   stream::StreamExt,
 };
 use url::Url;
 
 use crate::{
+  handler::{Callback, ErrorResponse, Partial, RouteResponse},
   response::to_value_set_status,
   returnable::{ErrorContext, RouteContext},
 };
 
-type RouteResponseHandler = fn(RouteContext<'_>) -> Response;
-type ErrorResponseHandler = fn(ErrorContext<'_>) -> Response;
-type CallbackHandler = fn(&TcpStream, &Url, Option<&Params<'_, '_>>);
-type PartialHandler = fn(RouteContext<'_>) -> String;
-
 #[derive(Clone)]
 pub struct Router {
-  routes: matchit::Router<RouteResponseHandler>,
-  error_handler: ErrorResponseHandler,
+  routes: matchit::Router<RouteResponse>,
+  error_handler: ErrorResponse,
   private_key_file_name: String,
   certificate_chain_file_name: String,
-  header: PartialHandler,
-  footer: PartialHandler,
+  header: Partial,
+  footer: Partial,
   ssl_acceptor: Arc<SslAcceptor>,
   #[cfg(feature = "logger")]
   default_logger: bool,
-  pre_route_callback: CallbackHandler,
-  post_route_callback: CallbackHandler,
+  pre_route_callback: Callback,
+  post_route_callback: Callback,
 }
 impl Router {
   /// Create a new `Router`
@@ -135,11 +130,7 @@ impl Router {
   /// # Panics
   ///
   /// if the route cannot be mounted.
-  pub fn mount(
-    &mut self,
-    route: &str,
-    handler: RouteResponseHandler,
-  ) -> &mut Self {
+  pub fn mount(&mut self, route: &str, handler: RouteResponse) -> &mut Self {
     self.routes.insert(route, handler).unwrap();
 
     self
@@ -154,10 +145,7 @@ impl Router {
   ///   windmark::Response::Success("You have encountered an error!".into())
   /// });
   /// ```
-  pub fn set_error_handler(
-    &mut self,
-    handler: ErrorResponseHandler,
-  ) -> &mut Self {
+  pub fn set_error_handler(&mut self, handler: ErrorResponse) -> &mut Self {
     self.error_handler = handler;
 
     self
@@ -172,7 +160,7 @@ impl Router {
   ///   format!("This is displayed at the top of {}!", context.url.path())
   /// });
   /// ```
-  pub fn set_header(&mut self, handler: PartialHandler) -> &mut Self {
+  pub fn set_header(&mut self, handler: Partial) -> &mut Self {
     self.header = handler;
 
     self
@@ -187,7 +175,7 @@ impl Router {
   ///   format!("This is displayed at the bottom of {}!", context.url.path())
   /// });
   /// ```
-  pub fn set_footer(&mut self, handler: PartialHandler) -> &mut Self {
+  pub fn set_footer(&mut self, handler: Partial) -> &mut Self {
     self.footer = handler;
 
     self
@@ -420,10 +408,7 @@ impl Router {
   ///   )
   /// });
   /// ```
-  pub fn set_pre_route_callback(
-    &mut self,
-    callback: CallbackHandler,
-  ) -> &mut Self {
+  pub fn set_pre_route_callback(&mut self, callback: Callback) -> &mut Self {
     self.pre_route_callback = callback;
 
     self
@@ -443,10 +428,7 @@ impl Router {
   ///   )
   /// });
   /// ```
-  pub fn set_post_route_callback(
-    &mut self,
-    callback: CallbackHandler,
-  ) -> &mut Self {
+  pub fn set_post_route_callback(&mut self, callback: Callback) -> &mut Self {
     self.post_route_callback = callback;
 
     self
