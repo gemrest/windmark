@@ -20,6 +20,8 @@ pub enum Response {
   Input(String),
   SensitiveInput(String),
   Success(String),
+  TemporaryRedirect(String),
+  PermanentRedirect(String),
   TemporaryFailure(String),
   ServerUnavailable(String),
   CGIError(String),
@@ -52,6 +54,16 @@ pub(crate) fn to_value_set_status(
     }
     Response::Success(value) => {
       *status = 20;
+
+      value
+    }
+    Response::TemporaryRedirect(value) => {
+      *status = 30;
+
+      value
+    }
+    Response::PermanentRedirect(value) => {
+      *status = 31;
 
       value
     }
