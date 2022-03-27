@@ -23,15 +23,17 @@ windmark = "0.1.0"
 ### Implement a Windmark server
 
 ```rust
-use windmark::response::Response;
+use windmark::Response;
 
-fn main() -> std::io::Result<()> {
+#[windmark::main]
+fn main() -> Result<(), Box<dyn std::error::Error>> {
   windmark::Router::new()
-    .mount("/", |_, _, _| Response::Success("Hello, World!".into()))
-    .set_error_handler(|_, _, _| {
+    .mount("/", |_| Response::Success("Hello, World!".into()))
+    .set_error_handler(|_| {
       Response::PermanentFailure("This route does not exist!".into())
     })
     .run()
+    .await
 }
 ```
 
