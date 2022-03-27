@@ -118,8 +118,8 @@ pub struct Router {
   error_handler: Arc<Mutex<ErrorResponse>>,
   private_key_file_name: String,
   certificate_chain_file_name: String,
-  header: Partial,
-  footer: Partial,
+  header: Arc<Mutex<Partial>>,
+  footer: Arc<Mutex<Partial>>,
   ssl_acceptor: Arc<SslAcceptor>,
   #[cfg(feature = "logger")]
   default_logger: bool,
@@ -223,7 +223,7 @@ impl Router {
   /// });
   /// ```
   pub fn set_header(&mut self, handler: Partial) -> &mut Self {
-    self.header = handler;
+    self.header = Arc::new(Mutex::new(handler));
 
     self
   }
@@ -238,7 +238,7 @@ impl Router {
   /// });
   /// ```
   pub fn set_footer(&mut self, handler: Partial) -> &mut Self {
-    self.footer = handler;
+    self.footer = Arc::new(Mutex::new(handler));
 
     self
   }
@@ -334,10 +334,8 @@ impl Router {
 
     if let Ok(ref route) = route {
       header = {
-        let header = (self.header)(RouteContext::new(
-          stream.get_ref(),
-          &url,
-          &route.params,
+        let header = (*self.header).lock().unwrap().call_mut((
+          RouteContext::new(stream.get_ref(), &url, &route.params),
         ));
 
         if header.is_empty() {
@@ -347,10 +345,8 @@ impl Router {
         }
       };
       footer = {
-        let footer = (self.footer)(RouteContext::new(
-          stream.get_ref(),
-          &url,
-          &route.params,
+        let footer = (*self.footer).lock().unwrap().call_mut((
+          RouteContext::new(stream.get_ref(), &url, &route.params),
         ));
 
         if footer.is_empty() {
@@ -622,8 +618,8 @@ impl Default for Router {
       }))),
       private_key_file_name: "".to_string(),
       certificate_chain_file_name: "".to_string(),
-      header: |_| "".to_string(),
-      footer: |_| "".to_string(),
+      header: Arc::new(Mutex::new(Box::new(|_| "".to_string()))),
+      footer: Arc::new(Mutex::new(Box::new(|_| "".to_string()))),
       ssl_acceptor: Arc::new(
         SslAcceptor::mozilla_intermediate(SslMethod::tls())
           .unwrap()

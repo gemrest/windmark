@@ -27,4 +27,4 @@ pub type Callback = Box<
     + Send
     + Sync,
 >;
-pub type Partial = fn(RouteContext<'_>) -> String;
+pub type Partial = Box<dyn FnMut(RouteContext<'_>) -> String + Send + Sync>;
