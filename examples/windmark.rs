@@ -21,7 +21,7 @@
 #[macro_use]
 extern crate log;
 
-use windmark::response::Response;
+use windmark::Response;
 
 fn main() -> std::io::Result<()> {
   windmark::Router::new()
@@ -29,6 +29,9 @@ fn main() -> std::io::Result<()> {
     .set_certificate_chain_file("windmark_pair.pem")
     .enable_default_logger(true)
     .set_error_handler(|_| Response::PermanentFailure("error...".to_string()))
+    .attach(|r| {
+      r.mount("/module", |_| Response::Success("This is a module!".into()));
+    })
     .set_pre_route_callback(|stream, url, _| {
       info!(
         "accepted connection from {} to {}",

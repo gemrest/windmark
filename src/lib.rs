@@ -41,10 +41,11 @@ use std::{net::TcpStream, sync::Arc};
 
 use matchit::Params;
 use openssl::ssl::{self, SslAcceptor, SslMethod};
+pub use response::Response;
 use url::Url;
 
 use crate::{
-  response::{to_value_set_status, Response},
+  response::to_value_set_status,
   returnable::{ErrorContext, RouteContext},
 };
 
@@ -119,7 +120,7 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// use windmark::response::Response;
+  /// use windmark::Response;
   ///
   /// windmark::Router::new()
   ///   .mount("/", |_| Response::Success("This is the index page!".into()))
@@ -147,9 +148,7 @@ impl Router {
   ///
   /// ```rust
   /// windmark::Router::new().set_error_handler(|_| {
-  ///   windmark::response::Response::Success(
-  ///     "You have encountered an error!".into(),
-  ///   )
+  ///   windmark::Response::Success("You have encountered an error!".into())
   /// });
   /// ```
   pub fn set_error_handler(
@@ -436,6 +435,32 @@ impl Router {
     callback: CallbackHandler,
   ) -> &mut Self {
     self.post_route_callback = callback;
+
+    self
+  }
+
+  /// Attach a module to a `Router`.
+  ///
+  /// A module is an extension or middleware to a `Router`. Modules get full
+  /// access to the `Router`, but can be extended by a third party.
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// use windmark::Response;
+  ///
+  /// windmark::Router::new().attach(|r| {
+  ///   r.mount("/module", |_| Response::Success("This is a module!".into()));
+  ///   r.set_error_handler(|_| {
+  ///     Response::NotFound(
+  ///       "This error handler has been implemented by a module!".into(),
+  ///     )
+  ///   });
+  /// });
+  /// ```
+  pub fn attach<F>(&mut self, mut module: F) -> &mut Self
+  where F: FnMut(&mut Self) {
+    module(self);
 
     self
   }
