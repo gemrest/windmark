@@ -328,12 +328,12 @@ impl Router {
           "{}{}\r\n{}",
           response_status,
           match response_status {
-            10 | 11 | 40 | 50 | 51 => &*content,
-            _ => " text/gemini; charset=utf-8",
+            20 => " text/gemini; charset=utf-8",
+            _ => &*content,
           },
           match response_status {
-            10 | 11 | 40 | 50 | 51 => "".to_string(),
-            _ => format!("{}{}{}", header, content, footer),
+            20 => format!("{}{}{}", header, content, footer),
+            _ => "".to_string(),
           }
         )
         .as_bytes(),

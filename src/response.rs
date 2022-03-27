@@ -20,9 +20,19 @@ pub enum Response {
   Input(String),
   SensitiveInput(String),
   Success(String),
-  NotFound(String),
   TemporaryFailure(String),
+  ServerUnavailable(String),
+  CGIError(String),
+  ProxyError(String),
+  SlowDown(String),
   PermanentFailure(String),
+  NotFound(String),
+  Gone(String),
+  ProxyRefused(String),
+  BadRequest(String),
+  ClientCertificateRequired(String),
+  CertificateNotAuthorised(String),
+  CertificateNotValid(String),
 }
 
 pub(crate) fn to_value_set_status(
@@ -50,13 +60,63 @@ pub(crate) fn to_value_set_status(
 
       value
     }
-    Response::NotFound(value) => {
-      *status = 51;
+    Response::ServerUnavailable(value) => {
+      *status = 41;
+
+      value
+    }
+    Response::CGIError(value) => {
+      *status = 42;
+
+      value
+    }
+    Response::ProxyError(value) => {
+      *status = 43;
+
+      value
+    }
+    Response::SlowDown(value) => {
+      *status = 44;
 
       value
     }
     Response::PermanentFailure(value) => {
       *status = 50;
+
+      value
+    }
+    Response::NotFound(value) => {
+      *status = 51;
+
+      value
+    }
+    Response::Gone(value) => {
+      *status = 52;
+
+      value
+    }
+    Response::ProxyRefused(value) => {
+      *status = 53;
+
+      value
+    }
+    Response::BadRequest(value) => {
+      *status = 59;
+
+      value
+    }
+    Response::ClientCertificateRequired(value) => {
+      *status = 60;
+
+      value
+    }
+    Response::CertificateNotAuthorised(value) => {
+      *status = 61;
+
+      value
+    }
+    Response::CertificateNotValid(value) => {
+      *status = 62;
 
       value
     }
