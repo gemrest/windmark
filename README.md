@@ -14,11 +14,11 @@ Windmark is an elegant and highly performant, async Gemini server framework.
 # Cargo.toml
 
 [dependencies]
-windmark = "0.1.2"
+windmark = "0.1.3"
 tokio = { version = "0.2.4", features = ["full"] }
 
 # If you would like to use the built-in logger (recommended)
-# windmark = { version = "0.1.2", features = ["logger"] }
+# windmark = { version = "0.1.3", features = ["logger"] }
 ```
 
 ### Implement a Windmark server
