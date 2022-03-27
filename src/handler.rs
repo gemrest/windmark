@@ -19,8 +19,9 @@
 use crate::{returnable::RouteContext, Response};
 
 pub type RouteResponse = fn(RouteContext<'_>) -> Response<'_>;
-pub type ErrorResponse =
-  fn(crate::returnable::ErrorContext<'_>) -> Response<'_>;
+pub type ErrorResponse = Box<
+  dyn FnMut(crate::returnable::ErrorContext<'_>) -> Response<'_> + Send + Sync,
+>;
 pub type Callback =
   fn(&tokio::net::TcpStream, &url::Url, Option<&matchit::Params<'_, '_>>);
 pub type Partial = fn(RouteContext<'_>) -> String;
