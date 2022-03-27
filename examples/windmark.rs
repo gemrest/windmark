@@ -39,7 +39,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       Response::PermanentFailure("e".into())
     }))
     .attach(|r| {
-      r.mount("/module", Box::new(|_| Response::Success("This is a module!".into())));
+      r.mount(
+        "/module",
+        Box::new(|_| Response::Success("This is a module!".into())),
+      );
     })
     .set_pre_route_callback(Box::new(|stream, url, _| {
       info!(
@@ -56,72 +59,106 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }))
     .set_header(Box::new(|_| "```\nART IS COOL\n```".to_string()))
     .set_footer(Box::new(|_| "Copyright 2022".to_string()))
-    .mount("/", Box::new(|_| {
-      Response::Success(
-        "# INDEX\n\nWelcome!\n\n=> /test Test Page\n=> /time Unix Epoch\n"
-          .to_string(),
-      )
-    }))
-    .mount("/ip", Box::new(|context| {
-      Response::Success(
-        { format!("Hello, {}", context.tcp.peer_addr().unwrap().ip()) }.into(),
-      )
-    }))
-    .mount("/test", Box::new(|_| {
-      Response::Success("hi there\n=> / back".to_string())
-    }))
-    .mount("/temporary-failure", Box::new(|_| {
-      Response::TemporaryFailure("Woops, temporarily...".into())
-    }))
-    .mount("/time", Box::new(|_| {
-      Response::Success(
-        std::time::UNIX_EPOCH
-          .elapsed()
-          .unwrap()
-          .as_nanos()
-          .to_string(),
-      )
-    }))
-    .mount("/query", Box::new(|context| {
-      Response::Success(format!(
-        "queries: {:?}",
-        windmark::utilities::queries_from_url(&context.url)
-      ))
-    }))
-    .mount("/param/:lang", Box::new(|context| {
-      Response::Success(format!(
-        "Parameter lang is {}",
-        context.params.get("lang").unwrap()
-      ))
-    }))
-    .mount("/names/:first/:last", Box::new(|context| {
-      Response::Success(format!(
-        "{} {}",
-        context.params.get("first").unwrap(),
-        context.params.get("last").unwrap()
-      ))
-    }))
-    .mount("/input", Box::new(|context| {
-      if let Some(name) = context.url.query() {
-        Response::Success(format!("Your name is {}!", name))
-      } else {
-        Response::Input("What is your name?".into())
-      }
-    }))
-    .mount("/sensitive-input", Box::new(|context| {
-      if let Some(password) = context.url.query() {
-        Response::Success(format!("Your password is {}!", password))
-      } else {
-        Response::SensitiveInput("What is your password?".into())
-      }
-    }))
-    .mount("/error", Box::new(|_| Response::CertificateNotValid("no".into())))
-    .mount("/redirect", Box::new(|_| {
-      Response::PermanentRedirect("gemini://localhost/test".into())
-    }))
-    .mount("/file", Box::new(|_| {
-      Response::SuccessFile(include_bytes!("../LICENSE"))
-    }))
+    .mount(
+      "/",
+      Box::new(|_| {
+        Response::Success(
+          "# INDEX\n\nWelcome!\n\n=> /test Test Page\n=> /time Unix Epoch\n"
+            .to_string(),
+        )
+      }),
+    )
+    .mount(
+      "/ip",
+      Box::new(|context| {
+        Response::Success(
+          { format!("Hello, {}", context.tcp.peer_addr().unwrap().ip()) }
+            .into(),
+        )
+      }),
+    )
+    .mount(
+      "/test",
+      Box::new(|_| Response::Success("hi there\n=> / back".to_string())),
+    )
+    .mount(
+      "/temporary-failure",
+      Box::new(|_| Response::TemporaryFailure("Woops, temporarily...".into())),
+    )
+    .mount(
+      "/time",
+      Box::new(|_| {
+        Response::Success(
+          std::time::UNIX_EPOCH
+            .elapsed()
+            .unwrap()
+            .as_nanos()
+            .to_string(),
+        )
+      }),
+    )
+    .mount(
+      "/query",
+      Box::new(|context| {
+        Response::Success(format!(
+          "queries: {:?}",
+          windmark::utilities::queries_from_url(&context.url)
+        ))
+      }),
+    )
+    .mount(
+      "/param/:lang",
+      Box::new(|context| {
+        Response::Success(format!(
+          "Parameter lang is {}",
+          context.params.get("lang").unwrap()
+        ))
+      }),
+    )
+    .mount(
+      "/names/:first/:last",
+      Box::new(|context| {
+        Response::Success(format!(
+          "{} {}",
+          context.params.get("first").unwrap(),
+          context.params.get("last").unwrap()
+        ))
+      }),
+    )
+    .mount(
+      "/input",
+      Box::new(|context| {
+        if let Some(name) = context.url.query() {
+          Response::Success(format!("Your name is {}!", name))
+        } else {
+          Response::Input("What is your name?".into())
+        }
+      }),
+    )
+    .mount(
+      "/sensitive-input",
+      Box::new(|context| {
+        if let Some(password) = context.url.query() {
+          Response::Success(format!("Your password is {}!", password))
+        } else {
+          Response::SensitiveInput("What is your password?".into())
+        }
+      }),
+    )
+    .mount(
+      "/error",
+      Box::new(|_| Response::CertificateNotValid("no".into())),
+    )
+    .mount(
+      "/redirect",
+      Box::new(|_| {
+        Response::PermanentRedirect("gemini://localhost/test".into())
+      }),
+    )
+    .mount(
+      "/file",
+      Box::new(|_| Response::SuccessFile(include_bytes!("../LICENSE"))),
+    )
     .run()
     .await
 }
