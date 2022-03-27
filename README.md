@@ -4,7 +4,7 @@
 [![docs.rs](https://docs.rs/windmark/badge.svg)](https://docs.rs/windmark)
 [![github.com](https://github.com/gemrest/windmark/actions/workflows/check.yaml/badge.svg?branch=main)](https://github.com/gemrest/windmark/actions/workflows/check.yaml)
 
-Windmark is An elegant and highly performant async Gemini server framework.
+Windmark is an elegant and highly performant, async Gemini server framework.
 
 ## Usage
 
@@ -14,10 +14,10 @@ Windmark is An elegant and highly performant async Gemini server framework.
 # Cargo.toml
 
 [dependencies]
-windmark = "0.1.1"
+windmark = "0.1.2"
 
-# If you would like to use the built-in logger (reccomended)
-# windmark = { version = "0.1.1", features = ["logger"] }
+# If you would like to use the built-in logger (recommended)
+# windmark = { version = "0.1.2", features = ["logger"] }
 ```
 
 ### Implement a Windmark server
@@ -43,8 +43,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Examples
 
-Examples can be found within the [`examples/`](./examples) directory.
+Examples can be found within the
+[`examples/`](https://github.com/gemrest/windmark/tree/main/examples) directory.
 
 ## License
 
-This project is licensed with the [GNU General Public License v3.0](./LICENSE).
+This project is licensed with the
+[GNU General Public License v3.0](https://github.com/gemrest/windmark/blob/main/LICENSE).

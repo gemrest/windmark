@@ -16,8 +16,11 @@
 // Copyright (C) 2022-2022 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
+//! Utilities to make cumbersome tasks simpler
+
 use std::collections::HashMap;
 
+/// Extract the queries from a URL into a `HashMap`.
 #[must_use]
 pub fn queries_from_url(url: &url::Url) -> HashMap<String, String> {
   let mut queries = HashMap::new();
