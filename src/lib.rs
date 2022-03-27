@@ -33,15 +33,19 @@ pub(crate) mod returnable;
 pub mod status;
 pub mod utilities;
 
-#[cfg(feature = "logger")]
 #[macro_use]
 extern crate log;
 
-use std::{net::TcpStream, sync::Arc};
+use std::sync::Arc;
 
 use matchit::Params;
 use openssl::ssl::{self, SslAcceptor, SslMethod};
 pub use response::Response;
+use tokio::{
+  io::{AsyncReadExt, AsyncWriteExt},
+  net::TcpStream,
+  stream::StreamExt,
+};
 use url::Url;
 
 use crate::{
@@ -205,7 +209,7 @@ impl Router {
   /// # Errors
   ///
   /// if the `TcpListener` could not be bound.
-  pub fn run(&mut self) -> std::io::Result<()> {
+  pub async fn run(&mut self) -> std::io::Result<()> {
     self.create_acceptor();
 
     #[cfg(feature = "logger")]
@@ -214,31 +218,39 @@ impl Router {
     }
 
     let acceptor = self.ssl_acceptor.clone();
-    let listener = std::net::TcpListener::bind("0.0.0.0:1965")?;
+    let mut listener = tokio::net::TcpListener::bind("0.0.0.0:1965").await?;
 
     #[cfg(feature = "logger")]
     info!("windmark is listening for connections");
 
-    for stream in listener.incoming() {
+    while let Some(stream) = listener.incoming().next().await {
       match stream {
         Ok(stream) => {
           let acceptor = acceptor.clone();
           let self_clone = self.clone();
 
-          std::thread::spawn(move || {
-            let mut stream = acceptor.accept(stream).unwrap();
-
-            self_clone.handle(&mut stream);
+          tokio::spawn(async move {
+            match tokio_openssl::accept(&acceptor, stream).await {
+              Ok(mut stream) => {
+                if let Err(e) = self_clone.handle(&mut stream).await {
+                  error!("handle error: {}", e);
+                }
+              }
+              Err(e) => error!("ssl error: {:?}", e),
+            }
           });
         }
-        Err(e) => eprintln!("tcp error: {:?}", e),
+        Err(e) => error!("tcp error: {:?}", e),
       }
     }
 
     Ok(())
   }
 
-  fn handle(&self, stream: &mut ssl::SslStream<std::net::TcpStream>) {
+  async fn handle(
+    &self,
+    stream: &mut tokio_openssl::SslStream<tokio::net::TcpStream>,
+  ) -> std::io::Result<()> {
     let mut buffer = [0u8; 1024];
     let mut url = Url::parse("gemini://fuwn.me/").unwrap();
     let mut response_status = 0;
@@ -246,7 +258,7 @@ impl Router {
     let mut header = String::new();
     let content;
 
-    while let Ok(size) = stream.ssl_read(&mut buffer) {
+    while let Ok(size) = stream.read(&mut buffer).await {
       let content = String::from_utf8(buffer[0..size].to_vec()).unwrap();
 
       url = url::Url::parse(&content.replace("\r\n", "")).unwrap();
@@ -311,7 +323,7 @@ impl Router {
     }
 
     stream
-      .ssl_write(
+      .write_all(
         format!(
           "{}{}\r\n{}",
           response_status,
@@ -326,7 +338,7 @@ impl Router {
         )
         .as_bytes(),
       )
-      .unwrap();
+      .await?;
 
     (self.post_route_callback)(stream.get_ref(), &url, {
       if let Ok(route) = &route {
@@ -336,7 +348,7 @@ impl Router {
       }
     });
 
-    stream.shutdown().unwrap();
+    stream.shutdown().await
   }
 
   fn create_acceptor(&mut self) {
