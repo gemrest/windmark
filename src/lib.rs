@@ -36,7 +36,7 @@ pub mod utilities;
 #[macro_use]
 extern crate log;
 
-use std::sync::Arc;
+use std::{error::Error, sync::Arc};
 
 use matchit::Params;
 use openssl::ssl::{self, SslAcceptor, SslMethod};
@@ -209,8 +209,8 @@ impl Router {
   /// # Errors
   ///
   /// if the `TcpListener` could not be bound.
-  pub async fn run(&mut self) -> std::io::Result<()> {
-    self.create_acceptor();
+  pub async fn run(&mut self) -> Result<(), Box<dyn Error>> {
+    self.create_acceptor()?;
 
     #[cfg(feature = "logger")]
     if self.default_logger {
@@ -353,19 +353,19 @@ impl Router {
     Ok(())
   }
 
-  fn create_acceptor(&mut self) {
-    let mut builder =
-      SslAcceptor::mozilla_intermediate(ssl::SslMethod::tls()).unwrap();
+  fn create_acceptor(&mut self) -> Result<(), Box<dyn Error>> {
+    let mut builder = SslAcceptor::mozilla_intermediate(ssl::SslMethod::tls())?;
 
-    builder
-      .set_private_key_file(&self.private_key_file_name, ssl::SslFiletype::PEM)
-      .unwrap();
-    builder
-      .set_certificate_chain_file(&self.certificate_chain_file_name)
-      .unwrap();
-    builder.check_private_key().unwrap();
+    builder.set_private_key_file(
+      &self.private_key_file_name,
+      ssl::SslFiletype::PEM,
+    )?;
+    builder.set_certificate_chain_file(&self.certificate_chain_file_name)?;
+    builder.check_private_key()?;
 
     self.ssl_acceptor = Arc::new(builder.build());
+
+    Ok(())
   }
 
   /// Use a self-made `SslAcceptor`
