@@ -66,6 +66,8 @@ pub struct Router {
   default_logger: bool,
   pre_route_callback: Callback,
   post_route_callback: Callback,
+  charset: String,
+  language: String,
 }
 impl Router {
   /// Create a new `Router`
@@ -320,7 +322,11 @@ impl Router {
             response_status
           },
           match response_status {
-            20 => " text/gemini; charset=utf-8".to_string(),
+            20 =>
+              format!(
+                " text/gemini; charset={}; lang={}",
+                self.charset, self.language
+              ),
             21 => tree_magic::from_u8(&*content.as_bytes()),
             _ => (&*content).to_string(),
           },
@@ -503,6 +509,36 @@ impl Router {
 
     self
   }
+
+  /// Specify a custom character set.
+  ///
+  /// Defaults to `"utf-8"`.
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// windmark::Router::new().set_charset("utf-8"); 
+  /// ```
+  pub fn set_charset(&mut self, charset: &str) -> &mut Self {
+    self.charset = charset.to_string();
+
+    self
+  }
+
+  /// Specify a custom language.
+  ///
+  /// Defaults to `"en"`.
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// windmark::Router::new().set_language("en"); 
+  /// ```
+  pub fn set_language(&mut self, language: &str) -> &mut Self {
+    self.language = language.to_string();
+
+    self
+  }
 }
 impl Default for Router {
   fn default() -> Self {
@@ -526,6 +562,8 @@ impl Default for Router {
       default_logger: false,
       pre_route_callback: |_, _, _| {},
       post_route_callback: |_, _, _| {},
+      charset: "utf-8".to_string(),
+      language: "en".to_string(),
     }
   }
 }
