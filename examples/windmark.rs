@@ -23,7 +23,8 @@ extern crate log;
 
 use windmark::Response;
 
-fn main() -> std::io::Result<()> {
+#[tokio::main]
+async fn main() -> std::io::Result<()> {
   windmark::Router::new()
     .set_private_key_file("windmark_private.pem")
     .set_certificate_chain_file("windmark_pair.pem")
@@ -107,4 +108,5 @@ fn main() -> std::io::Result<()> {
       }
     })
     .run()
+    .await
 }

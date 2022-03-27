@@ -16,9 +16,8 @@
 // Copyright (C) 2022-2022 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-use std::net::TcpStream;
-
 use matchit::Params;
+use tokio::net::TcpStream;
 use url::Url;
 
 pub struct RouteContext<'a> {
