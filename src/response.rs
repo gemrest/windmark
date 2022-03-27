@@ -16,10 +16,11 @@
 // Copyright (C) 2022-2022 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-pub enum Response {
+pub enum Response<'a> {
   Input(String),
   SensitiveInput(String),
   Success(String),
+  SuccessFile(&'a [u8]),
   TemporaryRedirect(String),
   PermanentRedirect(String),
   TemporaryFailure(String),
@@ -38,7 +39,7 @@ pub enum Response {
 }
 
 pub(crate) fn to_value_set_status(
-  response: Response,
+  response: Response<'_>,
   status: &mut i32,
 ) -> String {
   match response {
@@ -56,6 +57,11 @@ pub(crate) fn to_value_set_status(
       *status = 20;
 
       value
+    }
+    Response::SuccessFile(value) => {
+      *status = 21; // Internal status code, not real.
+
+      String::from_utf8(value.to_vec()).unwrap()
     }
     Response::TemporaryRedirect(value) => {
       *status = 30;
