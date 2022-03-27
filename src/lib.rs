@@ -396,7 +396,44 @@ impl Router {
   #[cfg(feature = "logger")]
   pub fn enable_default_logger(&mut self, enable: bool) -> &mut Self {
     self.default_logger = enable;
-    std::env::set_var("RUST_LOG", "trace");
+    std::env::set_var("RUST_LOG", "windmark=trace");
+
+    self
+  }
+
+  /// Set the default logger's log level.
+  ///
+  /// If you enable Windmark's default logger with `enable_default_logger`,
+  /// Windmark will only log, logs from itself. By setting a log level with
+  /// this method, you are overriding the default log level, so you must choose
+  /// to enable logs from Windmark with the `log_windmark` parameter.
+  ///
+  /// Log level "language" is detailed
+  /// [here](https://docs.rs/env_logger/0.9.0/env_logger/#enabling-logging).
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// windmark::Router::new()
+  ///   .enable_default_logger(true)
+  ///   .set_log_level("your_crate_name=trace", true);
+  /// // If you would only like to log, logs from your crate:
+  /// // .set_log_level("your_crate_name=trace", false);
+  /// ```
+  #[cfg(feature = "logger")]
+  pub fn set_log_level(
+    &mut self,
+    log_level: &str,
+    log_windmark: bool,
+  ) -> &mut Self {
+    std::env::set_var(
+      "RUST_LOG",
+      format!(
+        "{}{}",
+        if log_windmark { "windmark," } else { "" },
+        log_level
+      ),
+    );
 
     self
   }
