@@ -108,6 +108,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       }
     })
     .mount("/error", |_| Response::CertificateNotValid("no".into()))
+    .mount("/redirect", |_| {
+      Response::PermanentRedirect("gemini://localhost/test".into())
+    })
     .run()
     .await
 }

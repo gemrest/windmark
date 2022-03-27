@@ -30,7 +30,6 @@
 
 pub mod response;
 pub(crate) mod returnable;
-pub mod status;
 pub mod utilities;
 
 #[macro_use]
