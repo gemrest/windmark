@@ -111,6 +111,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .mount("/redirect", |_| {
       Response::PermanentRedirect("gemini://localhost/test".into())
     })
+    .mount("/file", |_| {
+      Response::SuccessFile(include_bytes!("../LICENSE"))
+    })
     .run()
     .await
 }

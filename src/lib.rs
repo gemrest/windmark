@@ -314,13 +314,19 @@ impl Router {
       .write_all(
         format!(
           "{}{}\r\n{}",
-          response_status,
+          if response_status == 21 {
+            20
+          } else {
+            response_status
+          },
           match response_status {
-            20 => " text/gemini; charset=utf-8",
-            _ => &*content,
+            20 => " text/gemini; charset=utf-8".to_string(),
+            21 => tree_magic::from_u8(&*content.as_bytes()),
+            _ => (&*content).to_string(),
           },
           match response_status {
             20 => format!("{}{}{}", header, content, footer),
+            21 => (&*content).to_string(),
             _ => "".to_string(),
           }
         )
