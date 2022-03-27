@@ -123,8 +123,8 @@ pub struct Router {
   ssl_acceptor: Arc<SslAcceptor>,
   #[cfg(feature = "logger")]
   default_logger: bool,
-  pre_route_callback: Callback,
-  post_route_callback: Callback,
+  pre_route_callback: Arc<Mutex<Callback>>,
+  post_route_callback: Arc<Mutex<Callback>>,
   charset: String,
   language: String,
 }
@@ -320,13 +320,17 @@ impl Router {
 
     let route = self.routes.at(url.path());
 
-    (self.pre_route_callback)(stream.get_ref(), &url, {
-      if let Ok(route) = &route {
-        Some(&route.params)
-      } else {
-        None
-      }
-    });
+    (*self.pre_route_callback).lock().unwrap().call_mut((
+      stream.get_ref(),
+      &url,
+      {
+        if let Ok(route) = &route {
+          Some(&route.params)
+        } else {
+          None
+        }
+      },
+    ));
 
     if let Ok(ref route) = route {
       header = {
@@ -403,13 +407,17 @@ impl Router {
       )
       .await?;
 
-    (self.post_route_callback)(stream.get_ref(), &url, {
-      if let Ok(route) = &route {
-        Some(&route.params)
-      } else {
-        None
-      }
-    });
+    (*self.post_route_callback).lock().unwrap().call_mut((
+      stream.get_ref(),
+      &url,
+      {
+        if let Ok(route) = &route {
+          Some(&route.params)
+        } else {
+          None
+        }
+      },
+    ));
 
     stream.shutdown().await?;
 
@@ -522,7 +530,7 @@ impl Router {
   /// });
   /// ```
   pub fn set_pre_route_callback(&mut self, callback: Callback) -> &mut Self {
-    self.pre_route_callback = callback;
+    self.pre_route_callback = Arc::new(Mutex::new(callback));
 
     self
   }
@@ -542,7 +550,7 @@ impl Router {
   /// });
   /// ```
   pub fn set_post_route_callback(&mut self, callback: Callback) -> &mut Self {
-    self.post_route_callback = callback;
+    self.post_route_callback = Arc::new(Mutex::new(callback));
 
     self
   }
@@ -623,8 +631,8 @@ impl Default for Router {
       ),
       #[cfg(feature = "logger")]
       default_logger: false,
-      pre_route_callback: |_, _, _| {},
-      post_route_callback: |_, _, _| {},
+      pre_route_callback: Arc::new(Mutex::new(Box::new(|_, _, _| {}))),
+      post_route_callback: Arc::new(Mutex::new(Box::new(|_, _, _| {}))),
       charset: "utf-8".to_string(),
       language: "en".to_string(),
     }
