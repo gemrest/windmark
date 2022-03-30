@@ -32,11 +32,11 @@
 //! # Cargo.toml
 //!
 //! [dependencies]
-//! windmark = "0.1.3"
+//! windmark = "0.1.4"
 //! tokio = { version = "0.2.4", features = ["full"] }
 //!
 //! # If you would like to use the built-in logger (recommended)
-//! # windmark = { version = "0.1.3", features = ["logger"] }
+//! # windmark = { version = "0.1.4", features = ["logger"] }
 //! ```
 //!
 //! ### Implement a Windmark server
@@ -127,6 +127,7 @@ pub struct Router {
   post_route_callback: Arc<Mutex<Callback>>,
   charset: String,
   language: String,
+  port: i32,
 }
 impl Router {
   /// Create a new `Router`
@@ -255,7 +256,7 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().run();
+  /// windmark::Router::new().run(); 
   /// ```
   ///
   /// # Panics
@@ -274,7 +275,8 @@ impl Router {
     }
 
     let acceptor = self.ssl_acceptor.clone();
-    let mut listener = tokio::net::TcpListener::bind("0.0.0.0:1965").await?;
+    let mut listener =
+      tokio::net::TcpListener::bind(format!("0.0.0.0:{}", self.port)).await?;
 
     #[cfg(feature = "logger")]
     info!("windmark is listening for connections");
@@ -620,6 +622,21 @@ impl Router {
 
     self
   }
+
+  /// Specify a custom port.
+  ///
+  /// Defaults to `1965`.
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// windmark::Router::new().set_port(1965); 
+  /// ```
+  pub fn set_port(&mut self, port: i32) -> &mut Self {
+    self.port = port;
+
+    self
+  }
 }
 impl Default for Router {
   fn default() -> Self {
@@ -645,6 +662,7 @@ impl Default for Router {
       post_route_callback: Arc::new(Mutex::new(Box::new(|_, _, _| {}))),
       charset: "utf-8".to_string(),
       language: "en".to_string(),
+      port: 1965,
     }
   }
 }
