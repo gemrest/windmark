@@ -32,11 +32,11 @@
 //! # Cargo.toml
 //!
 //! [dependencies]
-//! windmark = "0.1.4"
+//! windmark = "0.1.5"
 //! tokio = { version = "0.2.4", features = ["full"] }
 //!
 //! # If you would like to use the built-in logger (recommended)
-//! # windmark = { version = "0.1.4", features = ["logger"] }
+//! # windmark = { version = "0.1.5", features = ["logger"] }
 //! ```
 //!
 //! ### Implement a Windmark server
@@ -50,7 +50,7 @@
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!   windmark::Router::new()
 //!     .set_private_key_file("windmark_private.pem")
-//!     .set_certificate_chain_file("windmark_pair.pem")
+//!     .set_certificate_file("windmark_public.pem")
 //!     .mount("/", Box::new(|_| Response::Success("Hello, World!".into())))
 //!     .set_error_handler(Box::new(|_| {
 //!       Response::PermanentFailure("This route does not exist!".into())
@@ -114,20 +114,20 @@ use crate::{
 /// response generation, panics, logging, and more.
 #[derive(Clone)]
 pub struct Router {
-  routes: matchit::Router<Arc<Mutex<RouteResponse>>>,
-  error_handler: Arc<Mutex<ErrorResponse>>,
+  routes:                matchit::Router<Arc<Mutex<RouteResponse>>>,
+  error_handler:         Arc<Mutex<ErrorResponse>>,
   private_key_file_name: String,
-  certificate_chain_file_name: String,
-  header: Arc<Mutex<Partial>>,
-  footer: Arc<Mutex<Partial>>,
-  ssl_acceptor: Arc<SslAcceptor>,
+  ca_file_name:          String,
+  header:                Arc<Mutex<Partial>>,
+  footer:                Arc<Mutex<Partial>>,
+  ssl_acceptor:          Arc<SslAcceptor>,
   #[cfg(feature = "logger")]
-  default_logger: bool,
-  pre_route_callback: Arc<Mutex<Callback>>,
-  post_route_callback: Arc<Mutex<Callback>>,
-  charset: String,
-  language: String,
-  port: i32,
+  default_logger:        bool,
+  pre_route_callback:    Arc<Mutex<Callback>>,
+  post_route_callback:   Arc<Mutex<Callback>>,
+  charset:               String,
+  language:              String,
+  port:                  i32,
 }
 impl Router {
   /// Create a new `Router`
@@ -165,13 +165,10 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().set_certificate_chain_file("windmark_pair.pem");
+  /// windmark::Router::new().set_certificate_file("windmark_public.pem");
   /// ```
-  pub fn set_certificate_chain_file(
-    &mut self,
-    certificate_chain_file_name: &str,
-  ) -> &mut Self {
-    self.certificate_chain_file_name = certificate_chain_file_name.to_string();
+  pub fn set_certificate_file(&mut self, certificate_name: &str) -> &mut Self {
+    self.ca_file_name = certificate_name.to_string();
 
     self
   }
@@ -436,7 +433,10 @@ impl Router {
       &self.private_key_file_name,
       ssl::SslFiletype::PEM,
     )?;
-    builder.set_certificate_chain_file(&self.certificate_chain_file_name)?;
+    builder.set_certificate_file(
+      &self.ca_file_name,
+      openssl::ssl::SslFiletype::PEM,
+    )?;
     builder.check_private_key()?;
 
     self.ssl_acceptor = Arc::new(builder.build());
@@ -459,7 +459,7 @@ impl Router {
   ///     .set_private_key_file("windmark_private.pem", ssl::SslFiletype::PEM)
   ///     .unwrap();
   ///   builder
-  ///     .set_certificate_chain_file("windmark_pair.pem")
+  ///     .set_certificate_file("windmark_public.pem", openssl::ssl::SslFiletype::PEM)
   ///     .unwrap();
   ///   builder.check_private_key().unwrap();
   ///
@@ -648,7 +648,7 @@ impl Default for Router {
         )
       }))),
       private_key_file_name: "".to_string(),
-      certificate_chain_file_name: "".to_string(),
+      ca_file_name: "".to_string(),
       header: Arc::new(Mutex::new(Box::new(|_| "".to_string()))),
       footer: Arc::new(Mutex::new(Box::new(|_| "".to_string()))),
       ssl_acceptor: Arc::new(

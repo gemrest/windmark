@@ -29,7 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
   windmark::Router::new()
     .set_private_key_file("windmark_private.pem")
-    .set_certificate_chain_file("windmark_pair.pem")
+    .set_certificate_file("windmark_public.pem")
     .enable_default_logger(true)
     .set_error_handler(Box::new(move |_| {
       error_count += 1;
