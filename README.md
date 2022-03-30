@@ -14,11 +14,11 @@ Windmark is an elegant and highly performant, async Gemini server framework.
 # Cargo.toml
 
 [dependencies]
-windmark = "0.1.4"
+windmark = "0.1.5"
 tokio = { version = "0.2.4", features = ["full"] }
 
 # If you would like to use the built-in logger (recommended)
-# windmark = { version = "0.1.4", features = ["logger"] }
+# windmark = { version = "0.1.5", features = ["logger"] }
 ```
 
 ### Implement a Windmark server
@@ -32,7 +32,7 @@ use windmark::Response;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
   windmark::Router::new()
     .set_private_key_file("windmark_private.pem")
-    .set_certificate_chain_file("windmark_pair.pem")
+    .set_certificate_chain_file("windmark_public.pem")
     .mount("/", Box::new(|_| Response::Success("Hello, World!".into())))
     .set_error_handler(Box::new(|_| {
       Response::PermanentFailure("This route does not exist!".into())
