@@ -25,37 +25,27 @@ dependencies = ["fmt", "check"]
 [tasks.checkfc]
 dependencies = ["fmt", "check", "clippy"]
 
-# openssl req -x509 -newkey rsa:4096 -keyout windmark_private.pem -out windmark_public.pem -days 365
-
 [tasks.genkey]
 command = "openssl"
 args = [
   "req",
-  "-newkey",
-  "rsa:2048",
   "-new",
-  "-nodes",
-  "-keyout",
-  "windmark_private.pem",
-  "-out",
-  "windmark_public.pem",
   "-subj",
-  "/CN=localhost"
-]
-
-[tasks.fixkey]
-command = "openssl"
-args = [
-  "x509",
-  "-req",
+  "/CN=localhost",
+  "-x509",
+  "-newkey",
+  "ec",
+  "-pkeyopt",
+  "ec_paramgen_curve:prime256v1",
   "-days",
   "365",
-  "-in",
-  "windmark_public.pem",
-  "-signkey",
-  "windmark_private.pem",
+  "-nodes",
   "-out",
-  "windmark_pair.pem"
+  "windmark_public.pem",
+  "-keyout",
+  "windmark_private.pem",
+  "-inform",
+  "pem",
 ]
 
 [tasks.docs]

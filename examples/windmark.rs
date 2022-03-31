@@ -155,10 +155,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Response::PermanentRedirect("gemini://localhost/test".into())
       }),
     )
-    .mount(
-      "/file",
-      Box::new(|_| Response::SuccessFile(include_bytes!("../LICENSE"))),
-    )
+    .mount("/file", {
+      #[cfg(feature = "auto-deduce-mime")]
+      {
+        Box::new(|_| Response::SuccessFile(include_bytes!("../LICENSE")))
+      }
+
+      #[cfg(not(feature = "auto-deduce-mime"))]
+      Box::new(|_| {
+        Response::SuccessFile(
+          include_bytes!("../LICENSE"),
+          "text/plain".to_string(),
+        )
+      })
+    })
     .run()
     .await
 }

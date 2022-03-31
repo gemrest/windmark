@@ -16,6 +16,7 @@ categories = ["web-programming"]
 
 [features]
 logger = ["pretty_env_logger"]
+auto-deduce-mime = ["tree_magic"]
 
 [dependencies]
 # TCP
@@ -35,4 +36,4 @@ regex = "1.5.5"
 matchit = "0.5.0"
 
 # MIME
-tree_magic = "0.2.3"
+tree_magic = { version = "0.2.3", optional = true }
