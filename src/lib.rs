@@ -32,11 +32,11 @@
 //! # Cargo.toml
 //!
 //! [dependencies]
-//! windmark = "0.1.6"
+//! windmark = "0.1.7"
 //! tokio = { version = "0.2.4", features = ["full"] }
 //!
 //! # If you would like to use the built-in logger (recommended)
-//! # windmark = { version = "0.1.6", features = ["logger"] }
+//! # windmark = { version = "0.1.7", features = ["logger"] }
 //! ```
 //!
 //! ### Implement a Windmark server
@@ -370,6 +370,7 @@ impl Router {
             &route.params,
           ),)),
           &mut response_status,
+          #[cfg(not(feature = "auto-deduce-mime"))]
           &mut response_mime_type,
         )
       };
@@ -380,6 +381,7 @@ impl Router {
           .unwrap()
           .call_mut((ErrorContext::new(stream.get_ref(), &url),)),
         &mut response_status,
+        #[cfg(not(feature = "auto-deduce-mime"))]
         &mut response_mime_type,
       );
     }
