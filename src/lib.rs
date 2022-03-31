@@ -310,6 +310,7 @@ impl Router {
     let mut buffer = [0u8; 1024];
     let mut url = Url::parse("gemini://fuwn.me/")?;
     let mut response_status = 0;
+    let mut response_mime_type = "".to_string();
     let mut footer = String::new();
     let mut header = String::new();
     let content;
@@ -369,6 +370,7 @@ impl Router {
             &route.params,
           ),)),
           &mut response_status,
+          &mut response_mime_type,
         )
       };
     } else {
@@ -378,6 +380,7 @@ impl Router {
           .unwrap()
           .call_mut((ErrorContext::new(stream.get_ref(), &url),)),
         &mut response_status,
+        &mut response_mime_type,
       );
     }
 
@@ -396,7 +399,10 @@ impl Router {
                 " text/gemini; charset={}; lang={}",
                 self.charset, self.language
               ),
+            #[cfg(feature = "auto-deduce-mime")]
             21 => tree_magic::from_u8(&*content.as_bytes()),
+            #[cfg(not(feature = "auto-deduce-mime"))]
+            21 => response_mime_type,
             _ => (&*content).to_string(),
           },
           match response_status {
@@ -459,7 +465,10 @@ impl Router {
   ///     .set_private_key_file("windmark_private.pem", ssl::SslFiletype::PEM)
   ///     .unwrap();
   ///   builder
-  ///     .set_certificate_file("windmark_public.pem", openssl::ssl::SslFiletype::PEM)
+  ///     .set_certificate_file(
+  ///       "windmark_public.pem",
+  ///       openssl::ssl::SslFiletype::PEM,
+  ///     )
   ///     .unwrap();
   ///   builder.check_private_key().unwrap();
   ///
