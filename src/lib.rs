@@ -50,7 +50,7 @@
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!   windmark::Router::new()
 //!     .set_private_key_file("windmark_private.pem")
-//!     .set_certificate_file("windmark_public.pem")
+//!     .set_certificate_chain_file("windmark_public.pem")
 //!     .mount("/", Box::new(|_| Response::Success("Hello, World!".into())))
 //!     .set_error_handler(Box::new(|_| {
 //!       Response::PermanentFailure("This route does not exist!".into())
@@ -64,6 +64,21 @@
 //!
 //! Examples can be found within the
 //! [`examples/`](https://github.com/gemrest/windmark/tree/main/examples) directory.
+//!
+//! ## Modules
+//!
+//! Modules are reusable extensions which can be procedurally mounted onto
+//! Windmark routers.
+//!
+//! [Add yours!](https://github.com/gemrest/windmark/edit/main/README.md)
+//!
+//! - [Windmark Comments](https://github.com/gemrest/windmark-comments)
+//!
+//! ## Capsules using Windmark
+//!
+//! [Add yours!](https://github.com/gemrest/windmark/edit/main/README.md)
+//!
+//! - <https://fuwn.me/>
 //!
 //! ## License
 //!
