@@ -47,6 +47,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 Examples can be found within the
 [`examples/`](https://github.com/gemrest/windmark/tree/main/examples) directory.
 
+## Modules
+
+Modules are reusable extensions which can be procedurally mounted onto Windmark
+routers.
+
+[Add yours!](https://github.com/gemrest/windmark/edit/main/README.md)
+
+- [Windmark Comments](https://github.com/gemrest/windmark-comments)
+
+## Capsules using Windmark
+
+[Add yours!](https://github.com/gemrest/windmark/edit/main/README.md)
+
+- <https://fuwn.me/>
+
 ## License
 
 This project is licensed with the
