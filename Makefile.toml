@@ -53,3 +53,7 @@ workspace = false
 toolchain = "nightly"
 command = "cargo"
 args = ["doc", "--open", "--no-deps"]
+
+[tasks.run]
+command = "cargo"
+args = ["run", "--example", "windmark", "--features", "auto-deduce-mime,logger"]
