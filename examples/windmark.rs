@@ -21,7 +21,35 @@
 #[macro_use]
 extern crate log;
 
-use windmark::Response;
+use windmark::{returnable::CallbackContext, Response, Router};
+
+#[derive(Default)]
+struct Clicker {
+  clicks: isize,
+}
+impl windmark::Module for Clicker {
+  fn on_attach(&mut self, _: &mut Router) {
+    println!("clicker has been attached!");
+  }
+
+  fn on_pre_route(&mut self, context: CallbackContext<'_>) {
+    self.clicks += 1;
+
+    info!(
+      "clicker has been called pre-route on {} with {} clicks!",
+      context.url.path(),
+      self.clicks
+    );
+  }
+
+  fn on_post_route(&mut self, context: CallbackContext<'_>) {
+    info!(
+      "clicker has been called post-route on {} with {} clicks!",
+      context.url.path(),
+      self.clicks
+    );
+  }
+}
 
 #[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -38,12 +66,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
       Response::PermanentFailure("e".into())
     }))
-    .attach(|r| {
+    .attach_stateless(|r| {
       r.mount(
         "/module",
         Box::new(|_| Response::Success("This is a module!".into())),
       );
     })
+    .attach(Clicker::default())
     .set_pre_route_callback(Box::new(|stream, url, _| {
       info!(
         "accepted connection from {} to {}",
