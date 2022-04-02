@@ -51,3 +51,22 @@ impl<'a> ErrorContext<'a> {
     }
   }
 }
+
+pub struct CallbackContext<'a> {
+  pub tcp:    &'a TcpStream,
+  pub url:    &'a Url,
+  pub params: Option<&'a Params<'a, 'a>>,
+}
+impl<'a> CallbackContext<'a> {
+  pub const fn new(
+    tcp: &'a TcpStream,
+    url: &'a Url,
+    params: Option<&'a Params<'a, 'a>>,
+  ) -> Self {
+    Self {
+      tcp,
+      url,
+      params,
+    }
+  }
+}

@@ -98,8 +98,9 @@
 #![recursion_limit = "128"]
 
 mod handler;
+pub mod module;
 pub mod response;
-pub(crate) mod returnable;
+pub mod returnable;
 pub mod utilities;
 
 #[macro_use]
@@ -110,6 +111,7 @@ use std::{
   sync::{Arc, Mutex},
 };
 
+pub use module::Module;
 use openssl::ssl::{self, SslAcceptor, SslMethod};
 pub use response::Response;
 pub use tokio::main;
@@ -122,7 +124,7 @@ use url::Url;
 use crate::{
   handler::{Callback, ErrorResponse, Partial, RouteResponse},
   response::to_value_set_status,
-  returnable::{ErrorContext, RouteContext},
+  returnable::{CallbackContext, ErrorContext, RouteContext},
 };
 
 /// A router which takes care of all tasks a Windmark server should handle:
@@ -143,6 +145,7 @@ pub struct Router {
   charset:               String,
   language:              String,
   port:                  i32,
+  modules:               Arc<Mutex<Vec<Box<dyn Module + Send>>>>,
 }
 impl Router {
   /// Create a new `Router`
@@ -325,6 +328,7 @@ impl Router {
     let mut buffer = [0u8; 1024];
     let mut url = Url::parse("gemini://fuwn.me/")?;
     let mut response_status = 0;
+    #[cfg(not(feature = "auto-deduce-mime"))]
     let mut response_mime_type = "".to_string();
     let mut footer = String::new();
     let mut header = String::new();
@@ -340,7 +344,17 @@ impl Router {
       }
     }
 
-    let route = self.routes.at(url.path());
+    let route = &mut self.routes.at(url.path());
+
+    for module in &mut *self.modules.lock().unwrap() {
+      module.on_pre_route(CallbackContext::new(stream.get_ref(), &url, {
+        if let Ok(route) = &route {
+          Some(&route.params)
+        } else {
+          None
+        }
+      }));
+    }
 
     (*self.pre_route_callback).lock().unwrap().call_mut((
       stream.get_ref(),
@@ -431,6 +445,16 @@ impl Router {
         .as_bytes(),
       )
       .await?;
+
+    for module in &mut *self.modules.lock().unwrap() {
+      module.on_post_route(CallbackContext::new(stream.get_ref(), &url, {
+        if let Ok(route) = &route {
+          Some(&route.params)
+        } else {
+          None
+        }
+      }));
+    }
 
     (*self.post_route_callback).lock().unwrap().call_mut((
       stream.get_ref(),
@@ -590,17 +614,19 @@ impl Router {
     self
   }
 
-  /// Attach a module to a `Router`.
+  /// Attach a stateless module to a `Router`.
   ///
   /// A module is an extension or middleware to a `Router`. Modules get full
   /// access to the `Router`, but can be extended by a third party.
   ///
   /// # Examples
   ///
+  /// ## Integrated Module
+  ///
   /// ```rust
   /// use windmark::Response;
   ///
-  /// windmark::Router::new().attach(|r| {
+  /// windmark::Router::new().attach_stateless(|r| {
   ///   r.mount(
   ///     "/module",
   ///     Box::new(|_| Response::Success("This is a module!".into())),
@@ -612,9 +638,85 @@ impl Router {
   ///   }));
   /// });
   /// ```
-  pub fn attach<F>(&mut self, mut module: F) -> &mut Self
+  ///
+  /// ## External Module
+  ///
+  /// ```rust
+  /// use windmark::Response;
+  ///
+  /// mod windmark_example {
+  ///   pub fn module(router: &mut windmark::Router) {
+  ///     router.mount(
+  ///       "/module",
+  ///       Box::new(|_| windmark::Response::Success("This is a module!".into())),
+  ///     );
+  ///   }
+  /// }
+  ///
+  /// windmark::Router::new().attach_stateless(windmark_example::module);
+  /// ```
+  pub fn attach_stateless<F>(&mut self, mut module: F) -> &mut Self
   where F: FnMut(&mut Self) {
     module(self);
+
+    self
+  }
+
+  /// Attach a stateful module to a `Router`.
+  ///
+  /// Like a stateless module is an extension or middleware to a `Router`.
+  /// Modules get full access to the `Router` and can be extended by a third
+  /// party, but also, can create hooks will be executed through various parts
+  /// of a routes' lifecycle. Stateful modules also have state, so variables can
+  /// be stored for further access.
+  ///
+  /// # Panics
+  ///
+  /// May panic if the stateful module cannot be attached.
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// use log::info;
+  /// use windmark::{returnable::CallbackContext, Response, Router};
+  ///
+  /// #[derive(Default)]
+  /// struct Clicker {
+  ///   clicks: isize,
+  /// }
+  /// impl windmark::Module for Clicker {
+  ///   fn on_attach(&mut self, _: &mut Router) {
+  ///     info!("clicker has been attached!");
+  ///   }
+  ///
+  ///   fn on_pre_route(&mut self, context: CallbackContext<'_>) {
+  ///     self.clicks += 1;
+  ///
+  ///     info!(
+  ///       "clicker has been called pre-route on {} with {} clicks!",
+  ///       context.url.path(),
+  ///       self.clicks
+  ///     );
+  ///   }
+  ///
+  ///   fn on_post_route(&mut self, context: CallbackContext<'_>) {
+  ///     info!(
+  ///       "clicker has been called post-route on {} with {} clicks!",
+  ///       context.url.path(),
+  ///       self.clicks
+  ///     );
+  ///   }
+  /// }
+  ///
+  /// Router::new().attach(Clicker::default());
+  /// ```
+  pub fn attach(
+    &mut self,
+    mut module: impl Module + 'static + Send,
+  ) -> &mut Self {
+    module.on_attach(self);
+
+    (*self.modules.lock().unwrap()).push(Box::new(module));
 
     self
   }
@@ -689,6 +791,7 @@ impl Default for Router {
       charset: "utf-8".to_string(),
       language: "en".to_string(),
       port: 1965,
+      modules: Arc::new(Mutex::new(vec![])),
     }
   }
 }
