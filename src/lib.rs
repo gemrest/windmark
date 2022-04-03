@@ -139,8 +139,8 @@ pub struct Router {
   error_handler:         Arc<Mutex<ErrorResponse>>,
   private_key_file_name: String,
   ca_file_name:          String,
-  header:                Arc<Mutex<Partial>>,
-  footer:                Arc<Mutex<Partial>>,
+  headers:               Arc<Mutex<Vec<Partial>>>,
+  footers:               Arc<Mutex<Vec<Partial>>>,
   ssl_acceptor:          Arc<SslAcceptor>,
   #[cfg(feature = "logger")]
   default_logger:        bool,
@@ -240,32 +240,40 @@ impl Router {
     self
   }
 
-  /// Set a header for the `Router` which should be displayed on every route.
+  /// Add a header for the `Router` which should be displayed on every route.
+  ///
+  /// # Panics
+  ///
+  /// May panic if the header cannot be added.
   ///
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().set_header(Box::new(|context| {
+  /// windmark::Router::new().add_header(Box::new(|context| {
   ///   format!("This is displayed at the top of {}!", context.url.path())
   /// }));
   /// ```
-  pub fn set_header(&mut self, handler: Partial) -> &mut Self {
-    self.header = Arc::new(Mutex::new(handler));
+  pub fn add_header(&mut self, handler: Partial) -> &mut Self {
+    (*self.headers.lock().unwrap()).push(handler);
 
     self
   }
 
-  /// Set a footer for the `Router` which should be displayed on every route.
+  /// Add a footer for the `Router` which should be displayed on every route.
+  ///
+  /// # Panics
+  ///
+  /// May panic if the header cannot be added.
   ///
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().set_footer(Box::new(|context| {
+  /// windmark::Router::new().add_footer(Box::new(|context| {
   ///   format!("This is displayed at the bottom of {}!", context.url.path())
   /// }));
   /// ```
-  pub fn set_footer(&mut self, handler: Partial) -> &mut Self {
-    self.footer = Arc::new(Mutex::new(handler));
+  pub fn add_footer(&mut self, handler: Partial) -> &mut Self {
+    (*self.footers.lock().unwrap()).push(handler);
 
     self
   }
@@ -336,6 +344,7 @@ impl Router {
     let mut response_mime_type = "".to_string();
     let mut footer = String::new();
     let mut header = String::new();
+    #[allow(clippy::needless_late_init)]
     let content;
 
     while let Ok(size) = stream.read(&mut buffer).await {
@@ -373,28 +382,35 @@ impl Router {
     ));
 
     if let Ok(ref route) = route {
-      header = {
-        let header = (*self.header).lock().unwrap().call_mut((
-          RouteContext::new(stream.get_ref(), &url, &route.params),
-        ));
+      let footers_length = (*self.footers.lock().unwrap()).len();
 
-        if header.is_empty() {
-          "".to_string()
-        } else {
-          format!("{}\n", header)
-        }
-      };
-      footer = {
-        let footer = (*self.footer).lock().unwrap().call_mut((
-          RouteContext::new(stream.get_ref(), &url, &route.params),
+      for partial_header in &mut *self.headers.lock().unwrap() {
+        header.push_str(&format!(
+          "{}\n",
+          partial_header(RouteContext::new(
+            stream.get_ref(),
+            &url,
+            &route.params,
+          )),
         ));
-
-        if footer.is_empty() {
-          "".to_string()
-        } else {
-          format!("\n{}", footer)
-        }
-      };
+      }
+      for (i, partial_footer) in
+        (&mut *self.footers.lock().unwrap()).iter_mut().enumerate()
+      {
+        footer.push_str(&format!(
+          "{}{}",
+          partial_footer(RouteContext::new(
+            stream.get_ref(),
+            &url,
+            &route.params,
+          )),
+          if footers_length > 1 && i != footers_length - 1 {
+            "\n"
+          } else {
+            ""
+          },
+        ));
+      }
       content = {
         to_value_set_status(
           (*route.value).lock().unwrap().call_mut((RouteContext::new(
@@ -441,7 +457,7 @@ impl Router {
             _ => (&*content).to_string(),
           },
           match response_status {
-            20 => format!("{}{}{}", header, content, footer),
+            20 => format!("{}{}\n{}", header, content, footer),
             21 => (&*content).to_string(),
             _ => "".to_string(),
           }
@@ -781,8 +797,8 @@ impl Default for Router {
       }))),
       private_key_file_name: "".to_string(),
       ca_file_name: "".to_string(),
-      header: Arc::new(Mutex::new(Box::new(|_| "".to_string()))),
-      footer: Arc::new(Mutex::new(Box::new(|_| "".to_string()))),
+      headers: Arc::new(Mutex::new(vec![])),
+      footers: Arc::new(Mutex::new(vec![])),
       ssl_acceptor: Arc::new(
         SslAcceptor::mozilla_intermediate(SslMethod::tls())
           .unwrap()
