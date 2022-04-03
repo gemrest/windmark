@@ -344,8 +344,6 @@ impl Router {
     let mut response_mime_type = "".to_string();
     let mut footer = String::new();
     let mut header = String::new();
-    #[allow(clippy::needless_late_init)]
-    let content;
 
     while let Ok(size) = stream.read(&mut buffer).await {
       let content = String::from_utf8(buffer[0..size].to_vec())?;
@@ -381,7 +379,7 @@ impl Router {
       },
     ));
 
-    if let Ok(ref route) = route {
+    let content = if let Ok(ref route) = route {
       let footers_length = (*self.footers.lock().unwrap()).len();
 
       for partial_header in &mut *self.headers.lock().unwrap() {
@@ -411,20 +409,18 @@ impl Router {
           },
         ));
       }
-      content = {
-        to_value_set_status(
-          (*route.value).lock().unwrap().call_mut((RouteContext::new(
-            stream.get_ref(),
-            &url,
-            &route.params,
-          ),)),
-          &mut response_status,
-          #[cfg(not(feature = "auto-deduce-mime"))]
-          &mut response_mime_type,
-        )
-      };
+      to_value_set_status(
+        (*route.value).lock().unwrap().call_mut((RouteContext::new(
+          stream.get_ref(),
+          &url,
+          &route.params,
+        ),)),
+        &mut response_status,
+        #[cfg(not(feature = "auto-deduce-mime"))]
+        &mut response_mime_type,
+      )
     } else {
-      content = to_value_set_status(
+      to_value_set_status(
         (*self.error_handler)
           .lock()
           .unwrap()
@@ -432,8 +428,8 @@ impl Router {
         &mut response_status,
         #[cfg(not(feature = "auto-deduce-mime"))]
         &mut response_mime_type,
-      );
-    }
+      )
+    };
 
     stream
       .write_all(
