@@ -4,7 +4,8 @@
 [![docs.rs](https://docs.rs/windmark/badge.svg)](https://docs.rs/windmark)
 [![github.com](https://github.com/gemrest/windmark/actions/workflows/check.yaml/badge.svg?branch=main)](https://github.com/gemrest/windmark/actions/workflows/check.yaml)
 
-Windmark is an elegant and highly performant, async Gemini server framework.
+Windmark is an elegant and highly performant, async Gemini server framework for
+the modern age!
 
 ## Usage
 
@@ -14,15 +15,15 @@ Windmark is an elegant and highly performant, async Gemini server framework.
 # Cargo.toml
 
 [dependencies]
-windmark = "0.1.8"
+windmark = "0.1.9"
 tokio = { version = "0.2.4", features = ["full"] }
 
 # If you would like to use the built-in logger (recommended)
-# windmark = { version = "0.1.8", features = ["logger"] }
+# windmark = { version = "0.1.9", features = ["logger"] }
 
 # If you would like to use the built-in MIME dedection when `Success`-ing a file
 # (recommended)
-# windmark = { version = "0.1.8", features = ["auto-deduce-mime"] }
+# windmark = { version = "0.1.9", features = ["auto-deduce-mime"] }
 ```
 
 ### Implement a Windmark server
