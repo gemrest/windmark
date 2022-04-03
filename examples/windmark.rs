@@ -86,13 +86,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         stream.peer_addr().unwrap().ip()
       )
     }))
-    .set_header(Box::new(|_| "```\nART IS COOL\n```".to_string()))
-    .set_footer(Box::new(|_| "Copyright 2022".to_string()))
+    .add_header(Box::new(|_| "```\nART IS COOL\n```\nhi".to_string()))
+    .add_footer(Box::new(|_| "Copyright 2022".to_string()))
+    .add_footer(Box::new(|context| {
+      format!("Another footer, but lower! (from {})", context.url.path())
+    }))
     .mount(
       "/",
       Box::new(|_| {
         Response::Success(
-          "# INDEX\n\nWelcome!\n\n=> /test Test Page\n=> /time Unix Epoch\n"
+          "# INDEX\n\nWelcome!\n\n=> /test Test Page\n=> /time Unix Epoch"
             .to_string(),
         )
       }),
