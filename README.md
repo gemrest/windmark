@@ -52,6 +52,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 Examples can be found within the
 [`examples/`](https://github.com/gemrest/windmark/tree/main/examples) directory.
 
+An example of a fully featured Gemini capsule written using Windmark can be
+found [here](https://github.com/gemrest/locus). This example Gemini capsule also
+happens to be the source code for [Fuwn's](https://github.com/Fuwn) (this
+library's author) personal Gemini capsule!
+
 ## Modules
 
 Modules are reusable extensions which can be procedurally mounted onto Windmark
