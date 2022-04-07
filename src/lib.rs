@@ -33,15 +33,15 @@
 //! # Cargo.toml
 //!
 //! [dependencies]
-//! windmark = "0.1.10"
+//! windmark = "0.1.11"
 //! tokio = { version = "0.2.4", features = ["full"] }
 //!
 //! # If you would like to use the built-in logger (recommended)
-//! # windmark = { version = "0.1.10", features = ["logger"] }
+//! # windmark = { version = "0.1.11", features = ["logger"] }
 //!
 //! # If you would like to use the built-in MIME dedection when `Success`-ing a file
 //! # (recommended)
-//! # windmark = { version = "0.1.10", features = ["auto-deduce-mime"] }
+//! # windmark = { version = "0.1.11", features = ["auto-deduce-mime"] }
 //! ```
 //!
 //! ### Implement a Windmark server
@@ -363,7 +363,10 @@ impl Router {
     }
 
     let fixed_path = if self.fix_path {
-      self.routes.fix_path(url.path()).unwrap()
+      self
+        .routes
+        .fix_path(url.path())
+        .unwrap_or_else(|| url.path().to_string())
     } else {
       url.path().to_string()
     };
