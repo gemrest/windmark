@@ -199,6 +199,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       )
     })
   });
+  // router.mount("", Box::new(|_| {
+  //   Response::Success("hi".into())
+  // }));
 
   router.run().await
 }
