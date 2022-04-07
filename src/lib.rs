@@ -156,6 +156,7 @@ pub struct Router {
   language:              String,
   port:                  i32,
   modules:               Arc<Mutex<Vec<Box<dyn Module + Send>>>>,
+  fix_path:              bool,
 }
 impl Router {
   /// Create a new `Router`
@@ -361,7 +362,12 @@ impl Router {
       }
     }
 
-    let route = &mut self.routes.at(url.path());
+    let fixed_path = if self.fix_path {
+      self.routes.fix_path(url.path()).unwrap()
+    } else {
+      url.path().to_string()
+    };
+    let route = &mut self.routes.at(&fixed_path);
 
     for module in &mut *self.modules.lock().unwrap() {
       module.on_pre_route(CallbackContext::new(stream.get_ref(), &url, {
@@ -787,6 +793,20 @@ impl Router {
 
     self
   }
+
+  /// Performs a case-insensitive lookup of routes, using the case corrected
+  /// path if successful. Missing/ extra trailing slashes are also corrected.
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// windmark::Router::new().set_fix_path(true); 
+  /// ```
+  pub fn set_fix_path(&mut self, fix_path: bool) -> &mut Self {
+    self.fix_path = fix_path;
+
+    self
+  }
 }
 impl Default for Router {
   fn default() -> Self {
@@ -814,6 +834,7 @@ impl Default for Router {
       language: "en".to_string(),
       port: 1965,
       modules: Arc::new(Mutex::new(vec![])),
+      fix_path: false,
     }
   }
 }
