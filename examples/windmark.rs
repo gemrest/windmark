@@ -66,6 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Response::PermanentFailure("e".into())
   }));
+  router.set_fix_path(true);
   router.attach_stateless(|r| {
     r.mount(
       "/module",
