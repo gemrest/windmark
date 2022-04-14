@@ -137,6 +137,23 @@ use crate::{
   returnable::{CallbackContext, ErrorContext, RouteContext},
 };
 
+macro_rules! or_error {
+  ($stream:ident, $operation:expr, $error_format:literal) => {
+    match $operation {
+      Ok(u) => u,
+      Err(e) => {
+        $stream
+          .write_all(format!($error_format, e).as_bytes())
+          .await?;
+
+        $stream.shutdown().await?;
+
+        return Ok(());
+      }
+    }
+  };
+}
+
 /// A router which takes care of all tasks a Windmark server should handle:
 /// response generation, panics, logging, and more.
 #[derive(Clone)]
@@ -353,25 +370,18 @@ impl Router {
     let mut header = String::new();
 
     while let Ok(size) = stream.read(&mut buffer).await {
-      let content = String::from_utf8(buffer[0..size].to_vec())?;
+      let request = or_error!(
+        stream,
+        String::from_utf8(buffer[0..size].to_vec()),
+        "59 The server (Windmark) received a bad request: {}"
+      );
+      url = or_error!(
+        stream,
+        url::Url::parse(&request.replace("\r\n", "")),
+        "59 The server (Windmark) received a bad request: {}"
+      );
 
-      url = match url::Url::parse(&content.replace("\r\n", "")) {
-        Ok(u) => u,
-        Err(e) => {
-          stream
-            .write_all(
-              format!("59 The server (Windmark) received a bad request: {}", e)
-                .as_bytes(),
-            )
-            .await?;
-
-          stream.shutdown().await?;
-
-          return Ok(());
-        }
-      };
-
-      if content.contains("\r\n") {
+      if request.contains("\r\n") {
         break;
       }
     }
