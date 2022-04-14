@@ -355,7 +355,21 @@ impl Router {
     while let Ok(size) = stream.read(&mut buffer).await {
       let content = String::from_utf8(buffer[0..size].to_vec())?;
 
-      url = url::Url::parse(&content.replace("\r\n", ""))?;
+      url = match url::Url::parse(&content.replace("\r\n", "")) {
+        Ok(u) => u,
+        Err(e) => {
+          stream
+            .write_all(
+              format!("59 The server (Windmark) received a bad request: {}", e)
+                .as_bytes(),
+            )
+            .await?;
+
+          stream.shutdown().await?;
+
+          return Ok(());
+        }
+      };
 
       if content.contains("\r\n") {
         break;
