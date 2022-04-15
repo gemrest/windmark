@@ -107,7 +107,7 @@
 #![deny(clippy::all, clippy::nursery, clippy::pedantic)]
 #![recursion_limit = "128"]
 
-mod handler;
+pub mod handler;
 pub mod module;
 pub mod response;
 pub mod returnable;
