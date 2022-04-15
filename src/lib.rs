@@ -33,15 +33,15 @@
 //! # Cargo.toml
 //!
 //! [dependencies]
-//! windmark = "0.1.12"
+//! windmark = "0.1.13"
 //! tokio = { version = "0.2.4", features = ["full"] }
 //!
 //! # If you would like to use the built-in logger (recommended)
-//! # windmark = { version = "0.1.12", features = ["logger"] }
+//! # windmark = { version = "0.1.13", features = ["logger"] }
 //!
 //! # If you would like to use the built-in MIME dedection when `Success`-ing a file
 //! # (recommended)
-//! # windmark = { version = "0.1.12", features = ["auto-deduce-mime"] }
+//! # windmark = { version = "0.1.13", features = ["auto-deduce-mime"] }
 //! ```
 //!
 //! ### Implement a Windmark server
