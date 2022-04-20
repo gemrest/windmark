@@ -490,14 +490,14 @@ impl Router {
                 self.charset, self.language
               ),
             #[cfg(feature = "auto-deduce-mime")]
-            21 => tree_magic::from_u8(&*content.as_bytes()),
+            21 => format!(" {}", tree_magic::from_u8(&*content.as_bytes())),
             #[cfg(not(feature = "auto-deduce-mime"))]
             21 => response_mime_type,
-            _ => (&*content).to_string(),
+            _ => format!(" {}", content),
           },
           match response_status {
             20 => format!("{}{}\n{}", header, content, footer),
-            21 => (&*content).to_string(),
+            21 => format!(" {}", content),
             _ => "".to_string(),
           }
         )
