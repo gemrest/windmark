@@ -497,7 +497,7 @@ impl Router {
           },
           match response_status {
             20 => format!("{}{}\n{}", header, content, footer),
-            21 => format!(" {}", content),
+            21 => content.to_string(),
             _ => "".to_string(),
           }
         )
