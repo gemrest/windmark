@@ -54,6 +54,6 @@ toolchain = "nightly"
 command = "cargo"
 args = ["doc", "--open", "--no-deps"]
 
-[tasks.run]
+[tasks.example]
 command = "cargo"
-args = ["run", "--example", "windmark", "--features", "auto-deduce-mime,logger"]
+args = ["run", "--example", "${@}", "--all-features"]
