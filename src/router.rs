@@ -299,13 +299,18 @@ impl Router {
     let route = &mut self.routes.at(&fixed_path);
 
     for module in &mut *self.modules.lock().unwrap() {
-      module.on_pre_route(CallbackContext::new(stream.get_ref(), &url, {
-        if let Ok(route) = &route {
-          Some(&route.params)
-        } else {
-          None
-        }
-      }));
+      module.on_pre_route(CallbackContext::new(
+        stream.get_ref(),
+        &url,
+        {
+          if let Ok(route) = &route {
+            Some(&route.params)
+          } else {
+            None
+          }
+        },
+        &stream.ssl().peer_certificate(),
+      ));
     }
 
     (*self.pre_route_callback).lock().unwrap().call_mut((
@@ -330,6 +335,7 @@ impl Router {
             stream.get_ref(),
             &url,
             &route.params,
+            &stream.ssl().peer_certificate()
           )),
         ));
       }
@@ -342,6 +348,7 @@ impl Router {
             stream.get_ref(),
             &url,
             &route.params,
+            &stream.ssl().peer_certificate()
           )),
           if footers_length > 1 && i != footers_length - 1 {
             "\n"
@@ -355,6 +362,7 @@ impl Router {
           stream.get_ref(),
           &url,
           &route.params,
+          &stream.ssl().peer_certificate(),
         ),)),
         &mut response_status,
         #[cfg(not(feature = "auto-deduce-mime"))]
@@ -365,7 +373,11 @@ impl Router {
         (*self.error_handler)
           .lock()
           .unwrap()
-          .call_mut((ErrorContext::new(stream.get_ref(), &url),)),
+          .call_mut((ErrorContext::new(
+            stream.get_ref(),
+            &url,
+            &stream.ssl().peer_certificate(),
+          ),)),
         &mut response_status,
         #[cfg(not(feature = "auto-deduce-mime"))]
         &mut response_mime_type,
@@ -404,13 +416,18 @@ impl Router {
       .await?;
 
     for module in &mut *self.modules.lock().unwrap() {
-      module.on_post_route(CallbackContext::new(stream.get_ref(), &url, {
-        if let Ok(route) = &route {
-          Some(&route.params)
-        } else {
-          None
-        }
-      }));
+      module.on_post_route(CallbackContext::new(
+        stream.get_ref(),
+        &url,
+        {
+          if let Ok(route) = &route {
+            Some(&route.params)
+          } else {
+            None
+          }
+        },
+        &stream.ssl().peer_certificate(),
+      ));
     }
 
     (*self.post_route_callback).lock().unwrap().call_mut((
@@ -439,6 +456,7 @@ impl Router {
     )?;
     builder.set_certificate_file(&self.ca_file_name, ssl::SslFiletype::PEM)?;
     builder.check_private_key()?;
+    builder.set_verify_callback(ssl::SslVerifyMode::PEER, |_, _| true);
 
     self.ssl_acceptor = Arc::new(builder.build());
 
