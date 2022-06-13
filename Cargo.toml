@@ -2,7 +2,7 @@
 
 [package]
 name = "windmark"
-version = "0.1.15"
+version = "0.1.16"
 authors = ["Fuwn <contact@fuwn.me>"]
 edition = "2021"
 description = "An elegant and highly performant async Gemini server framework"
@@ -35,5 +35,4 @@ url = "2.2.2"
 regex = "1.5.5"
 matchit = "0.5.0"
 
-# MIME
-tree_magic = { version = "0.2.3", optional = true }
+tree_magic = { version = "0.2.3", optional = true } # MIME
