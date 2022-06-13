@@ -258,7 +258,7 @@ impl Router {
   async fn handle(
     &mut self,
     stream: &mut tokio_openssl::SslStream<tokio::net::TcpStream>,
-  ) -> Result<(), Box<dyn std::error::Error>> {
+  ) -> Result<(), Box<dyn Error>> {
     let mut buffer = [0u8; 1024];
     let mut url = Url::parse("gemini://fuwn.me/")?;
     let mut response_status = 0;
@@ -431,16 +431,13 @@ impl Router {
   }
 
   fn create_acceptor(&mut self) -> Result<(), Box<dyn Error>> {
-    let mut builder = SslAcceptor::mozilla_intermediate(ssl::SslMethod::tls())?;
+    let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls())?;
 
     builder.set_private_key_file(
       &self.private_key_file_name,
       ssl::SslFiletype::PEM,
     )?;
-    builder.set_certificate_file(
-      &self.ca_file_name,
-      openssl::ssl::SslFiletype::PEM,
-    )?;
+    builder.set_certificate_file(&self.ca_file_name, ssl::SslFiletype::PEM)?;
     builder.check_private_key()?;
 
     self.ssl_acceptor = Arc::new(builder.build());
@@ -463,10 +460,7 @@ impl Router {
   ///     .set_private_key_file("windmark_private.pem", ssl::SslFiletype::PEM)
   ///     .unwrap();
   ///   builder
-  ///     .set_certificate_file(
-  ///       "windmark_public.pem",
-  ///       openssl::ssl::SslFiletype::PEM,
-  ///     )
+  ///     .set_certificate_file("windmark_public.pem", ssl::SslFiletype::PEM)
   ///     .unwrap();
   ///   builder.check_private_key().unwrap();
   ///
