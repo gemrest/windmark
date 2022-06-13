@@ -223,7 +223,6 @@ impl Router {
       pretty_env_logger::init();
     }
 
-    let acceptor = self.ssl_acceptor.clone();
     let mut listener =
       tokio::net::TcpListener::bind(format!("0.0.0.0:{}", self.port)).await?;
 
@@ -233,7 +232,7 @@ impl Router {
     while let Some(stream) = listener.incoming().next().await {
       match stream {
         Ok(stream) => {
-          let acceptor = acceptor.clone();
+          let acceptor = self.ssl_acceptor.clone();
           let mut self_clone = self.clone();
 
           tokio::spawn(async move {
