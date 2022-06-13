@@ -17,56 +17,69 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 use matchit::Params;
+use openssl::x509::X509;
 use tokio::net::TcpStream;
 use url::Url;
 
 pub struct RouteContext<'a> {
-  pub tcp:    &'a TcpStream,
-  pub url:    &'a Url,
-  pub params: &'a Params<'a, 'a>,
+  pub tcp:         &'a TcpStream,
+  pub url:         &'a Url,
+  pub params:      &'a Params<'a, 'a>,
+  pub certificate: &'a Option<X509>,
 }
 impl<'a> RouteContext<'a> {
   pub const fn new(
     tcp: &'a TcpStream,
     url: &'a Url,
     params: &'a Params<'a, 'a>,
+    certificate: &'a Option<X509>,
   ) -> Self {
     Self {
       tcp,
       url,
       params,
+      certificate,
     }
   }
 }
 
 pub struct ErrorContext<'a> {
-  pub tcp: &'a TcpStream,
-  pub url: &'a Url,
+  pub tcp:         &'a TcpStream,
+  pub url:         &'a Url,
+  pub certificate: &'a Option<X509>,
 }
 impl<'a> ErrorContext<'a> {
-  pub const fn new(tcp: &'a TcpStream, url: &'a Url) -> Self {
+  pub const fn new(
+    tcp: &'a TcpStream,
+    url: &'a Url,
+    certificate: &'a Option<X509>,
+  ) -> Self {
     Self {
       tcp,
       url,
+      certificate,
     }
   }
 }
 
 pub struct CallbackContext<'a> {
-  pub tcp:    &'a TcpStream,
-  pub url:    &'a Url,
-  pub params: Option<&'a Params<'a, 'a>>,
+  pub tcp:         &'a TcpStream,
+  pub url:         &'a Url,
+  pub params:      Option<&'a Params<'a, 'a>>,
+  pub certificate: &'a Option<X509>,
 }
 impl<'a> CallbackContext<'a> {
   pub const fn new(
     tcp: &'a TcpStream,
     url: &'a Url,
     params: Option<&'a Params<'a, 'a>>,
+    certificate: &'a Option<X509>,
   ) -> Self {
     Self {
       tcp,
       url,
       params,
+      certificate,
     }
   }
 }

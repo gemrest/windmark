@@ -199,9 +199,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       )
     })
   });
-  // router.mount("", Box::new(|_| {
-  //   Response::Success("hi".into())
-  // }));
+  router.mount(
+    "/secret",
+    Box::new(|context| {
+      if let Some(certificate) = context.certificate {
+        Response::Success(format!("Your public key: {}.", {
+          (|| -> Result<String, openssl::error::ErrorStack> {
+            Ok(format!(
+              "{:?}",
+              certificate.public_key()?.rsa()?.public_key_to_pem()?
+            ))
+          })()
+          .unwrap_or_else(|_| "Unknown".to_string())
+        },))
+      } else {
+        Response::ClientCertificateRequired(
+          "This is a secret route! Identify yourself!".to_string(),
+        )
+      }
+    }),
+  );
 
   router.run().await
 }
