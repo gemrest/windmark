@@ -54,7 +54,7 @@ impl windmark::Module for Clicker {
 #[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
   let mut error_count = 0;
-  let mut router = windmark::Router::new();
+  let mut router = Router::new();
 
   router.set_private_key_file("windmark_private.pem");
   router.set_certificate_file("windmark_public.pem");
