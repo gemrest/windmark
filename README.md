@@ -15,15 +15,15 @@ the modern age!
 # Cargo.toml
 
 [dependencies]
-windmark = "0.1.17"
+windmark = "0.1.18"
 tokio = { version = "0.2.4", features = ["full"] }
 
 # If you would like to use the built-in logger (recommended)
-# windmark = { version = "0.1.17", features = ["logger"] }
+# windmark = { version = "0.1.18", features = ["logger"] }
 
 # If you would like to use the built-in MIME dedection when `Success`-ing a file
 # (recommended)
-# windmark = { version = "0.1.17", features = ["auto-deduce-mime"] }
+# windmark = { version = "0.1.18", features = ["auto-deduce-mime"] }
 ```
 
 ### Implement a Windmark server
