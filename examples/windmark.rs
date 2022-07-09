@@ -103,6 +103,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }),
   );
   router.mount(
+    "/specific-mime",
+    Box::new(|_| {
+      Response::SuccessWithMime("hi".to_string(), "text/plain".to_string())
+    }),
+  );
+  router.mount(
     "/ip",
     Box::new(|context| {
       Response::Success(
