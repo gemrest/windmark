@@ -261,7 +261,6 @@ impl Router {
     let mut buffer = [0u8; 1024];
     let mut url = Url::parse("gemini://fuwn.me/")?;
     let mut response_status = 0;
-    #[cfg(not(feature = "auto-deduce-mime"))]
     let mut response_mime_type = "".to_string();
     let mut footer = String::new();
     let mut header = String::new();
@@ -364,7 +363,6 @@ impl Router {
           &stream.ssl().peer_certificate(),
         ),)),
         &mut response_status,
-        #[cfg(not(feature = "auto-deduce-mime"))]
         &mut response_mime_type,
       )
     } else {
@@ -378,7 +376,6 @@ impl Router {
             &stream.ssl().peer_certificate(),
           ),)),
         &mut response_status,
-        #[cfg(not(feature = "auto-deduce-mime"))]
         &mut response_mime_type,
       )
     };
@@ -387,7 +384,7 @@ impl Router {
       .write_all(
         format!(
           "{}{}\r\n{}",
-          if response_status == 21 {
+          if response_status == 21 || response_status == 22 {
             20
           } else {
             response_status
@@ -399,14 +396,13 @@ impl Router {
                 self.charset, self.language
               ),
             #[cfg(feature = "auto-deduce-mime")]
-            21 => format!(" {}", tree_magic::from_u8(&*content.as_bytes())),
-            #[cfg(not(feature = "auto-deduce-mime"))]
+            22 => format!(" {}", tree_magic::from_u8(&*content.as_bytes())),
             21 => response_mime_type,
             _ => format!(" {}", content),
           },
           match response_status {
             20 => format!("{}{}\n{}", header, content, footer),
-            21 => content.to_string(),
+            21 | 22 => content.to_string(),
             _ => "".to_string(),
           }
         )

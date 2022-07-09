@@ -58,6 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
   router.set_private_key_file("windmark_private.pem");
   router.set_certificate_file("windmark_public.pem");
+  #[cfg(feature = "logger")]
   router.enable_default_logger(true);
   router.set_error_handler(Box::new(move |_| {
     error_count += 1;
@@ -185,13 +186,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     "/redirect",
     Box::new(|_| Response::PermanentRedirect("gemini://localhost/test".into())),
   );
+  #[cfg(feature = "auto-deduce-mime")]
+  router.mount("/auto-file", {
+    Box::new(|_| Response::SuccessFileAuto(include_bytes!("../LICENSE")))
+  });
   router.mount("/file", {
-    #[cfg(feature = "auto-deduce-mime")]
-    {
-      Box::new(|_| Response::SuccessFile(include_bytes!("../LICENSE")))
-    }
-
-    #[cfg(not(feature = "auto-deduce-mime"))]
     Box::new(|_| {
       Response::SuccessFile(
         include_bytes!("../LICENSE"),
