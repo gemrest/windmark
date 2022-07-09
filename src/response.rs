@@ -23,6 +23,9 @@ pub enum Response<'a> {
   Input(String),
   SensitiveInput(String),
   Success(String),
+  /// A successful response where the MIME type of the response is manually
+  /// specific by the user
+  SuccessWithMime(String, String),
   #[cfg(feature = "auto-deduce-mime")]
   /// A successful response where the MIME type of the response is
   /// automatically deduced from the provided bytes
@@ -63,6 +66,12 @@ pub(crate) fn to_value_set_status(
     }
     Response::Success(value) => {
       *status = 20;
+
+      value
+    }
+    Response::SuccessWithMime(value, value_mime) => {
+      *status = 23;
+      *mime = value_mime;
 
       value
     }
