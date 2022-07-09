@@ -384,7 +384,10 @@ impl Router {
       .write_all(
         format!(
           "{}{}\r\n{}",
-          if response_status == 21 || response_status == 22 {
+          if response_status == 21
+            || response_status == 22
+            || response_status == 23
+          {
             20
           } else {
             response_status
@@ -395,14 +398,15 @@ impl Router {
                 " text/gemini; charset={}; lang={}",
                 self.charset, self.language
               ),
+            21 => response_mime_type,
             #[cfg(feature = "auto-deduce-mime")]
             22 => format!(" {}", tree_magic::from_u8(&*content.as_bytes())),
-            21 => response_mime_type,
+            23 => response_mime_type,
             _ => format!(" {}", content),
           },
           match response_status {
             20 => format!("{}{}\n{}", header, content, footer),
-            21 | 22 => content.to_string(),
+            21 | 22 | 23 => content.to_string(),
             _ => "".to_string(),
           }
         )
