@@ -10,7 +10,7 @@ the modern age!
 ## Usage
 
 Check out an example starter project
-[here](https://github.com/gemrest/windmark-starter-project]!
+[here](https://github.com/gemrest/windmark-starter-project)!
 
 ### Add Windmark and Tokio as Dependencies
 
