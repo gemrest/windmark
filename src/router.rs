@@ -311,17 +311,13 @@ impl Router {
       ));
     }
 
-    (*self.pre_route_callback).lock().unwrap().call_mut((
-      stream.get_ref(),
-      &url,
-      {
-        if let Ok(route) = &route {
-          Some(&route.params)
-        } else {
-          None
-        }
-      },
-    ));
+    (*self.pre_route_callback).lock().unwrap()(stream.get_ref(), &url, {
+      if let Ok(route) = &route {
+        Some(&route.params)
+      } else {
+        None
+      }
+    });
 
     let content = if let Ok(ref route) = route {
       let footers_length = (*self.footers.lock().unwrap()).len();
@@ -356,25 +352,22 @@ impl Router {
         ));
       }
       to_value_set_status(
-        (*route.value).lock().unwrap().call_mut((RouteContext::new(
+        (*route.value).lock().unwrap()(RouteContext::new(
           stream.get_ref(),
           &url,
           &route.params,
           &stream.ssl().peer_certificate(),
-        ),)),
+        )),
         &mut response_status,
         &mut response_mime_type,
       )
     } else {
       to_value_set_status(
-        (*self.error_handler)
-          .lock()
-          .unwrap()
-          .call_mut((ErrorContext::new(
-            stream.get_ref(),
-            &url,
-            &stream.ssl().peer_certificate(),
-          ),)),
+        (*self.error_handler).lock().unwrap()(ErrorContext::new(
+          stream.get_ref(),
+          &url,
+          &stream.ssl().peer_certificate(),
+        )),
         &mut response_status,
         &mut response_mime_type,
       )
@@ -429,17 +422,13 @@ impl Router {
       ));
     }
 
-    (*self.post_route_callback).lock().unwrap().call_mut((
-      stream.get_ref(),
-      &url,
-      {
-        if let Ok(route) = &route {
-          Some(&route.params)
-        } else {
-          None
-        }
-      },
-    ));
+    (*self.post_route_callback).lock().unwrap()(stream.get_ref(), &url, {
+      if let Ok(route) = &route {
+        Some(&route.params)
+      } else {
+        None
+      }
+    });
 
     stream.shutdown().await?;
 

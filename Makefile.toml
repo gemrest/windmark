@@ -1,24 +1,18 @@
-# ------------
-# | Wrappers |
-# ------------
 [tasks.fmt]
-command = "cargo"
 args = ["fmt"]
-private = true
+command = "cargo"
+toolchain = "nightly"
 
 [tasks.check]
-command = "cargo"
 args = ["check"]
-private = true
+command = "cargo"
+toolchain = "nightly"
 
 [tasks.clippy]
-command = "cargo"
 args = ["clippy"]
-private = true
+command = "cargo"
+toolchain = "nightly"
 
-# -------------
-# | Executors |
-# -------------
 [tasks.checkf]
 dependencies = ["fmt", "check"]
 

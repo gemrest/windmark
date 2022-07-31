@@ -2,7 +2,7 @@
 
 [package]
 name = "windmark"
-version = "0.1.19"
+version = "0.1.20"
 authors = ["Fuwn <contact@fuwn.me>"]
 edition = "2021"
 description = "An elegant and highly performant async Gemini server framework"

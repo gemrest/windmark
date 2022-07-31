@@ -9,12 +9,6 @@ the modern age!
 
 ## Usage
 
-### Notice
-
-Windmark requires the nightly Rust toolchain!
-
-To sync your project directory with Windmark's toolchain version, execute `rustup override set nightly-2022-02-22` within your command prompt while inside your projects directory.
-
 ### Add Windmark as a dependency
 
 ```toml
