@@ -9,7 +9,10 @@ the modern age!
 
 ## Usage
 
-### Add Windmark as a dependency
+Check out an example starter project
+[here](https://github.com/gemrest/windmark-starter-project]!
+
+### Add Windmark and Tokio as Dependencies
 
 ```toml
 # Cargo.toml
@@ -34,10 +37,10 @@ tokio = { version = "0.2.4", features = ["full"] }
 use windmark::Response;
 
 #[windmark::main]
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
   windmark::Router::new()
     .set_private_key_file("windmark_private.pem")
-    .set_certificate_chain_file("windmark_public.pem")
+    .set_certificate_file("windmark_public.pem")
     .mount("/", Box::new(|_| Response::Success("Hello, World!".into())))
     .set_error_handler(Box::new(|_| {
       Response::PermanentFailure("This route does not exist!".into())
