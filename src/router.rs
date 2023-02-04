@@ -261,7 +261,7 @@ impl Router {
     let mut buffer = [0u8; 1024];
     let mut url = Url::parse("gemini://fuwn.me/")?;
     let mut response_status = 0;
-    let mut response_mime_type = "".to_string();
+    let mut response_mime_type = String::new();
     let mut footer = String::new();
     let mut header = String::new();
 
@@ -300,23 +300,13 @@ impl Router {
       module.on_pre_route(CallbackContext::new(
         stream.get_ref(),
         &url,
-        {
-          if let Ok(route) = &route {
-            Some(&route.params)
-          } else {
-            None
-          }
-        },
+        route.as_ref().map_or(None, |route| Some(&route.params)),
         &stream.ssl().peer_certificate(),
       ));
     }
 
     (*self.pre_route_callback).lock().unwrap()(stream.get_ref(), &url, {
-      if let Ok(route) = &route {
-        Some(&route.params)
-      } else {
-        None
-      }
+      route.as_ref().map_or(None, |route| Some(&route.params))
     });
 
     let content = if let Ok(ref route) = route {
@@ -333,9 +323,10 @@ impl Router {
           )),
         ));
       }
-      for (i, partial_footer) in
+      for (i, partial_footer) in {
+        #[allow(clippy::needless_borrow)]
         (&mut *self.footers.lock().unwrap()).iter_mut().enumerate()
-      {
+      } {
         footer.push_str(&format!(
           "{}{}",
           partial_footer(RouteContext::new(
@@ -395,12 +386,12 @@ impl Router {
             #[cfg(feature = "auto-deduce-mime")]
             22 => format!(" {}", tree_magic::from_u8(&*content.as_bytes())),
             23 => response_mime_type,
-            _ => format!(" {}", content),
+            _ => format!(" {content}"),
           },
           match response_status {
-            20 => format!("{}{}\n{}", header, content, footer),
+            20 => format!("{header}{content}\n{footer}"),
             21 | 22 | 23 => content.to_string(),
-            _ => "".to_string(),
+            _ => String::new(),
           }
         )
         .as_bytes(),
@@ -411,23 +402,13 @@ impl Router {
       module.on_post_route(CallbackContext::new(
         stream.get_ref(),
         &url,
-        {
-          if let Ok(route) = &route {
-            Some(&route.params)
-          } else {
-            None
-          }
-        },
+        route.as_ref().map_or(None, |route| Some(&route.params)),
         &stream.ssl().peer_certificate(),
       ));
     }
 
     (*self.post_route_callback).lock().unwrap()(stream.get_ref(), &url, {
-      if let Ok(route) = &route {
-        Some(&route.params)
-      } else {
-        None
-      }
+      route.as_ref().map_or(None, |route| Some(&route.params))
     });
 
     stream.shutdown().await?;
@@ -746,8 +727,8 @@ impl Default for Router {
           "This capsule has not implemented an error handler...".to_string(),
         )
       }))),
-      private_key_file_name: "".to_string(),
-      ca_file_name: "".to_string(),
+      private_key_file_name: String::new(),
+      ca_file_name: String::new(),
       headers: Arc::new(Mutex::new(vec![])),
       footers: Arc::new(Mutex::new(vec![])),
       ssl_acceptor: Arc::new(
