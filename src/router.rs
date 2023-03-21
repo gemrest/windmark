@@ -19,13 +19,11 @@
 use std::{
   error::Error,
   sync::{Arc, Mutex},
+  time,
 };
 
 use openssl::ssl::{self, SslAcceptor, SslMethod};
-use tokio::{
-  io::{AsyncReadExt, AsyncWriteExt},
-  stream::StreamExt,
-};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use url::Url;
 
 use crate::{
@@ -44,7 +42,7 @@ macro_rules! or_error {
           .write_all(format!($error_format, e).as_bytes())
           .await?;
 
-        $stream.shutdown().await?;
+        // $stream.shutdown().await?;
 
         return Ok(());
       }
@@ -223,34 +221,47 @@ impl Router {
       pretty_env_logger::init();
     }
 
-    let mut listener =
+    let listener =
       tokio::net::TcpListener::bind(format!("0.0.0.0:{}", self.port)).await?;
 
     #[cfg(feature = "logger")]
     info!("windmark is listening for connections");
 
-    while let Some(stream) = listener.incoming().next().await {
-      match stream {
-        Ok(stream) => {
-          let acceptor = self.ssl_acceptor.clone();
+    loop {
+      match listener.accept().await {
+        Ok((stream, _)) => {
           let mut self_clone = self.clone();
+          let acceptor = self_clone.ssl_acceptor.clone();
 
           tokio::spawn(async move {
-            match tokio_openssl::accept(&acceptor, stream).await {
+            let ssl = match ssl::Ssl::new(acceptor.context()) {
+              Ok(ssl) => ssl,
+              Err(e) => {
+                error!("ssl context error: {:?}", e);
+
+                return;
+              }
+            };
+
+            match tokio_openssl::SslStream::new(ssl, stream) {
               Ok(mut stream) => {
+                if let Err(e) = std::pin::Pin::new(&mut stream).accept().await {
+                  println!("stream accept error: {e:?}");
+                }
+
                 if let Err(e) = self_clone.handle(&mut stream).await {
                   error!("handle error: {}", e);
                 }
               }
-              Err(e) => error!("ssl error: {:?}", e),
+              Err(e) => error!("ssl stream error: {:?}", e),
             }
           });
         }
-        Err(e) => error!("tcp error: {:?}", e),
+        Err(e) => error!("tcp stream error: {:?}", e),
       }
     }
 
-    Ok(())
+    // Ok(())
   }
 
   #[allow(clippy::too_many_lines)]
@@ -426,6 +437,13 @@ impl Router {
     builder.set_certificate_file(&self.ca_file_name, ssl::SslFiletype::PEM)?;
     builder.check_private_key()?;
     builder.set_verify_callback(ssl::SslVerifyMode::PEER, |_, _| true);
+    builder.set_session_id_context(
+      time::SystemTime::now()
+        .duration_since(time::UNIX_EPOCH)?
+        .as_secs()
+        .to_string()
+        .as_bytes(),
+    )?;
 
     self.ssl_acceptor = Arc::new(builder.build());
 
