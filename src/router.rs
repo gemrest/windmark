@@ -27,7 +27,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use url::Url;
 
 use crate::{
-  handler::{Callback, ErrorResponse, Partial, RouteResponse},
+  handler::{Callback, CleanupCallback, ErrorResponse, Partial, RouteResponse},
   module::Module,
   response::{to_value_set_status, Response},
   returnable::{CallbackContext, ErrorContext, RouteContext},
@@ -64,7 +64,7 @@ pub struct Router {
   #[cfg(feature = "logger")]
   default_logger:        bool,
   pre_route_callback:    Arc<Mutex<Callback>>,
-  post_route_callback:   Arc<Mutex<Callback>>,
+  post_route_callback:   Arc<Mutex<CleanupCallback>>,
   charset:               String,
   language:              String,
   port:                  i32,
@@ -323,7 +323,7 @@ impl Router {
       &stream.ssl().peer_certificate(),
     ));
 
-    let content = if let Ok(ref route) = route {
+    let mut content = if let Ok(ref route) = route {
       let footers_length = (*self.footers.lock().unwrap()).len();
 
       for partial_header in &mut *self.headers.lock().unwrap() {
@@ -378,6 +378,25 @@ impl Router {
       )
     };
 
+    for module in &mut *self.modules.lock().unwrap() {
+      module.on_post_route(CallbackContext::new(
+        stream.get_ref(),
+        &url,
+        route.as_ref().map_or(None, |route| Some(&route.params)),
+        &stream.ssl().peer_certificate(),
+      ));
+    }
+
+    (*self.post_route_callback).lock().unwrap()(
+      CallbackContext::new(
+        stream.get_ref(),
+        &url,
+        route.as_ref().map_or(None, |route| Some(&route.params)),
+        &stream.ssl().peer_certificate(),
+      ),
+      &mut content,
+    );
+
     stream
       .write_all(
         format!(
@@ -411,22 +430,6 @@ impl Router {
         .as_bytes(),
       )
       .await?;
-
-    for module in &mut *self.modules.lock().unwrap() {
-      module.on_post_route(CallbackContext::new(
-        stream.get_ref(),
-        &url,
-        route.as_ref().map_or(None, |route| Some(&route.params)),
-        &stream.ssl().peer_certificate(),
-      ));
-    }
-
-    (*self.post_route_callback).lock().unwrap()(CallbackContext::new(
-      stream.get_ref(),
-      &url,
-      route.as_ref().map_or(None, |route| Some(&route.params)),
-      &stream.ssl().peer_certificate(),
-    ));
 
     stream.shutdown().await?;
 
@@ -539,14 +542,12 @@ impl Router {
   /// ```rust
   /// use log::info;
   ///
-  /// windmark::Router::new().set_pre_route_callback(Box::new(
-  ///   |stream, _url, _| {
-  ///     info!(
-  ///       "accepted connection from {}",
-  ///       stream.peer_addr().unwrap().ip(),
-  ///     )
-  ///   },
-  /// ));
+  /// windmark::Router::new().set_pre_route_callback(Box::new(|context| {
+  ///   info!(
+  ///     "accepted connection from {}",
+  ///     context.stream.peer_addr().unwrap().ip(),
+  ///   )
+  /// }));
   /// ```
   pub fn set_pre_route_callback(&mut self, callback: Callback) -> &mut Self {
     self.pre_route_callback = Arc::new(Mutex::new(callback));
@@ -561,16 +562,17 @@ impl Router {
   /// ```rust
   /// use log::info;
   ///
-  /// windmark::Router::new().set_post_route_callback(Box::new(
-  ///   |stream, _url, _| {
-  ///     info!(
-  ///       "closed connection from {}",
-  ///       stream.peer_addr().unwrap().ip(),
-  ///     )
-  ///   },
-  /// ));
+  /// windmark::Router::new().set_post_route_callback(Box::new(|context, _| {
+  ///   info!(
+  ///     "closed connection from {}",
+  ///     context.stream.peer_addr().unwrap().ip(),
+  ///   )
+  /// }));
   /// ```
-  pub fn set_post_route_callback(&mut self, callback: Callback) -> &mut Self {
+  pub fn set_post_route_callback(
+    &mut self,
+    callback: CleanupCallback,
+  ) -> &mut Self {
     self.post_route_callback = Arc::new(Mutex::new(callback));
 
     self
@@ -763,7 +765,7 @@ impl Default for Router {
       #[cfg(feature = "logger")]
       default_logger: false,
       pre_route_callback: Arc::new(Mutex::new(Box::new(|_| {}))),
-      post_route_callback: Arc::new(Mutex::new(Box::new(|_| {}))),
+      post_route_callback: Arc::new(Mutex::new(Box::new(|_, _| {}))),
       charset: "utf-8".to_string(),
       language: "en".to_string(),
       port: 1965,
