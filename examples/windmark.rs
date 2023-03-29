@@ -82,7 +82,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       context.url.to_string()
     )
   }));
-  router.set_post_route_callback(Box::new(|context| {
+  router.set_post_route_callback(Box::new(|context, content| {
+    *content = content.replace("Welcome!", "Welcome to Windmark!");
+
     info!(
       "closed connection from {}",
       context.tcp.peer_addr().unwrap().ip()
