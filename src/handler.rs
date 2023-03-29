@@ -16,16 +16,12 @@
 // Copyright (C) 2022-2022 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-use crate::{returnable::RouteContext, Response};
+use crate::{returnable, returnable::RouteContext, Response};
 
 pub type RouteResponse =
   Box<dyn FnMut(RouteContext<'_>) -> Response<'_> + Send + Sync>;
-pub type ErrorResponse = Box<
-  dyn FnMut(crate::returnable::ErrorContext<'_>) -> Response<'_> + Send + Sync,
->;
-pub type Callback = Box<
-  dyn FnMut(&tokio::net::TcpStream, &url::Url, Option<&matchit::Params<'_, '_>>)
-    + Send
-    + Sync,
->;
+pub type ErrorResponse =
+  Box<dyn FnMut(returnable::ErrorContext<'_>) -> Response<'_> + Send + Sync>;
+pub type Callback =
+  Box<dyn FnMut(returnable::CallbackContext<'_>) + Send + Sync>;
 pub type Partial = Box<dyn FnMut(RouteContext<'_>) -> String + Send + Sync>;

@@ -75,17 +75,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
   });
   router.attach(Clicker::default());
-  router.set_pre_route_callback(Box::new(|stream, url, _| {
+  router.set_pre_route_callback(Box::new(|context| {
     info!(
       "accepted connection from {} to {}",
-      stream.peer_addr().unwrap().ip(),
-      url.to_string()
+      context.tcp.peer_addr().unwrap().ip(),
+      context.url.to_string()
     )
   }));
-  router.set_post_route_callback(Box::new(|stream, _url, _| {
+  router.set_post_route_callback(Box::new(|context| {
     info!(
       "closed connection from {}",
-      stream.peer_addr().unwrap().ip()
+      context.tcp.peer_addr().unwrap().ip()
     )
   }));
   router.add_header(Box::new(|_| "```\nART IS COOL\n```\nhi".to_string()));
