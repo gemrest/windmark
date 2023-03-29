@@ -316,9 +316,12 @@ impl Router {
       ));
     }
 
-    (*self.pre_route_callback).lock().unwrap()(stream.get_ref(), &url, {
-      route.as_ref().map_or(None, |route| Some(&route.params))
-    });
+    (*self.pre_route_callback).lock().unwrap()(CallbackContext::new(
+      stream.get_ref(),
+      &url,
+      route.as_ref().map_or(None, |route| Some(&route.params)),
+      &stream.ssl().peer_certificate(),
+    ));
 
     let content = if let Ok(ref route) = route {
       let footers_length = (*self.footers.lock().unwrap()).len();
@@ -418,9 +421,12 @@ impl Router {
       ));
     }
 
-    (*self.post_route_callback).lock().unwrap()(stream.get_ref(), &url, {
-      route.as_ref().map_or(None, |route| Some(&route.params))
-    });
+    (*self.post_route_callback).lock().unwrap()(CallbackContext::new(
+      stream.get_ref(),
+      &url,
+      route.as_ref().map_or(None, |route| Some(&route.params)),
+      &stream.ssl().peer_certificate(),
+    ));
 
     stream.shutdown().await?;
 
@@ -756,8 +762,8 @@ impl Default for Router {
       ),
       #[cfg(feature = "logger")]
       default_logger: false,
-      pre_route_callback: Arc::new(Mutex::new(Box::new(|_, _, _| {}))),
-      post_route_callback: Arc::new(Mutex::new(Box::new(|_, _, _| {}))),
+      pre_route_callback: Arc::new(Mutex::new(Box::new(|_| {}))),
+      post_route_callback: Arc::new(Mutex::new(Box::new(|_| {}))),
       charset: "utf-8".to_string(),
       language: "en".to_string(),
       port: 1965,
