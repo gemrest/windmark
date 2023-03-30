@@ -125,11 +125,11 @@ impl Router {
   /// windmark::Router::new()
   ///   .mount(
   ///     "/",
-  ///     Box::new(|_| Response::Success("This is the index page!".into())),
+  ///     Box::new(|_| Response::success("This is the index page!")),
   ///   )
   ///   .mount(
   ///     "/test",
-  ///     Box::new(|_| Response::Success("This is a test page!".into())),
+  ///     Box::new(|_| Response::success("This is a test page!")),
   ///   );
   /// ```
   ///
@@ -151,7 +151,7 @@ impl Router {
   ///
   /// ```rust
   /// windmark::Router::new().set_error_handler(Box::new(|_| {
-  ///   windmark::Response::Success("You have encountered an error!".into())
+  ///   windmark::Response::success("You have encountered an error!")
   /// }));
   /// ```
   pub fn set_error_handler(&mut self, handler: ErrorResponse) -> &mut Self {
@@ -587,11 +587,11 @@ impl Router {
   /// windmark::Router::new().attach_stateless(|r| {
   ///   r.mount(
   ///     "/module",
-  ///     Box::new(|_| Response::Success("This is a module!".into())),
+  ///     Box::new(|_| Response::success("This is a module!")),
   ///   );
   ///   r.set_error_handler(Box::new(|_| {
-  ///     Response::NotFound(
-  ///       "This error handler has been implemented by a module!".into(),
+  ///     Response::not_found(
+  ///       "This error handler has been implemented by a module!",
   ///     )
   ///   }));
   /// });
@@ -606,7 +606,7 @@ impl Router {
   ///   pub fn module(router: &mut windmark::Router) {
   ///     router.mount(
   ///       "/module",
-  ///       Box::new(|_| windmark::Response::Success("This is a module!".into())),
+  ///       Box::new(|_| windmark::Response::success("This is a module!")),
   ///     );
   ///   }
   /// }
