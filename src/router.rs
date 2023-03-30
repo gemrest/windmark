@@ -29,7 +29,7 @@ use url::Url;
 use crate::{
   handler::{Callback, CleanupCallback, ErrorResponse, Partial, RouteResponse},
   module::Module,
-  response::{to_value_set_status, Response},
+  response::Response,
   returnable::{CallbackContext, ErrorContext, RouteContext},
 };
 
@@ -271,8 +271,6 @@ impl Router {
   ) -> Result<(), Box<dyn Error>> {
     let mut buffer = [0u8; 1024];
     let mut url = Url::parse("gemini://fuwn.me/")?;
-    let mut response_status = 0;
-    let mut response_mime_type = String::new();
     let mut footer = String::new();
     let mut header = String::new();
 
@@ -356,26 +354,19 @@ impl Router {
           },
         ));
       }
-      to_value_set_status(
-        (*route.value).lock().unwrap()(RouteContext::new(
-          stream.get_ref(),
-          &url,
-          &route.params,
-          &stream.ssl().peer_certificate(),
-        )),
-        &mut response_status,
-        &mut response_mime_type,
-      )
+
+      (*route.value).lock().unwrap()(RouteContext::new(
+        stream.get_ref(),
+        &url,
+        &route.params,
+        &stream.ssl().peer_certificate(),
+      ))
     } else {
-      to_value_set_status(
-        (*self.error_handler).lock().unwrap()(ErrorContext::new(
-          stream.get_ref(),
-          &url,
-          &stream.ssl().peer_certificate(),
-        )),
-        &mut response_status,
-        &mut response_mime_type,
-      )
+      (*self.error_handler).lock().unwrap()(ErrorContext::new(
+        stream.get_ref(),
+        &url,
+        &stream.ssl().peer_certificate(),
+      ))
     };
 
     for module in &mut *self.modules.lock().unwrap() {
@@ -394,36 +385,39 @@ impl Router {
         route.as_ref().map_or(None, |route| Some(&route.params)),
         &stream.ssl().peer_certificate(),
       ),
-      &mut content,
+      &mut content.content,
     );
 
     stream
       .write_all(
         format!(
           "{}{}\r\n{}",
-          if response_status == 21
-            || response_status == 22
-            || response_status == 23
+          if content.status == 21
+            || content.status == 22
+            || content.status == 23
           {
             20
           } else {
-            response_status
+            content.status
           },
-          match response_status {
+          match content.status {
             20 =>
               format!(
-                " text/gemini; charset={}; lang={}",
-                self.charset, self.language
+                " {}; charset={}; lang={}",
+                content.mime.unwrap_or_else(|| "text/gemini".to_string()),
+                content
+                  .character_set
+                  .unwrap_or_else(|| self.charset.clone()),
+                content.language.unwrap_or_else(|| self.language.clone())
               ),
-            21 => response_mime_type,
+            21 => content.mime.unwrap_or_default(),
             #[cfg(feature = "auto-deduce-mime")]
-            22 => format!(" {}", tree_magic::from_u8(&*content.as_bytes())),
-            23 => response_mime_type,
-            _ => format!(" {content}"),
+            22 => format!(" {}", content.mime.unwrap_or_default()),
+            _ => format!(" {}", content.content),
           },
-          match response_status {
-            20 => format!("{header}{content}\n{footer}"),
-            21 | 22 | 23 => content.to_string(),
+          match content.status {
+            20 => format!("{header}{}\n{footer}", content.content),
+            21 | 22 => content.content,
             _ => String::new(),
           }
         )
@@ -749,8 +743,8 @@ impl Default for Router {
     Self {
       routes: matchit::Router::new(),
       error_handler: Arc::new(Mutex::new(Box::new(|_| {
-        Response::NotFound(
-          "This capsule has not implemented an error handler...".to_string(),
+        Response::not_found(
+          "This capsule has not implemented an error handler...",
         )
       }))),
       private_key_file_name: String::new(),

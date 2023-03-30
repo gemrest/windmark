@@ -18,149 +18,110 @@
 
 //! Content and response handlers
 
-/// The content and response type a handler should reply with.
-pub enum Response<'a> {
-  Input(String),
-  SensitiveInput(String),
-  Success(String),
-  /// A successful response where the MIME type of the response is manually
-  /// specific by the user
-  SuccessWithMime(String, String),
-  #[cfg(feature = "auto-deduce-mime")]
-  /// A successful response where the MIME type of the response is
-  /// automatically deduced from the provided bytes
-  SuccessFileAuto(&'a [u8]),
-  SuccessFile(&'a [u8], String),
-  TemporaryRedirect(String),
-  PermanentRedirect(String),
-  TemporaryFailure(String),
-  ServerUnavailable(String),
-  CGIError(String),
-  ProxyError(String),
-  SlowDown(String),
-  PermanentFailure(String),
-  NotFound(String),
-  Gone(String),
-  ProxyRefused(String),
-  BadRequest(String),
-  ClientCertificateRequired(String),
-  CertificateNotAuthorised(String),
-  CertificateNotValid(String),
+macro_rules! response {
+  ($name:ident, $status:expr) => {
+    pub fn $name<S>(content: S) -> Self
+    where S: AsRef<str> {
+      Self::new($status, content.as_ref())
+    }
+  };
 }
 
-pub(crate) fn to_value_set_status(
-  response: Response<'_>,
-  status: &mut i32,
-  mime: &mut String,
-) -> String {
-  match response {
-    Response::Input(value) => {
-      *status = 10;
+/// The content and response type a handler should reply with.
+#[derive(Clone)]
+pub struct Response {
+  pub status:        i32,
+  pub mime:          Option<String>,
+  pub content:       String,
+  pub character_set: Option<String>,
+  pub language:      Option<String>,
+}
 
-      value
-    }
-    Response::SensitiveInput(value) => {
-      *status = 11;
+impl Response {
+  response!(input, 10);
 
-      value
-    }
-    Response::Success(value) => {
-      *status = 20;
+  response!(sensitive_input, 11);
 
-      value
-    }
-    Response::SuccessWithMime(value, value_mime) => {
-      *status = 23;
-      *mime = value_mime;
+  response!(temporary_redirect, 30);
 
-      value
-    }
-    Response::SuccessFile(value, value_mime) => {
-      *status = 21; // Internal status code, not real.
-      *mime = value_mime;
+  response!(permanent_redirect, 31);
 
-      String::from_utf8(value.to_vec()).unwrap()
-    }
-    #[cfg(feature = "auto-deduce-mime")]
-    Response::SuccessFileAuto(value) => {
-      *status = 22; // Internal status code, not real.
+  response!(temporary_failure, 40);
 
-      String::from_utf8(value.to_vec()).unwrap()
-    }
-    Response::TemporaryRedirect(value) => {
-      *status = 30;
+  response!(server_unavailable, 41);
 
-      value
-    }
-    Response::PermanentRedirect(value) => {
-      *status = 31;
+  response!(cgi_error, 42);
 
-      value
-    }
-    Response::TemporaryFailure(value) => {
-      *status = 40;
+  response!(proxy_error, 43);
 
-      value
-    }
-    Response::ServerUnavailable(value) => {
-      *status = 41;
+  response!(slow_down, 44);
 
-      value
-    }
-    Response::CGIError(value) => {
-      *status = 42;
+  response!(permanent_failure, 50);
 
-      value
-    }
-    Response::ProxyError(value) => {
-      *status = 43;
+  response!(not_found, 51);
 
-      value
-    }
-    Response::SlowDown(value) => {
-      *status = 44;
+  response!(gone, 52);
 
-      value
-    }
-    Response::PermanentFailure(value) => {
-      *status = 50;
+  response!(proxy_refused, 53);
 
-      value
-    }
-    Response::NotFound(value) => {
-      *status = 51;
+  response!(bad_request, 59);
 
-      value
-    }
-    Response::Gone(value) => {
-      *status = 52;
+  response!(client_certificate_required, 60);
 
-      value
-    }
-    Response::ProxyRefused(value) => {
-      *status = 53;
+  response!(certificate_not_authorised, 61);
 
-      value
-    }
-    Response::BadRequest(value) => {
-      *status = 59;
+  response!(certificate_not_valid, 62);
 
-      value
-    }
-    Response::ClientCertificateRequired(value) => {
-      *status = 60;
+  pub fn success<S>(content: S) -> Self
+  where S: AsRef<str> {
+    Self::new(20, content.as_ref())
+      .with_mime("text/gemini")
+      .with_language("en")
+      .with_character_set("utf-8")
+      .clone()
+  }
 
-      value
-    }
-    Response::CertificateNotAuthorised(value) => {
-      *status = 61;
+  #[must_use]
+  pub fn binary_success(content: &[u8], mime: &str) -> Self {
+    Self::new(21, &String::from_utf8_lossy(content))
+      .with_mime(mime)
+      .clone()
+  }
 
-      value
-    }
-    Response::CertificateNotValid(value) => {
-      *status = 62;
+  #[cfg(feature = "auto-deduce-mime")]
+  #[must_use]
+  pub fn binary_success_auto(content: &[u8]) -> Self {
+    Self::new(22, &String::from_utf8_lossy(content))
+      .with_mime(&tree_magic::from_u8(&*content))
+      .clone()
+  }
 
-      value
+  #[must_use]
+  pub fn new(status: i32, content: &str) -> Self {
+    Self {
+      status,
+      mime: None,
+      content: content.to_string(),
+      character_set: None,
+      language: None,
     }
+  }
+
+  pub fn with_mime(&mut self, mime: &str) -> &mut Self {
+    self.mime = Some(mime.to_string());
+
+    self
+  }
+
+  pub fn with_character_set(&mut self, character_set: &str) -> &mut Self {
+    self.character_set = Some(character_set.to_string());
+
+    self
+  }
+
+  pub fn with_language(&mut self, language: &str) -> &mut Self {
+    self.language = Some(language.to_string());
+
+    self
   }
 }
