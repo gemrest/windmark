@@ -65,7 +65,7 @@ pub struct Router {
   default_logger:        bool,
   pre_route_callback:    Arc<Mutex<Callback>>,
   post_route_callback:   Arc<Mutex<CleanupCallback>>,
-  charset:               String,
+  character_set:         String,
   language:              String,
   port:                  i32,
   modules:               Arc<Mutex<Vec<Box<dyn Module + Send>>>>,
@@ -407,7 +407,7 @@ impl Router {
                 content.mime.unwrap_or_else(|| "text/gemini".to_string()),
                 content
                   .character_set
-                  .unwrap_or_else(|| self.charset.clone()),
+                  .unwrap_or_else(|| self.character_set.clone()),
                 content.language.unwrap_or_else(|| self.language.clone())
               ),
             21 => content.mime.unwrap_or_default(),
@@ -681,20 +681,24 @@ impl Router {
 
   /// Specify a custom character set.
   ///
+  /// Will be over-ridden if a character set is specified in a [`Response`].
+  ///
   /// Defaults to `"utf-8"`.
   ///
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().set_charset("utf-8"); 
+  /// windmark::Router::new().set_character_set("utf-8"); 
   /// ```
-  pub fn set_charset(&mut self, charset: &str) -> &mut Self {
-    self.charset = charset.to_string();
+  pub fn set_character_set(&mut self, character_set: &str) -> &mut Self {
+    self.character_set = character_set.to_string();
 
     self
   }
 
   /// Specify a custom language.
+  ///
+  /// Will be over-ridden if a language is specified in a [`Response`].
   ///
   /// Defaults to `"en"`.
   ///
@@ -760,7 +764,7 @@ impl Default for Router {
       default_logger: false,
       pre_route_callback: Arc::new(Mutex::new(Box::new(|_| {}))),
       post_route_callback: Arc::new(Mutex::new(Box::new(|_, _| {}))),
-      charset: "utf-8".to_string(),
+      character_set: "utf-8".to_string(),
       language: "en".to_string(),
       port: 1965,
       modules: Arc::new(Mutex::new(vec![])),
