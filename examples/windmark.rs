@@ -21,7 +21,7 @@
 #[macro_use]
 extern crate log;
 
-use windmark::{returnable::CallbackContext, Response, Router};
+use windmark::{response::Response, returnable::CallbackContext, Router};
 
 #[derive(Default)]
 struct Clicker {
@@ -65,13 +65,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("{} errors so far", error_count);
 
-    Response::PermanentFailure("e".into())
+    Response::permanent_failure("e")
   }));
   router.set_fix_path(true);
   router.attach_stateless(|r| {
     r.mount(
       "/module",
-      Box::new(|_| Response::Success("This is a module!".into())),
+      Box::new(|_| Response::success("This is a module!")),
     );
   });
   router.attach(Clicker::default());
@@ -98,38 +98,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   router.mount(
     "/",
     Box::new(|_| {
-      Response::Success(
-        "# INDEX\n\nWelcome!\n\n=> /test Test Page\n=> /time Unix Epoch"
-          .to_string(),
+      Response::success(
+        "# INDEX\n\nWelcome!\n\n=> /test Test Page\n=> /time Unix Epoch",
       )
     }),
   );
   router.mount(
     "/specific-mime",
     Box::new(|_| {
-      Response::SuccessWithMime("hi".to_string(), "text/plain".to_string())
+      Response::success("hi".to_string())
+        .with_mime("text/plain")
+        .clone()
     }),
   );
   router.mount(
     "/ip",
     Box::new(|context| {
-      Response::Success(
-        { format!("Hello, {}", context.tcp.peer_addr().unwrap().ip()) }.into(),
-      )
+      Response::success(format!(
+        "Hello, {}",
+        context.tcp.peer_addr().unwrap().ip()
+      ))
     }),
   );
   router.mount(
     "/test",
-    Box::new(|_| Response::Success("hi there\n=> / back".to_string())),
+    Box::new(|_| Response::success("hi there\n=> / back")),
   );
   router.mount(
     "/temporary-failure",
-    Box::new(|_| Response::TemporaryFailure("Woops, temporarily...".into())),
+    Box::new(|_| Response::temporary_failure("Woops, temporarily...")),
   );
   router.mount(
     "/time",
     Box::new(|_| {
-      Response::Success(
+      Response::success(
         std::time::UNIX_EPOCH
           .elapsed()
           .unwrap()
@@ -141,7 +143,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   router.mount(
     "/query",
     Box::new(|context| {
-      Response::Success(format!(
+      Response::success(format!(
         "queries: {:?}",
         windmark::utilities::queries_from_url(&context.url)
       ))
@@ -150,7 +152,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   router.mount(
     "/param/:lang",
     Box::new(|context| {
-      Response::Success(format!(
+      Response::success(format!(
         "Parameter lang is {}",
         context.params.get("lang").unwrap()
       ))
@@ -159,7 +161,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   router.mount(
     "/names/:first/:last",
     Box::new(|context| {
-      Response::Success(format!(
+      Response::success(format!(
         "{} {}",
         context.params.get("first").unwrap(),
         context.params.get("last").unwrap()
@@ -170,9 +172,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     "/input",
     Box::new(|context| {
       if let Some(name) = context.url.query() {
-        Response::Success(format!("Your name is {}!", name))
+        Response::success(format!("Your name is {}!", name))
       } else {
-        Response::Input("What is your name?".into())
+        Response::input("What is your name?")
       }
     }),
   );
@@ -180,37 +182,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     "/sensitive-input",
     Box::new(|context| {
       if let Some(password) = context.url.query() {
-        Response::Success(format!("Your password is {}!", password))
+        Response::success(format!("Your password is {}!", password))
       } else {
-        Response::SensitiveInput("What is your password?".into())
+        Response::sensitive_input("What is your password?")
       }
     }),
   );
   router.mount(
     "/error",
-    Box::new(|_| Response::CertificateNotValid("no".into())),
+    Box::new(|_| Response::certificate_not_valid("no")),
   );
   router.mount(
     "/redirect",
-    Box::new(|_| Response::PermanentRedirect("gemini://localhost/test".into())),
+    Box::new(|_| Response::permanent_redirect("gemini://localhost/test")),
   );
   #[cfg(feature = "auto-deduce-mime")]
   router.mount("/auto-file", {
-    Box::new(|_| Response::SuccessFileAuto(include_bytes!("../LICENSE")))
+    Box::new(|_| Response::binary_success_auto(include_bytes!("../LICENSE")))
   });
   router.mount("/file", {
     Box::new(|_| {
-      Response::SuccessFile(
-        include_bytes!("../LICENSE"),
-        "text/plain".to_string(),
-      )
+      Response::binary_success(include_bytes!("../LICENSE"), "text/plain")
+        .clone()
     })
   });
   router.mount(
     "/secret",
     Box::new(|context| {
       if let Some(certificate) = context.certificate {
-        Response::Success(format!("Your public key: {}.", {
+        Response::success(format!("Your public key: {}.", {
           (|| -> Result<String, openssl::error::ErrorStack> {
             Ok(format!(
               "{:?}",
@@ -220,8 +220,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
           .unwrap_or_else(|_| "Unknown".to_string())
         },))
       } else {
-        Response::ClientCertificateRequired(
-          "This is a secret route! Identify yourself!".to_string(),
+        Response::client_certificate_required(
+          "This is a secret route! Identify yourself!",
         )
       }
     }),
