@@ -21,7 +21,12 @@
 #[macro_use]
 extern crate log;
 
-use windmark::{response::Response, returnable::CallbackContext, Router};
+use windmark::{
+  response::Response,
+  returnable::CallbackContext,
+  success,
+  Router,
+};
 
 #[derive(Default)]
 struct Clicker {
@@ -69,10 +74,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   }));
   router.set_fix_path(true);
   router.attach_stateless(|r| {
-    r.mount(
-      "/module",
-      Box::new(|_| Response::success("This is a module!")),
-    );
+    r.mount("/module", success!("This is a module!"));
   });
   router.attach(Clicker::default());
   router.set_pre_route_callback(Box::new(|context| {
@@ -97,11 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   }));
   router.mount(
     "/",
-    Box::new(|_| {
-      Response::success(
-        "# INDEX\n\nWelcome!\n\n=> /test Test Page\n=> /time Unix Epoch",
-      )
-    }),
+    success!("# INDEX\n\nWelcome!\n\n=> /test Test Page\n=> /time Unix Epoch"),
   );
   router.mount(
     "/specific-mime",
@@ -113,60 +111,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   );
   router.mount(
     "/ip",
-    Box::new(|context| {
-      Response::success(format!(
-        "Hello, {}",
-        context.tcp.peer_addr().unwrap().ip()
-      ))
-    }),
+    success!(
+      context,
+      format!("Hello, {}", context.tcp.peer_addr().unwrap().ip())
+    ),
   );
-  router.mount(
-    "/test",
-    Box::new(|_| Response::success("hi there\n=> / back")),
-  );
+  router.mount("/test", success!("hi there\n=> / back"));
   router.mount(
     "/temporary-failure",
-    Box::new(|_| Response::temporary_failure("Woops, temporarily...")),
+    windmark::temporary_failure!("Woops, temporarily..."),
   );
   router.mount(
     "/time",
-    Box::new(|_| {
-      Response::success(
-        std::time::UNIX_EPOCH
-          .elapsed()
-          .unwrap()
-          .as_nanos()
-          .to_string(),
-      )
-    }),
+    success!(std::time::UNIX_EPOCH
+      .elapsed()
+      .unwrap()
+      .as_nanos()
+      .to_string()),
   );
   router.mount(
     "/query",
-    Box::new(|context| {
-      Response::success(format!(
+    success!(
+      context,
+      format!(
         "queries: {:?}",
         windmark::utilities::queries_from_url(&context.url)
-      ))
-    }),
+      )
+    ),
   );
   router.mount(
     "/param/:lang",
-    Box::new(|context| {
-      Response::success(format!(
-        "Parameter lang is {}",
-        context.params.get("lang").unwrap()
-      ))
-    }),
+    success!(
+      context,
+      format!("Parameter lang is {}", context.params.get("lang").unwrap())
+    ),
   );
   router.mount(
     "/names/:first/:last",
-    Box::new(|context| {
-      Response::success(format!(
+    success!(
+      context,
+      format!(
         "{} {}",
         context.params.get("first").unwrap(),
         context.params.get("last").unwrap()
-      ))
-    }),
+      )
+    ),
   );
   router.mount(
     "/input",
@@ -188,23 +177,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       }
     }),
   );
-  router.mount(
-    "/error",
-    Box::new(|_| Response::certificate_not_valid("no")),
-  );
+  router.mount("/error", windmark::certificate_not_valid!("no"));
   router.mount(
     "/redirect",
-    Box::new(|_| Response::permanent_redirect("gemini://localhost/test")),
+    windmark::permanent_redirect!("gemini://localhost/test"),
   );
   #[cfg(feature = "auto-deduce-mime")]
   router.mount("/auto-file", {
-    Box::new(|_| Response::binary_success_auto(include_bytes!("../LICENSE")))
+    windmark::binary_success_auto!(include_bytes!("../LICENSE"))
   });
   router.mount("/file", {
-    Box::new(|_| {
-      Response::binary_success(include_bytes!("../LICENSE"), "text/plain")
-        .clone()
-    })
+    windmark::binary_success!(include_bytes!("../LICENSE"), "text/plain")
   });
   router.mount(
     "/secret",

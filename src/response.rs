@@ -18,6 +18,8 @@
 
 //! Content and response handlers
 
+mod macros;
+
 macro_rules! response {
   ($name:ident, $status:expr) => {
     pub fn $name<S>(content: S) -> Self
