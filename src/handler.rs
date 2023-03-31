@@ -28,5 +28,5 @@ pub type ErrorResponse =
   Box<dyn FnMut(returnable::ErrorContext<'_>) -> Response + Send + Sync>;
 pub type Callback = Box<dyn FnMut(CallbackContext<'_>) + Send + Sync>;
 pub type CleanupCallback =
-  Box<dyn FnMut(CallbackContext<'_>, &mut String) + Send + Sync>;
+  Box<dyn FnMut(CallbackContext<'_>, &mut Response) + Send + Sync>;
 pub type Partial = Box<dyn FnMut(RouteContext<'_>) -> String + Send + Sync>;
