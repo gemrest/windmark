@@ -18,15 +18,15 @@ Check out an example starter project
 # Cargo.toml
 
 [dependencies]
-windmark = "0.2.3"
+windmark = "0.2.4"
 tokio = { version = "0.2.4", features = ["full"] }
 
 # If you would like to use the built-in logger (recommended)
-# windmark = { version = "0.2.3", features = ["logger"] }
+# windmark = { version = "0.2.4", features = ["logger"] }
 
 # If you would like to use the built-in MIME dedection when `Success`-ing a file
 # (recommended)
-# windmark = { version = "0.2.3", features = ["auto-deduce-mime"] }
+# windmark = { version = "0.2.4", features = ["auto-deduce-mime"] }
 ```
 
 ### Implement a Windmark server
@@ -41,10 +41,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   windmark::Router::new()
     .set_private_key_file("windmark_private.pem")
     .set_certificate_file("windmark_public.pem")
-    .mount("/", Box::new(|_| Response::success("Hello, World!")))
-    .set_error_handler(Box::new(|_| {
-      Response::permanent_failure("This route does not exist!")
-    }))
+    .mount("/", windmark::success!("Hello, World!"))
+    .set_error_handler(
+      windmark::permanent_failure!("This route does not exist!")
+    )
     .run()
     .await
 }
