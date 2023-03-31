@@ -17,6 +17,7 @@ categories = ["web-programming"]
 [features]
 logger = ["pretty_env_logger"]
 auto-deduce-mime = ["tree_magic"]
+response-macros = []
 
 [dependencies]
 # SSL
