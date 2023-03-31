@@ -326,6 +326,7 @@ impl Router {
       &stream.ssl().peer_certificate(),
     ));
 
+    let peer_certificate = stream.ssl().peer_certificate();
     let mut content = if let Ok(ref route) = route {
       let footers_length = (*self.footers.lock().unwrap()).len();
 
@@ -364,13 +365,13 @@ impl Router {
         stream.get_ref(),
         &url,
         &route.params,
-        &stream.ssl().peer_certificate(),
+        &peer_certificate,
       ))
     } else {
       (*self.error_handler).lock().unwrap()(ErrorContext::new(
         stream.get_ref(),
         &url,
-        &stream.ssl().peer_certificate(),
+        &peer_certificate,
       ))
     };
 
@@ -390,7 +391,7 @@ impl Router {
         route.as_ref().map_or(None, |route| Some(&route.params)),
         &stream.ssl().peer_certificate(),
       ),
-      &mut content.content,
+      &mut content,
     );
 
     stream
