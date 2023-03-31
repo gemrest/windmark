@@ -85,7 +85,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
   }));
   router.set_post_route_callback(Box::new(|context, content| {
-    *content = content.replace("Welcome!", "Welcome to Windmark!");
+    content.content =
+      content.content.replace("Welcome!", "Welcome to Windmark!");
 
     info!(
       "closed connection from {}",
