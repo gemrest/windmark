@@ -21,8 +21,8 @@
 macro_rules! response {
   ($name:ident, $status:expr) => {
     pub fn $name<S>(content: S) -> Self
-    where S: AsRef<str> {
-      Self::new($status, content.as_ref())
+    where S: Into<String> + AsRef<str> {
+      Self::new($status, content.into())
     }
   };
 }
@@ -73,8 +73,8 @@ impl Response {
   response!(certificate_not_valid, 62);
 
   pub fn success<S>(content: S) -> Self
-  where S: AsRef<str> {
-    Self::new(20, content.as_ref())
+  where S: Into<String> + AsRef<str> {
+    Self::new(20, content.into())
       .with_mime("text/gemini")
       .with_language("en")
       .with_character_set("utf-8")
@@ -83,7 +83,7 @@ impl Response {
 
   #[must_use]
   pub fn binary_success(content: &[u8], mime: &str) -> Self {
-    Self::new(21, &String::from_utf8_lossy(content))
+    Self::new(21, String::from_utf8_lossy(content))
       .with_mime(mime)
       .clone()
   }
@@ -91,36 +91,40 @@ impl Response {
   #[cfg(feature = "auto-deduce-mime")]
   #[must_use]
   pub fn binary_success_auto(content: &[u8]) -> Self {
-    Self::new(22, &String::from_utf8_lossy(content))
+    Self::new(22, String::from_utf8_lossy(content))
       .with_mime(&tree_magic::from_u8(&*content))
       .clone()
   }
 
   #[must_use]
-  pub fn new(status: i32, content: &str) -> Self {
+  pub fn new<S>(status: i32, content: S) -> Self
+  where S: Into<String> + AsRef<str> {
     Self {
       status,
       mime: None,
-      content: content.to_string(),
+      content: content.into(),
       character_set: None,
       language: None,
     }
   }
 
-  pub fn with_mime(&mut self, mime: &str) -> &mut Self {
-    self.mime = Some(mime.to_string());
+  pub fn with_mime<S>(&mut self, mime: S) -> &mut Self
+  where S: Into<String> + AsRef<str> {
+    self.mime = Some(mime.into());
 
     self
   }
 
-  pub fn with_character_set(&mut self, character_set: &str) -> &mut Self {
-    self.character_set = Some(character_set.to_string());
+  pub fn with_character_set<S>(&mut self, character_set: S) -> &mut Self
+  where S: Into<String> + AsRef<str> {
+    self.character_set = Some(character_set.into());
 
     self
   }
 
-  pub fn with_language(&mut self, language: &str) -> &mut Self {
-    self.language = Some(language.to_string());
+  pub fn with_language<S>(&mut self, language: S) -> &mut Self
+  where S: Into<String> + AsRef<str> {
+    self.language = Some(language.into());
 
     self
   }
