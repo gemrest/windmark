@@ -18,6 +18,7 @@
 
 //! Content and response handlers
 
+#[cfg(feature = "response-macros")]
 mod macros;
 
 macro_rules! response {
