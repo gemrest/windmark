@@ -66,7 +66,7 @@ pub struct Router {
   pre_route_callback:    Arc<Mutex<Callback>>,
   post_route_callback:   Arc<Mutex<CleanupCallback>>,
   character_set:         String,
-  language:              String,
+  languages:             Vec<String>,
   port:                  i32,
   modules:               Arc<Mutex<Vec<Box<dyn Module + Send>>>>,
   fix_path:              bool,
@@ -416,7 +416,10 @@ impl Router {
                 content
                   .character_set
                   .unwrap_or_else(|| self.character_set.clone()),
-                content.language.unwrap_or_else(|| self.language.clone())
+                content
+                  .languages
+                  .unwrap_or_else(|| self.languages.clone())
+                  .join(","),
               ),
             21 => content.mime.unwrap_or_default(),
             #[cfg(feature = "auto-deduce-mime")]
@@ -716,13 +719,15 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().set_language("en"); 
+  /// windmark::Router::new().set_languages("en"); 
   /// ```
-  pub fn set_language(
-    &mut self,
-    language: impl Into<String> + AsRef<str>,
-  ) -> &mut Self {
-    self.language = language.into();
+  pub fn set_languages<S>(&mut self, language: impl AsRef<[S]>) -> &mut Self
+  where S: Into<String> + AsRef<str> {
+    self.languages = language
+      .as_ref()
+      .iter()
+      .map(|s| s.as_ref().to_string())
+      .collect::<Vec<String>>();
 
     self
   }
@@ -779,7 +784,7 @@ impl Default for Router {
       pre_route_callback: Arc::new(Mutex::new(Box::new(|_| {}))),
       post_route_callback: Arc::new(Mutex::new(Box::new(|_, _| {}))),
       character_set: "utf-8".to_string(),
-      language: "en".to_string(),
+      languages: vec!["en".to_string()],
       port: 1965,
       modules: Arc::new(Mutex::new(vec![])),
       fix_path: false,
