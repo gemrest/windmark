@@ -186,6 +186,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   router.mount("/file", {
     windmark::binary_success!(include_bytes!("../LICENSE"), "text/plain")
   });
+  router.mount("/string-file", {
+    windmark::binary_success!("hi", "text/plain")
+  });
   router.mount(
     "/secret",
     Box::new(|context| {
