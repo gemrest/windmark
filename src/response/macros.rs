@@ -61,9 +61,41 @@ macro_rules! binary_success {
       ::windmark::Response::binary_success($body, $mime)
     })
   };
+  ($body:expr) => {{
+    #[cfg(not(feature = "auto-deduce-mime"))]
+    compile_error!(
+      "`binary_success` without a MIME type requires the `auto-deduce-mime` \
+       feature to be enabled"
+    );
+
+    ::std::boxed::Box::new(|_| {
+      #[cfg(feature = "auto-deduce-mime")]
+      return ::windmark::Response::binary_success_auto($body);
+
+      // Suppress item not found warning
+      #[cfg(not(feature = "auto-deduce-mime"))]
+      ::windmark::Response::binary_success($body, "application/octet-stream")
+    })
+  }};
   ($context:ident, $body:expr, $mime:expr) => {
     ::std::boxed::Box::new(|$context| {
       ::windmark::Response::binary_success($body, $mime)
     })
   };
+  ($context:ident, $body:expr) => {{
+    #[cfg(not(feature = "auto-deduce-mime"))]
+    compile_error!(
+      "`binary_success` without a MIME type requires the `auto-deduce-mime` \
+       feature to be enabled"
+    );
+
+    ::std::boxed::Box::new(|$context| {
+      #[cfg(feature = "auto-deduce-mime")]
+      return ::windmark::Response::binary_success_auto($body);
+
+      // Suppress item not found warning
+      #[cfg(not(feature = "auto-deduce-mime"))]
+      ::windmark::Response::binary_success($body, "application/octet-stream")
+    })
+  }};
 }
