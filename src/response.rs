@@ -37,7 +37,7 @@ pub struct Response {
   pub mime:          Option<String>,
   pub content:       String,
   pub character_set: Option<String>,
-  pub language:      Option<String>,
+  pub languages:     Option<Vec<String>>,
 }
 
 impl Response {
@@ -79,7 +79,7 @@ impl Response {
   pub fn success(content: impl ToString) -> Self {
     Self::new(20, content.to_string())
       .with_mime("text/gemini")
-      .with_language("en")
+      .with_languages(["en"])
       .with_character_set("utf-8")
       .clone()
   }
@@ -109,7 +109,7 @@ impl Response {
       mime: None,
       content: content.into(),
       character_set: None,
-      language: None,
+      languages: None,
     }
   }
 
@@ -131,11 +131,15 @@ impl Response {
     self
   }
 
-  pub fn with_language(
-    &mut self,
-    language: impl Into<String> + AsRef<str>,
-  ) -> &mut Self {
-    self.language = Some(language.into());
+  pub fn with_languages<S>(&mut self, languages: impl AsRef<[S]>) -> &mut Self
+  where S: Into<String> + AsRef<str> {
+    self.languages = Some(
+      languages
+        .as_ref()
+        .iter()
+        .map(|s| s.as_ref().to_string())
+        .collect::<Vec<String>>(),
+    );
 
     self
   }
