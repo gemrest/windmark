@@ -93,13 +93,10 @@ impl Router {
   /// ```rust
   /// windmark::Router::new().set_private_key_file("windmark_private.pem");
   /// ```
-  pub fn set_private_key_file<S>(
+  pub fn set_private_key_file(
     &mut self,
-    private_key_file_name: S,
-  ) -> &mut Self
-  where
-    S: Into<String> + AsRef<str>,
-  {
+    private_key_file_name: impl Into<String> + AsRef<str>,
+  ) -> &mut Self {
     self.private_key_file_name = private_key_file_name.into();
 
     self
@@ -112,8 +109,10 @@ impl Router {
   /// ```rust
   /// windmark::Router::new().set_certificate_file("windmark_public.pem");
   /// ```
-  pub fn set_certificate_file<S>(&mut self, certificate_name: S) -> &mut Self
-  where S: Into<String> + AsRef<str> {
+  pub fn set_certificate_file(
+    &mut self,
+    certificate_name: impl Into<String> + AsRef<str>,
+  ) -> &mut Self {
     self.ca_file_name = certificate_name.into();
 
     self
@@ -140,8 +139,11 @@ impl Router {
   /// # Panics
   ///
   /// if the route cannot be mounted.
-  pub fn mount<S>(&mut self, route: S, handler: RouteResponse) -> &mut Self
-  where S: Into<String> + AsRef<str> {
+  pub fn mount(
+    &mut self,
+    route: impl Into<String> + AsRef<str>,
+    handler: RouteResponse,
+  ) -> &mut Self {
     self
       .routes
       .insert(route.into(), Arc::new(Mutex::new(handler)))
@@ -518,14 +520,11 @@ impl Router {
   /// // .set_log_level("your_crate_name=trace", false);
   /// ```
   #[cfg(feature = "logger")]
-  pub fn set_log_level<S>(
+  pub fn set_log_level(
     &mut self,
-    log_level: S,
+    log_level: impl Into<String> + AsRef<str>,
     log_windmark: bool,
-  ) -> &mut Self
-  where
-    S: Into<String> + AsRef<str>,
-  {
+  ) -> &mut Self {
     std::env::set_var(
       "RUST_LOG",
       format!(
@@ -699,8 +698,10 @@ impl Router {
   /// ```rust
   /// windmark::Router::new().set_character_set("utf-8"); 
   /// ```
-  pub fn set_character_set<S>(&mut self, character_set: S) -> &mut Self
-  where S: Into<String> + AsRef<str> {
+  pub fn set_character_set(
+    &mut self,
+    character_set: impl Into<String> + AsRef<str>,
+  ) -> &mut Self {
     self.character_set = character_set.into();
 
     self
@@ -717,8 +718,10 @@ impl Router {
   /// ```rust
   /// windmark::Router::new().set_language("en"); 
   /// ```
-  pub fn set_language<S>(&mut self, language: S) -> &mut Self
-  where S: Into<String> + AsRef<str> {
+  pub fn set_language(
+    &mut self,
+    language: impl Into<String> + AsRef<str>,
+  ) -> &mut Self {
     self.language = language.into();
 
     self

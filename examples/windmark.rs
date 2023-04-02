@@ -124,11 +124,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   );
   router.mount(
     "/time",
-    success!(std::time::UNIX_EPOCH
-      .elapsed()
-      .unwrap()
-      .as_nanos()
-      .to_string()),
+    success!(std::time::UNIX_EPOCH.elapsed().unwrap().as_nanos()),
   );
   router.mount(
     "/query",
