@@ -86,10 +86,10 @@ impl Response {
 
   #[must_use]
   pub fn binary_success(
-    content: &[u8],
+    content: impl AsRef<[u8]>,
     mime: impl Into<String> + AsRef<str>,
   ) -> Self {
-    Self::new(21, String::from_utf8_lossy(content))
+    Self::new(21, String::from_utf8_lossy(content.as_ref()))
       .with_mime(mime)
       .clone()
   }
