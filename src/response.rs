@@ -75,9 +75,9 @@ impl Response {
 
   response!(certificate_not_valid, 62);
 
-  pub fn success<S>(content: S) -> Self
-  where S: Into<String> + AsRef<str> {
-    Self::new(20, content.into())
+  #[allow(clippy::needless_pass_by_value)]
+  pub fn success(content: impl ToString) -> Self {
+    Self::new(20, content.to_string())
       .with_mime("text/gemini")
       .with_language("en")
       .with_character_set("utf-8")
@@ -85,7 +85,10 @@ impl Response {
   }
 
   #[must_use]
-  pub fn binary_success(content: &[u8], mime: &str) -> Self {
+  pub fn binary_success(
+    content: &[u8],
+    mime: impl Into<String> + AsRef<str>,
+  ) -> Self {
     Self::new(21, String::from_utf8_lossy(content))
       .with_mime(mime)
       .clone()
@@ -100,8 +103,7 @@ impl Response {
   }
 
   #[must_use]
-  pub fn new<S>(status: i32, content: S) -> Self
-  where S: Into<String> + AsRef<str> {
+  pub fn new(status: i32, content: impl Into<String> + AsRef<str>) -> Self {
     Self {
       status,
       mime: None,
@@ -111,22 +113,28 @@ impl Response {
     }
   }
 
-  pub fn with_mime<S>(&mut self, mime: S) -> &mut Self
-  where S: Into<String> + AsRef<str> {
+  pub fn with_mime(
+    &mut self,
+    mime: impl Into<String> + AsRef<str>,
+  ) -> &mut Self {
     self.mime = Some(mime.into());
 
     self
   }
 
-  pub fn with_character_set<S>(&mut self, character_set: S) -> &mut Self
-  where S: Into<String> + AsRef<str> {
+  pub fn with_character_set(
+    &mut self,
+    character_set: impl Into<String> + AsRef<str>,
+  ) -> &mut Self {
     self.character_set = Some(character_set.into());
 
     self
   }
 
-  pub fn with_language<S>(&mut self, language: S) -> &mut Self
-  where S: Into<String> + AsRef<str> {
+  pub fn with_language(
+    &mut self,
+    language: impl Into<String> + AsRef<str>,
+  ) -> &mut Self {
     self.language = Some(language.into());
 
     self
