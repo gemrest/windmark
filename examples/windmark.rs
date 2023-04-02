@@ -181,7 +181,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   );
   #[cfg(feature = "auto-deduce-mime")]
   router.mount("/auto-file", {
-    windmark::binary_success_auto!(include_bytes!("../LICENSE"))
+    windmark::binary_success!(include_bytes!("../LICENSE"))
   });
   router.mount("/file", {
     windmark::binary_success!(include_bytes!("../LICENSE"), "text/plain")
