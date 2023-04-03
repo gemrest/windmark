@@ -77,14 +77,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     r.mount("/module", success!("This is a module!"));
   });
   router.attach(Clicker::default());
-  router.set_pre_route_callback(Box::new(|context| {
+  router.set_pre_route_callback(|context| {
     info!(
       "accepted connection from {} to {}",
       context.tcp.peer_addr().unwrap().ip(),
       context.url.to_string()
     )
-  }));
-  router.set_post_route_callback(Box::new(|context, content| {
+  });
+  router.set_post_route_callback(|context, content| {
     content.content =
       content.content.replace("Welcome!", "Welcome to Windmark!");
 
@@ -92,12 +92,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       "closed connection from {}",
       context.tcp.peer_addr().unwrap().ip()
     )
-  }));
-  router.add_header(Box::new(|_| "```\nART IS COOL\n```\nhi".to_string()));
-  router.add_footer(Box::new(|_| "Copyright 2022".to_string()));
-  router.add_footer(Box::new(|context| {
+  });
+  router.add_header(|_| "```\nART IS COOL\n```\nhi".to_string());
+  router.add_footer(|_| "Copyright 2022".to_string());
+  router.add_footer(|context| {
     format!("Another footer, but lower! (from {})", context.url.path())
-  }));
+  });
   router.mount(
     "/",
     success!("# INDEX\n\nWelcome!\n\n=> /test Test Page\n=> /time Unix Epoch"),
