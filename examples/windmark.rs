@@ -23,7 +23,7 @@ extern crate log;
 
 use windmark::{
   response::Response,
-  context::{CallbackContext, RouteContext},
+  context::{HookContext, RouteContext},
   success,
   Router,
 };
@@ -37,7 +37,7 @@ impl windmark::Module for Clicker {
     println!("clicker has been attached!");
   }
 
-  fn on_pre_route(&mut self, context: CallbackContext<'_>) {
+  fn on_pre_route(&mut self, context: HookContext<'_>) {
     self.clicks += 1;
 
     info!(
@@ -47,7 +47,7 @@ impl windmark::Module for Clicker {
     );
   }
 
-  fn on_post_route(&mut self, context: CallbackContext<'_>) {
+  fn on_post_route(&mut self, context: HookContext<'_>) {
     info!(
       "clicker has been called post-route on {} with {} clicks!",
       context.url.path(),

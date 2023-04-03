@@ -16,10 +16,10 @@
 // Copyright (C) 2022-2022 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-mod callback;
+mod hook;
 mod error;
 mod route;
 
-pub use callback::CallbackContext;
+pub use hook::HookContext;
 pub use error::ErrorContext;
 pub use route::RouteContext;
