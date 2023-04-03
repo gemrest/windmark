@@ -57,7 +57,7 @@ macro_rules! or_error {
 #[derive(Clone)]
 pub struct Router {
   routes:                matchit::Router<Arc<Mutex<Box<dyn RouteResponse>>>>,
-  error_handler:         Arc<Mutex<ErrorResponse>>,
+  error_handler:         Arc<Mutex<Box<dyn ErrorResponse>>>,
   private_key_file_name: String,
   ca_file_name:          String,
   headers:               Arc<Mutex<Vec<Partial>>>,
@@ -151,12 +151,15 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().set_error_handler(Box::new(|_| {
-  ///   windmark::Response::success("You have encountered an error!")
-  /// }));
+  /// windmark::Router::new().set_error_handler(|_| {
+  ///   windmark::success!("You have encountered an error!")
+  /// });
   /// ```
-  pub fn set_error_handler(&mut self, handler: ErrorResponse) -> &mut Self {
-    self.error_handler = Arc::new(Mutex::new(handler));
+  pub fn set_error_handler(
+    &mut self,
+    handler: impl ErrorResponse + 'static,
+  ) -> &mut Self {
+    self.error_handler = Arc::new(Mutex::new(Box::new(handler)));
 
     self
   }
