@@ -23,10 +23,10 @@ macro_rules! response {
       #[macro_export]
       macro_rules! $name {
         ($body:expr /* $(,)? */) => {
-          |_: ::windmark::returnable::RouteContext<'_>| ::windmark::Response::$name($body)
+          |_: ::windmark::context::RouteContext<'_>| ::windmark::Response::$name($body)
         };
         ($context:ident, $body:expr /* $(,)? */) => {
-          |$context: ::windmark::returnable::RouteContext<'_>| ::windmark::Response::$name($body)
+          |$context: ::windmark::context::RouteContext<'_>| ::windmark::Response::$name($body)
         };
       }
     )*
@@ -57,7 +57,7 @@ response!(certificate_not_valid);
 #[macro_export]
 macro_rules! binary_success {
   ($body:expr, $mime:expr) => {
-    |_: ::windmark::returnable::RouteContext<'_>| {
+    |_: ::windmark::context::RouteContext<'_>| {
       ::windmark::Response::binary_success($body, $mime)
     }
   };
@@ -68,7 +68,7 @@ macro_rules! binary_success {
        feature to be enabled"
     );
 
-    |_: ::windmark::returnable::RouteContext<'_>| {
+    |_: ::windmark::context::RouteContext<'_>| {
       #[cfg(feature = "auto-deduce-mime")]
       return ::windmark::Response::binary_success_auto($body);
 
@@ -78,7 +78,7 @@ macro_rules! binary_success {
     }
   }};
   ($context:ident, $body:expr, $mime:expr) => {
-    |$context: ::windmark::returnable::RouteContext<'_>| {
+    |$context: ::windmark::context::RouteContext<'_>| {
       ::windmark::Response::binary_success($body, $mime)
     }
   };
@@ -89,7 +89,7 @@ macro_rules! binary_success {
        feature to be enabled"
     );
 
-    |$context: ::windmark::returnable::RouteContext<'_>| {
+    |$context: ::windmark::context::RouteContext<'_>| {
       #[cfg(feature = "auto-deduce-mime")]
       return ::windmark::Response::binary_success_auto($body);
 
