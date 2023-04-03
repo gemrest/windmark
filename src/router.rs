@@ -79,6 +79,7 @@ pub struct Router {
   modules:               Arc<Mutex<Vec<Box<dyn Module + Send>>>>,
   fix_path:              bool,
 }
+
 impl Router {
   /// Create a new `Router`
   ///
@@ -290,6 +291,7 @@ impl Router {
         String::from_utf8(buffer[0..size].to_vec()),
         "59 The server (Windmark) received a bad request: {}"
       );
+
       url = or_error!(
         stream,
         url::Url::parse(&request.replace("\r\n", "")),
@@ -346,6 +348,7 @@ impl Router {
           )),
         ));
       }
+
       for (i, partial_footer) in {
         #[allow(clippy::needless_borrow)]
         (&mut *self.footers.lock().unwrap()).iter_mut().enumerate()
@@ -501,6 +504,7 @@ impl Router {
   #[cfg(feature = "logger")]
   pub fn enable_default_logger(&mut self, enable: bool) -> &mut Self {
     self.default_logger = enable;
+
     std::env::set_var("RUST_LOG", "windmark=trace");
 
     self
@@ -659,6 +663,7 @@ impl Router {
   /// struct Clicker {
   ///   clicks: isize,
   /// }
+  ///
   /// impl windmark::Module for Clicker {
   ///   fn on_attach(&mut self, _: &mut Router) {
   ///     info!("clicker has been attached!");
