@@ -60,13 +60,13 @@ pub struct Router {
   error_handler:         Arc<Mutex<Box<dyn ErrorResponse>>>,
   private_key_file_name: String,
   ca_file_name:          String,
-  headers:               Arc<Mutex<Vec<Partial>>>,
-  footers:               Arc<Mutex<Vec<Partial>>>,
+  headers:               Arc<Mutex<Vec<Box<dyn Partial>>>>,
+  footers:               Arc<Mutex<Vec<Box<dyn Partial>>>>,
   ssl_acceptor:          Arc<SslAcceptor>,
   #[cfg(feature = "logger")]
   default_logger:        bool,
-  pre_route_callback:    Arc<Mutex<Callback>>,
-  post_route_callback:   Arc<Mutex<CleanupCallback>>,
+  pre_route_callback:    Arc<Mutex<Box<dyn Callback>>>,
+  post_route_callback:   Arc<Mutex<Box<dyn CleanupCallback>>>,
   character_set:         String,
   languages:             Vec<String>,
   port:                  i32,
@@ -173,12 +173,12 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().add_header(Box::new(|context| {
+  /// windmark::Router::new().add_header(|context| {
   ///   format!("This is displayed at the top of {}!", context.url.path())
-  /// }));
+  /// });
   /// ```
-  pub fn add_header(&mut self, handler: Partial) -> &mut Self {
-    (*self.headers.lock().unwrap()).push(handler);
+  pub fn add_header(&mut self, handler: impl Partial + 'static) -> &mut Self {
+    (*self.headers.lock().unwrap()).push(Box::new(handler));
 
     self
   }
@@ -192,12 +192,12 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().add_footer(Box::new(|context| {
+  /// windmark::Router::new().add_footer(|context| {
   ///   format!("This is displayed at the bottom of {}!", context.url.path())
-  /// }));
+  /// });
   /// ```
-  pub fn add_footer(&mut self, handler: Partial) -> &mut Self {
-    (*self.footers.lock().unwrap()).push(handler);
+  pub fn add_footer(&mut self, handler: impl Partial + 'static) -> &mut Self {
+    (*self.footers.lock().unwrap()).push(Box::new(handler));
 
     self
   }
@@ -544,15 +544,18 @@ impl Router {
   /// ```rust
   /// use log::info;
   ///
-  /// windmark::Router::new().set_pre_route_callback(Box::new(|context| {
+  /// windmark::Router::new().set_pre_route_callback(|context| {
   ///   info!(
   ///     "accepted connection from {}",
   ///     context.stream.peer_addr().unwrap().ip(),
   ///   )
-  /// }));
+  /// });
   /// ```
-  pub fn set_pre_route_callback(&mut self, callback: Callback) -> &mut Self {
-    self.pre_route_callback = Arc::new(Mutex::new(callback));
+  pub fn set_pre_route_callback(
+    &mut self,
+    callback: impl Callback + 'static,
+  ) -> &mut Self {
+    self.pre_route_callback = Arc::new(Mutex::new(Box::new(callback)));
 
     self
   }
@@ -564,18 +567,18 @@ impl Router {
   /// ```rust
   /// use log::info;
   ///
-  /// windmark::Router::new().set_post_route_callback(Box::new(|context, _| {
+  /// windmark::Router::new().set_post_route_callback(|context, _| {
   ///   info!(
   ///     "closed connection from {}",
   ///     context.stream.peer_addr().unwrap().ip(),
   ///   )
-  /// }));
+  /// });
   /// ```
   pub fn set_post_route_callback(
     &mut self,
-    callback: CleanupCallback,
+    callback: impl CleanupCallback + 'static,
   ) -> &mut Self {
-    self.post_route_callback = Arc::new(Mutex::new(callback));
+    self.post_route_callback = Arc::new(Mutex::new(Box::new(callback)));
 
     self
   }
