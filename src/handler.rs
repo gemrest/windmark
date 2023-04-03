@@ -21,7 +21,7 @@ mod partial;
 mod response;
 
 pub use self::{
-  hooks::{PostRouteCallback, PreRouteCallback},
+  hooks::{PostRouteHook, PreRouteHook},
   partial::Partial,
   response::{ErrorResponse, RouteResponse},
 };
