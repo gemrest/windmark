@@ -16,6 +16,8 @@
 // Copyright (C) 2022-2022 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
+#![allow(clippy::significant_drop_tightening)]
+
 use std::{
   error::Error,
   sync::{Arc, Mutex},
@@ -54,7 +56,7 @@ macro_rules! or_error {
 /// response generation, panics, logging, and more.
 #[derive(Clone)]
 pub struct Router {
-  routes:                matchit::Router<Arc<Mutex<RouteResponse>>>,
+  routes:                matchit::Router<Arc<Mutex<Box<dyn RouteResponse>>>>,
   error_handler:         Arc<Mutex<ErrorResponse>>,
   private_key_file_name: String,
   ca_file_name:          String,
@@ -123,17 +125,9 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// use windmark::Response;
-  ///
   /// windmark::Router::new()
-  ///   .mount(
-  ///     "/",
-  ///     Box::new(|_| Response::success("This is the index page!")),
-  ///   )
-  ///   .mount(
-  ///     "/test",
-  ///     Box::new(|_| Response::success("This is a test page!")),
-  ///   );
+  ///   .mount("/", |_| windmark::success!("This is the index page!"))
+  ///   .mount("/test", |_| windmark::success!("This is a test page!"));
   /// ```
   ///
   /// # Panics
@@ -142,11 +136,11 @@ impl Router {
   pub fn mount(
     &mut self,
     route: impl Into<String> + AsRef<str>,
-    handler: RouteResponse,
+    handler: impl RouteResponse + 'static,
   ) -> &mut Self {
     self
       .routes
-      .insert(route.into(), Arc::new(Mutex::new(handler)))
+      .insert(route.into(), Arc::new(Mutex::new(Box::new(handler))))
       .unwrap();
 
     self
