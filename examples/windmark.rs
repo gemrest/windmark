@@ -32,6 +32,7 @@ use windmark::{
 struct Clicker {
   clicks: isize,
 }
+
 impl windmark::Module for Clicker {
   fn on_attach(&mut self, _: &mut Router) {
     println!("clicker has been attached!");
