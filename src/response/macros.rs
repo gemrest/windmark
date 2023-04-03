@@ -23,10 +23,10 @@ macro_rules! response {
       #[macro_export]
       macro_rules! $name {
         ($body:expr /* $(,)? */) => {
-          ::std::boxed::Box::new(|_| windmark::Response::$name($body))
+          |_: ::windmark::returnable::RouteContext<'_>| ::windmark::Response::$name($body)
         };
         ($context:ident, $body:expr /* $(,)? */) => {
-          ::std::boxed::Box::new(|$context| windmark::Response::$name($body))
+          |$context: ::windmark::returnable::RouteContext<'_>| ::windmark::Response::$name($body)
         };
       }
     )*
@@ -57,9 +57,9 @@ response!(certificate_not_valid);
 #[macro_export]
 macro_rules! binary_success {
   ($body:expr, $mime:expr) => {
-    ::std::boxed::Box::new(|_| {
+    |_: ::windmark::returnable::RouteContext<'_>| {
       ::windmark::Response::binary_success($body, $mime)
-    })
+    }
   };
   ($body:expr) => {{
     #[cfg(not(feature = "auto-deduce-mime"))]
@@ -68,19 +68,19 @@ macro_rules! binary_success {
        feature to be enabled"
     );
 
-    ::std::boxed::Box::new(|_| {
+    |_: ::windmark::returnable::RouteContext<'_>| {
       #[cfg(feature = "auto-deduce-mime")]
       return ::windmark::Response::binary_success_auto($body);
 
       // Suppress item not found warning
       #[cfg(not(feature = "auto-deduce-mime"))]
       ::windmark::Response::binary_success($body, "application/octet-stream")
-    })
+    }
   }};
   ($context:ident, $body:expr, $mime:expr) => {
-    ::std::boxed::Box::new(|$context| {
+    |$context: ::windmark::returnable::RouteContext<'_>| {
       ::windmark::Response::binary_success($body, $mime)
-    })
+    }
   };
   ($context:ident, $body:expr) => {{
     #[cfg(not(feature = "auto-deduce-mime"))]
@@ -89,13 +89,13 @@ macro_rules! binary_success {
        feature to be enabled"
     );
 
-    ::std::boxed::Box::new(|$context| {
+    |$context: ::windmark::returnable::RouteContext<'_>| {
       #[cfg(feature = "auto-deduce-mime")]
       return ::windmark::Response::binary_success_auto($body);
 
       // Suppress item not found warning
       #[cfg(not(feature = "auto-deduce-mime"))]
       ::windmark::Response::binary_success($body, "application/octet-stream")
-    })
+    }
   }};
 }

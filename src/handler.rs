@@ -22,8 +22,14 @@ use crate::{
   returnable::{CallbackContext, RouteContext},
 };
 
-pub type RouteResponse =
-  Box<dyn FnMut(RouteContext<'_>) -> Response + Send + Sync>;
+pub trait RouteResponse:
+  FnMut(RouteContext<'_>) -> Response + Send + Sync
+{
+}
+
+impl<T> RouteResponse for T where T: FnMut(RouteContext<'_>) -> Response + Send + Sync
+{}
+
 pub type ErrorResponse =
   Box<dyn FnMut(returnable::ErrorContext<'_>) -> Response + Send + Sync>;
 pub type Callback = Box<dyn FnMut(CallbackContext<'_>) + Send + Sync>;
