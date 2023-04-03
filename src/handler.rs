@@ -38,7 +38,18 @@ pub trait ErrorResponse:
 impl<T> ErrorResponse for T where T: FnMut(returnable::ErrorContext<'_>) -> Response + Send + Sync
 {}
 
-pub type Callback = Box<dyn FnMut(CallbackContext<'_>) + Send + Sync>;
-pub type CleanupCallback =
-  Box<dyn FnMut(CallbackContext<'_>, &mut Response) + Send + Sync>;
-pub type Partial = Box<dyn FnMut(RouteContext<'_>) -> String + Send + Sync>;
+pub trait Callback: FnMut(CallbackContext<'_>) + Send + Sync {}
+
+impl<T> Callback for T where T: FnMut(CallbackContext<'_>) + Send + Sync {}
+
+pub trait CleanupCallback:
+  FnMut(CallbackContext<'_>, &mut Response) + Send + Sync
+{
+}
+
+impl<T> CleanupCallback for T where T: FnMut(CallbackContext<'_>, &mut Response) + Send + Sync
+{}
+
+pub trait Partial: FnMut(RouteContext<'_>) -> String + Send + Sync {}
+
+impl<T> Partial for T where T: FnMut(RouteContext<'_>) -> String + Send + Sync {}
