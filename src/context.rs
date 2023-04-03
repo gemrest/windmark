@@ -16,15 +16,10 @@
 // Copyright (C) 2022-2022 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-use crate::{context::CallbackContext, Router};
+mod callback;
+mod error;
+mod route;
 
-pub trait Module {
-  /// Called right after the module is attached.
-  fn on_attach(&mut self, _: &mut Router) {}
-
-  /// Called before a route is mounted.
-  fn on_pre_route(&mut self, _: CallbackContext<'_>) {}
-
-  /// Called after a route is mounted.
-  fn on_post_route(&mut self, _: CallbackContext<'_>) {}
-}
+pub use callback::CallbackContext;
+pub use error::ErrorContext;
+pub use route::RouteContext;
