@@ -23,7 +23,7 @@ extern crate log;
 
 use windmark::{
   response::Response,
-  returnable::CallbackContext,
+  returnable::{CallbackContext, RouteContext},
   success,
   Router,
 };
@@ -102,14 +102,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     "/",
     success!("# INDEX\n\nWelcome!\n\n=> /test Test Page\n=> /time Unix Epoch"),
   );
-  router.mount(
-    "/specific-mime",
-    Box::new(|_| {
-      Response::success("hi".to_string())
-        .with_mime("text/plain")
-        .clone()
-    }),
-  );
+  router.mount("/specific-mime", |_| {
+    Response::success("hi".to_string())
+      .with_mime("text/plain")
+      .clone()
+  });
   router.mount(
     "/ip",
     success!(
@@ -154,26 +151,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       )
     ),
   );
-  router.mount(
-    "/input",
-    Box::new(|context| {
-      if let Some(name) = context.url.query() {
-        Response::success(format!("Your name is {}!", name))
-      } else {
-        Response::input("What is your name?")
-      }
-    }),
-  );
-  router.mount(
-    "/sensitive-input",
-    Box::new(|context| {
-      if let Some(password) = context.url.query() {
-        Response::success(format!("Your password is {}!", password))
-      } else {
-        Response::sensitive_input("What is your password?")
-      }
-    }),
-  );
+  router.mount("/input", |context: RouteContext| {
+    if let Some(name) = context.url.query() {
+      Response::success(format!("Your name is {}!", name))
+    } else {
+      Response::input("What is your name?")
+    }
+  });
+  router.mount("/sensitive-input", |context: RouteContext| {
+    if let Some(password) = context.url.query() {
+      Response::success(format!("Your password is {}!", password))
+    } else {
+      Response::sensitive_input("What is your password?")
+    }
+  });
   router.mount("/error", windmark::certificate_not_valid!("no"));
   router.mount(
     "/redirect",
@@ -189,26 +180,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   router.mount("/string-file", {
     windmark::binary_success!("hi", "text/plain")
   });
-  router.mount(
-    "/secret",
-    Box::new(|context| {
-      if let Some(certificate) = context.certificate {
-        Response::success(format!("Your public key: {}.", {
-          (|| -> Result<String, openssl::error::ErrorStack> {
-            Ok(format!(
-              "{:?}",
-              certificate.public_key()?.rsa()?.public_key_to_pem()?
-            ))
-          })()
-          .unwrap_or_else(|_| "Unknown".to_string())
-        },))
-      } else {
-        Response::client_certificate_required(
-          "This is a secret route! Identify yourself!",
-        )
-      }
-    }),
-  );
+  router.mount("/secret", |context: RouteContext| {
+    if let Some(certificate) = context.certificate {
+      Response::success(format!("Your public key: {}.", {
+        (|| -> Result<String, openssl::error::ErrorStack> {
+          Ok(format!(
+            "{:?}",
+            certificate.public_key()?.rsa()?.public_key_to_pem()?
+          ))
+        })()
+        .unwrap_or_else(|_| "Unknown".to_string())
+      },))
+    } else {
+      Response::client_certificate_required(
+        "This is a secret route! Identify yourself!",
+      )
+    }
+  });
 
   router.run().await
 }
