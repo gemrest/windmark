@@ -30,8 +30,14 @@ pub trait RouteResponse:
 impl<T> RouteResponse for T where T: FnMut(RouteContext<'_>) -> Response + Send + Sync
 {}
 
-pub type ErrorResponse =
-  Box<dyn FnMut(returnable::ErrorContext<'_>) -> Response + Send + Sync>;
+pub trait ErrorResponse:
+  FnMut(returnable::ErrorContext<'_>) -> Response + Send + Sync
+{
+}
+
+impl<T> ErrorResponse for T where T: FnMut(returnable::ErrorContext<'_>) -> Response + Send + Sync
+{}
+
 pub type Callback = Box<dyn FnMut(CallbackContext<'_>) + Send + Sync>;
 pub type CleanupCallback =
   Box<dyn FnMut(CallbackContext<'_>, &mut Response) + Send + Sync>;
