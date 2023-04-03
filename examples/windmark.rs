@@ -22,8 +22,8 @@
 extern crate log;
 
 use windmark::{
-  response::Response,
   context::{HookContext, RouteContext},
+  response::Response,
   success,
   Router,
 };
