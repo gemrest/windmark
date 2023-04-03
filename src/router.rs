@@ -32,8 +32,8 @@ use crate::{
   handler::{
     ErrorResponse,
     Partial,
-    PostRouteCallback,
-    PreRouteCallback,
+    PostRouteHook,
+    PreRouteHook,
     RouteResponse,
   },
   module::Module,
@@ -71,8 +71,8 @@ pub struct Router {
   ssl_acceptor:          Arc<SslAcceptor>,
   #[cfg(feature = "logger")]
   default_logger:        bool,
-  pre_route_callback:    Arc<Mutex<Box<dyn PreRouteCallback>>>,
-  post_route_callback:   Arc<Mutex<Box<dyn PostRouteCallback>>>,
+  pre_route_callback:    Arc<Mutex<Box<dyn PreRouteHook>>>,
+  post_route_callback:   Arc<Mutex<Box<dyn PostRouteHook>>>,
   character_set:         String,
   languages:             Vec<String>,
   port:                  i32,
@@ -559,7 +559,7 @@ impl Router {
   /// ```
   pub fn set_pre_route_callback(
     &mut self,
-    callback: impl PreRouteCallback + 'static,
+    callback: impl PreRouteHook + 'static,
   ) -> &mut Self {
     self.pre_route_callback = Arc::new(Mutex::new(Box::new(callback)));
 
@@ -582,7 +582,7 @@ impl Router {
   /// ```
   pub fn set_post_route_callback(
     &mut self,
-    callback: impl PostRouteCallback + 'static,
+    callback: impl PostRouteHook + 'static,
   ) -> &mut Self {
     self.post_route_callback = Arc::new(Mutex::new(Box::new(callback)));
 
