@@ -65,13 +65,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   router.set_certificate_file("windmark_public.pem");
   #[cfg(feature = "logger")]
   router.enable_default_logger(true);
-  router.set_error_handler(Box::new(move |_| {
+  router.set_error_handler(move |_| {
     error_count += 1;
 
     println!("{} errors so far", error_count);
 
     Response::permanent_failure("e")
-  }));
+  });
   router.set_fix_path(true);
   router.attach_stateless(|r| {
     r.mount("/module", success!("This is a module!"));
