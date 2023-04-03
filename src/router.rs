@@ -29,7 +29,13 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use url::Url;
 
 use crate::{
-  handler::{Callback, CleanupCallback, ErrorResponse, Partial, RouteResponse},
+  handler::{
+    ErrorResponse,
+    Partial,
+    PostRouteCallback,
+    PreRouteCallback,
+    RouteResponse,
+  },
   module::Module,
   response::Response,
   returnable::{CallbackContext, ErrorContext, RouteContext},
@@ -65,8 +71,8 @@ pub struct Router {
   ssl_acceptor:          Arc<SslAcceptor>,
   #[cfg(feature = "logger")]
   default_logger:        bool,
-  pre_route_callback:    Arc<Mutex<Box<dyn Callback>>>,
-  post_route_callback:   Arc<Mutex<Box<dyn CleanupCallback>>>,
+  pre_route_callback:    Arc<Mutex<Box<dyn PreRouteCallback>>>,
+  post_route_callback:   Arc<Mutex<Box<dyn PostRouteCallback>>>,
   character_set:         String,
   languages:             Vec<String>,
   port:                  i32,
@@ -553,7 +559,7 @@ impl Router {
   /// ```
   pub fn set_pre_route_callback(
     &mut self,
-    callback: impl Callback + 'static,
+    callback: impl PreRouteCallback + 'static,
   ) -> &mut Self {
     self.pre_route_callback = Arc::new(Mutex::new(Box::new(callback)));
 
@@ -576,7 +582,7 @@ impl Router {
   /// ```
   pub fn set_post_route_callback(
     &mut self,
-    callback: impl CleanupCallback + 'static,
+    callback: impl PostRouteCallback + 'static,
   ) -> &mut Self {
     self.post_route_callback = Arc::new(Mutex::new(Box::new(callback)));
 
