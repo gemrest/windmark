@@ -16,40 +16,12 @@
 // Copyright (C) 2022-2022 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-use crate::{
-  response::Response,
-  returnable,
-  returnable::{CallbackContext, RouteContext},
+mod hooks;
+mod partial;
+mod response;
+
+pub use self::{
+  hooks::{PostRouteCallback, PreRouteCallback},
+  partial::Partial,
+  response::{ErrorResponse, RouteResponse},
 };
-
-pub trait RouteResponse:
-  FnMut(RouteContext<'_>) -> Response + Send + Sync
-{
-}
-
-impl<T> RouteResponse for T where T: FnMut(RouteContext<'_>) -> Response + Send + Sync
-{}
-
-pub trait ErrorResponse:
-  FnMut(returnable::ErrorContext<'_>) -> Response + Send + Sync
-{
-}
-
-impl<T> ErrorResponse for T where T: FnMut(returnable::ErrorContext<'_>) -> Response + Send + Sync
-{}
-
-pub trait Callback: FnMut(CallbackContext<'_>) + Send + Sync {}
-
-impl<T> Callback for T where T: FnMut(CallbackContext<'_>) + Send + Sync {}
-
-pub trait CleanupCallback:
-  FnMut(CallbackContext<'_>, &mut Response) + Send + Sync
-{
-}
-
-impl<T> CleanupCallback for T where T: FnMut(CallbackContext<'_>, &mut Response) + Send + Sync
-{}
-
-pub trait Partial: FnMut(RouteContext<'_>) -> String + Send + Sync {}
-
-impl<T> Partial for T where T: FnMut(RouteContext<'_>) -> String + Send + Sync {}
