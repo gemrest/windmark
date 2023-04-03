@@ -30,10 +30,10 @@
 #![doc = include_str!("../README.md")]
 #![recursion_limit = "128"]
 
+pub mod context;
 pub mod handler;
 pub mod module;
 pub mod response;
-pub mod context;
 pub mod router;
 pub mod utilities;
 

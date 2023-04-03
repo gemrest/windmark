@@ -16,10 +16,12 @@
 // Copyright (C) 2022-2022 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-mod hook;
+#![allow(clippy::module_name_repetitions)]
+
 mod error;
+mod hook;
 mod route;
 
-pub use hook::HookContext;
 pub use error::ErrorContext;
+pub use hook::HookContext;
 pub use route::RouteContext;
