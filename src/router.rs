@@ -38,7 +38,7 @@ use crate::{
   },
   module::Module,
   response::Response,
-  returnable::{CallbackContext, ErrorContext, RouteContext},
+  context::{CallbackContext, ErrorContext, RouteContext},
 };
 
 macro_rules! or_error {
@@ -653,7 +653,7 @@ impl Router {
   ///
   /// ```rust
   /// use log::info;
-  /// use windmark::{returnable::CallbackContext, Response, Router};
+  /// use windmark::{context::CallbackContext, Response, Router};
   ///
   /// #[derive(Default)]
   /// struct Clicker {
