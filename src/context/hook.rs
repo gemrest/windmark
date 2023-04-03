@@ -21,6 +21,7 @@ use openssl::x509::X509;
 use tokio::net::TcpStream;
 use url::Url;
 
+#[allow(clippy::module_name_repetitions)]
 pub struct HookContext<'a> {
   pub tcp:         &'a TcpStream,
   pub url:         &'a Url,

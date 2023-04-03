@@ -29,6 +29,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use url::Url;
 
 use crate::{
+  context::{ErrorContext, HookContext, RouteContext},
   handler::{
     ErrorResponse,
     Partial,
@@ -38,7 +39,6 @@ use crate::{
   },
   module::Module,
   response::Response,
-  context::{HookContext, ErrorContext, RouteContext},
 };
 
 macro_rules! or_error {
