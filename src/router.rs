@@ -38,7 +38,7 @@ use crate::{
   },
   module::Module,
   response::Response,
-  context::{CallbackContext, ErrorContext, RouteContext},
+  context::{HookContext, ErrorContext, RouteContext},
 };
 
 macro_rules! or_error {
@@ -316,7 +316,7 @@ impl Router {
     let route = &mut self.routes.at(&fixed_path);
 
     for module in &mut *self.modules.lock().unwrap() {
-      module.on_pre_route(CallbackContext::new(
+      module.on_pre_route(HookContext::new(
         stream.get_ref(),
         &url,
         route.as_ref().map_or(None, |route| Some(&route.params)),
@@ -324,7 +324,7 @@ impl Router {
       ));
     }
 
-    (*self.pre_route_callback).lock().unwrap()(CallbackContext::new(
+    (*self.pre_route_callback).lock().unwrap()(HookContext::new(
       stream.get_ref(),
       &url,
       route.as_ref().map_or(None, |route| Some(&route.params)),
@@ -381,7 +381,7 @@ impl Router {
     };
 
     for module in &mut *self.modules.lock().unwrap() {
-      module.on_post_route(CallbackContext::new(
+      module.on_post_route(HookContext::new(
         stream.get_ref(),
         &url,
         route.as_ref().map_or(None, |route| Some(&route.params)),
@@ -390,7 +390,7 @@ impl Router {
     }
 
     (*self.post_route_callback).lock().unwrap()(
-      CallbackContext::new(
+      HookContext::new(
         stream.get_ref(),
         &url,
         route.as_ref().map_or(None, |route| Some(&route.params)),
@@ -653,7 +653,7 @@ impl Router {
   ///
   /// ```rust
   /// use log::info;
-  /// use windmark::{context::CallbackContext, Response, Router};
+  /// use windmark::{context::HookContext, Response, Router};
   ///
   /// #[derive(Default)]
   /// struct Clicker {
@@ -664,7 +664,7 @@ impl Router {
   ///     info!("clicker has been attached!");
   ///   }
   ///
-  ///   fn on_pre_route(&mut self, context: CallbackContext<'_>) {
+  ///   fn on_pre_route(&mut self, context: HookContext<'_>) {
   ///     self.clicks += 1;
   ///
   ///     info!(
@@ -674,7 +674,7 @@ impl Router {
   ///     );
   ///   }
   ///
-  ///   fn on_post_route(&mut self, context: CallbackContext<'_>) {
+  ///   fn on_post_route(&mut self, context: HookContext<'_>) {
   ///     info!(
   ///       "clicker has been called post-route on {} with {} clicks!",
   ///       context.url.path(),
