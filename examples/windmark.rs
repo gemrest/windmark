@@ -61,6 +61,7 @@ impl windmark::Module for Clicker {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
   let mut error_count = 0;
   let mut router = Router::new();
+  let async_clicks = std::sync::Arc::new(tokio::sync::Mutex::new(0));
 
   router.set_private_key_file("windmark_private.pem");
   router.set_certificate_file("windmark_public.pem");
@@ -197,6 +198,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "This is a secret route! Identify yourself!",
       )
     }
+  });
+  router.mount_async("/async", move |_| {
+    let async_clicks = async_clicks.clone();
+
+    async move {
+      let mut clicks = async_clicks.lock().await;
+
+      *clicks += 1;
+
+      Response::success(*clicks)
+    }
+  });
+  router.mount_async("/async-nothing", |_| {
+    async { Response::success("This is an async route.") }
   });
 
   router.run().await

@@ -133,21 +133,56 @@ impl Router {
   ///
   /// ```rust
   /// windmark::Router::new()
-  ///   .mount("/", |_| windmark::success!("This is the index page!"))
-  ///   .mount("/test", |_| windmark::success!("This is a test page!"));
+  ///   .mount("/", windmark::success!("This is the index page!"))
+  ///   .mount("/test", windmark::success!("This is a test page!"));
   /// ```
   ///
   /// # Panics
   ///
-  /// if the route cannot be mounted.
+  /// May panic if the route cannot be mounted.
   pub fn mount(
     &mut self,
     route: impl Into<String> + AsRef<str>,
-    handler: impl RouteResponse + 'static,
+    mut handler: impl FnMut(RouteContext<'_>) -> Response + Send + Sync + 'static,
   ) -> &mut Self {
+    self.mount_async(route, move |context| {
+      let response = handler(context);
+
+      async move { response }
+    });
+
+    self
+  }
+
+  /// Map routes to URL paths; with async support
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// windmark::Router::new().mount_async("/", |_| {
+  ///   async { windmark::Response::success("This is the index page!") }
+  /// });
+  /// ```
+  ///
+  /// # Panics
+  ///
+  /// May panic if the route cannot be mounted.
+  pub fn mount_async<R>(
+    &mut self,
+    route: impl Into<String> + AsRef<str>,
+    mut handler: impl FnMut(RouteContext<'_>) -> R + Send + Sync + 'static,
+  ) -> &mut Self
+  where
+    R: std::future::Future<Output = Response> + Send + 'static,
+  {
     self
       .routes
-      .insert(route.into(), Arc::new(Mutex::new(Box::new(handler))))
+      .insert(
+        route.into(),
+        Arc::new(Mutex::new(Box::new(move |context: RouteContext<'_>| {
+          Box::pin(handler(context))
+        }))),
+      )
       .unwrap();
 
     self
@@ -369,12 +404,14 @@ impl Router {
         ));
       }
 
-      (*route.value).lock().unwrap()(RouteContext::new(
+      let handler = (*route.value).lock().unwrap().call(RouteContext::new(
         stream.get_ref(),
         &url,
         &route.params,
         &peer_certificate,
-      ))
+      ));
+
+      handler.await
     } else {
       (*self.error_handler).lock().unwrap()(ErrorContext::new(
         stream.get_ref(),
@@ -606,7 +643,7 @@ impl Router {
   /// use windmark::Response;
   ///
   /// windmark::Router::new().attach_stateless(|r| {
-  ///   r.mount(
+  ///   r.mount_async(
   ///     "/module",
   ///     Box::new(|_| Response::success("This is a module!")),
   ///   );
@@ -625,7 +662,7 @@ impl Router {
   ///
   /// mod windmark_example {
   ///   pub fn module(router: &mut windmark::Router) {
-  ///     router.mount(
+  ///     router.mount_async(
   ///       "/module",
   ///       Box::new(|_| windmark::Response::success("This is a module!")),
   ///     );
