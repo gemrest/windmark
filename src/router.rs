@@ -25,7 +25,10 @@ use std::{
 };
 
 use openssl::ssl::{self, SslAcceptor, SslMethod};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::{
+  io::{AsyncReadExt, AsyncWriteExt},
+  sync::Mutex as AsyncMutex,
+};
 use url::Url;
 
 use crate::{
@@ -37,7 +40,7 @@ use crate::{
     PreRouteHook,
     RouteResponse,
   },
-  module::Module,
+  module::{AsyncModule, Module},
   response::Response,
 };
 
@@ -76,6 +79,7 @@ pub struct Router {
   character_set:         String,
   languages:             Vec<String>,
   port:                  i32,
+  async_modules:         Arc<AsyncMutex<Vec<Box<dyn AsyncModule + Send>>>>,
   modules:               Arc<Mutex<Vec<Box<dyn Module + Send>>>>,
   fix_path:              bool,
 }
@@ -352,6 +356,17 @@ impl Router {
     };
     let route = &mut self.routes.at(&fixed_path);
 
+    for module in &mut *self.async_modules.lock().await {
+      module
+        .on_pre_route(HookContext::new(
+          stream.get_ref(),
+          &url,
+          route.as_ref().map_or(None, |route| Some(&route.params)),
+          &stream.ssl().peer_certificate(),
+        ))
+        .await;
+    }
+
     for module in &mut *self.modules.lock().unwrap() {
       module.on_pre_route(HookContext::new(
         stream.get_ref(),
@@ -419,6 +434,17 @@ impl Router {
         &peer_certificate,
       ))
     };
+
+    for module in &mut *self.async_modules.lock().await {
+      module
+        .on_post_route(HookContext::new(
+          stream.get_ref(),
+          &url,
+          route.as_ref().map_or(None, |route| Some(&route.params)),
+          &stream.ssl().peer_certificate(),
+        ))
+        .await;
+    }
 
     for module in &mut *self.modules.lock().unwrap() {
       module.on_post_route(HookContext::new(
@@ -678,6 +704,71 @@ impl Router {
     self
   }
 
+  /// Attach a stateful module to a `Router`; with async support
+  ///
+  /// Like a stateless module is an extension or middleware to a `Router`.
+  /// Modules get full access to the `Router` and can be extended by a third
+  /// party, but also, can create hooks will be executed through various parts
+  /// of a routes' lifecycle. Stateful modules also have state, so variables can
+  /// be stored for further access.
+  ///
+  /// # Panics
+  ///
+  /// May panic if the stateful module cannot be attached.
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// use log::info;
+  /// use windmark::{context::HookContext, Response, Router};
+  ///
+  /// #[derive(Default)]
+  /// struct Clicker {
+  ///   clicks: isize,
+  /// }
+  ///
+  /// #[async_trait::async_trait]
+  /// impl windmark::AsyncModule for Clicker {
+  ///   async fn on_attach(&mut self, _: &mut Router) {
+  ///     info!("clicker has been attached!");
+  ///   }
+  ///
+  ///   async fn on_pre_route(&mut self, context: HookContext<'_>) {
+  ///     self.clicks += 1;
+  ///
+  ///     info!(
+  ///       "clicker has been called pre-route on {} with {} clicks!",
+  ///       context.url.path(),
+  ///       self.clicks
+  ///     );
+  ///   }
+  ///
+  ///   async fn on_post_route(&mut self, context: HookContext<'_>) {
+  ///     info!(
+  ///       "clicker has been called post-route on {} with {} clicks!",
+  ///       context.url.path(),
+  ///       self.clicks
+  ///     );
+  ///   }
+  /// }
+  ///
+  /// Router::new().attach_async(Clicker::default());
+  /// ```
+  pub fn attach_async(
+    &mut self,
+    mut module: impl AsyncModule + 'static + Send,
+  ) -> &mut Self {
+    tokio::task::block_in_place(|| {
+      tokio::runtime::Handle::current().block_on(async {
+        module.on_attach(self).await;
+
+        (*self.async_modules.lock().await).push(Box::new(module));
+      });
+    });
+
+    self
+  }
+
   /// Attach a stateful module to a `Router`.
   ///
   /// Like a stateless module is an extension or middleware to a `Router`.
@@ -835,6 +926,7 @@ impl Default for Router {
       languages: vec!["en".to_string()],
       port: 1965,
       modules: Arc::new(Mutex::new(vec![])),
+      async_modules: Arc::new(AsyncMutex::new(vec![])),
       fix_path: false,
     }
   }

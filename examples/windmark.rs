@@ -33,12 +33,13 @@ struct Clicker {
   clicks: isize,
 }
 
-impl windmark::Module for Clicker {
-  fn on_attach(&mut self, _: &mut Router) {
+#[async_trait::async_trait]
+impl windmark::AsyncModule for Clicker {
+  async fn on_attach(&mut self, _: &mut Router) {
     println!("clicker has been attached!");
   }
 
-  fn on_pre_route(&mut self, context: HookContext<'_>) {
+  async fn on_pre_route(&mut self, context: HookContext<'_>) {
     self.clicks += 1;
 
     info!(
@@ -48,7 +49,7 @@ impl windmark::Module for Clicker {
     );
   }
 
-  fn on_post_route(&mut self, context: HookContext<'_>) {
+  async fn on_post_route(&mut self, context: HookContext<'_>) {
     info!(
       "clicker has been called post-route on {} with {} clicks!",
       context.url.path(),
@@ -78,7 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   router.attach_stateless(|r| {
     r.mount("/module", success!("This is a module!"));
   });
-  router.attach(Clicker::default());
+  router.attach_async(Clicker::default());
   router.set_pre_route_callback(|context| {
     info!(
       "accepted connection from {} to {}",
