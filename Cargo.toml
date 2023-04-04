@@ -24,7 +24,9 @@ response-macros = []
 openssl = "0.10.38"
 tokio-openssl = "0.6.3"
 
-tokio = { version = "1.26.0", features = ["full"] } # Non-blocking I/O
+# Non-blocking I/O
+tokio = { version = "1.26.0", features = ["full"] }
+async-trait = "0.1.68"
 
 # Logging
 pretty_env_logger = { version = "0.4.0", optional = true }

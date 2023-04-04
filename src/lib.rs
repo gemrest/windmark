@@ -40,7 +40,7 @@ pub mod utilities;
 #[macro_use]
 extern crate log;
 
-pub use module::Module;
+pub use module::{AsyncModule, Module};
 pub use response::Response;
 pub use router::Router;
 pub use tokio::main;
