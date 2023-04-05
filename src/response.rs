@@ -144,3 +144,10 @@ impl Response {
     self
   }
 }
+
+impl std::future::IntoFuture for Response {
+  type IntoFuture = std::future::Ready<Self::Output>;
+  type Output = Self;
+
+  fn into_future(self) -> Self::IntoFuture { std::future::ready(self) }
+}

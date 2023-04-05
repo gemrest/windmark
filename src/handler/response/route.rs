@@ -16,27 +16,25 @@
 // Copyright (C) 2022-2022 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-use std::{future::Future, pin::Pin};
+use std::future::Future;
+
+use async_trait::async_trait;
 
 use crate::{context::RouteContext, Response};
 
 #[allow(clippy::module_name_repetitions)]
+#[async_trait]
 pub trait RouteResponse: Send + Sync {
-  fn call(
-    &mut self,
-    context: RouteContext<'_>,
-  ) -> Pin<Box<dyn Future<Output = Response> + Send>>;
+  async fn call(&mut self, context: RouteContext<'_>) -> Response;
 }
 
+#[async_trait]
 impl<T, F> RouteResponse for T
 where
   T: FnMut(RouteContext<'_>) -> F + Send + Sync,
   F: Future<Output = Response> + Send + 'static,
 {
-  fn call(
-    &mut self,
-    context: RouteContext<'_>,
-  ) -> Pin<Box<dyn Future<Output = Response> + Send>> {
-    Box::pin((*self)(context))
+  async fn call(&mut self, context: RouteContext<'_>) -> Response {
+    (*self)(context).await
   }
 }
