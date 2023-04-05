@@ -67,16 +67,16 @@ macro_rules! or_error {
 #[derive(Clone)]
 pub struct Router {
   routes: matchit::Router<Arc<AsyncMutex<Box<dyn RouteResponse>>>>,
-  error_handler:         Arc<Mutex<Box<dyn ErrorResponse>>>,
+  error_handler:         Arc<Mutex<Box<dyn ErrorResponse<Output = Response>>>>,
   private_key_file_name: String,
   ca_file_name:          String,
-  headers:               Arc<Mutex<Vec<Box<dyn Partial>>>>,
-  footers:               Arc<Mutex<Vec<Box<dyn Partial>>>>,
+  headers:               Arc<Mutex<Vec<Box<dyn Partial<Output = String>>>>>,
+  footers:               Arc<Mutex<Vec<Box<dyn Partial<Output = String>>>>>,
   ssl_acceptor:          Arc<SslAcceptor>,
   #[cfg(feature = "logger")]
   default_logger:        bool,
-  pre_route_callback:    Arc<Mutex<Box<dyn PreRouteHook>>>,
-  post_route_callback:   Arc<Mutex<Box<dyn PostRouteHook>>>,
+  pre_route_callback:    Arc<Mutex<Box<dyn PreRouteHook<Output = ()>>>>,
+  post_route_callback:   Arc<Mutex<Box<dyn PostRouteHook<Output = ()>>>>,
   character_set:         String,
   languages:             Vec<String>,
   port:                  i32,
