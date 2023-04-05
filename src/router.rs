@@ -20,6 +20,7 @@
 
 use std::{
   error::Error,
+  future::IntoFuture,
   sync::{Arc, Mutex},
   time,
 };
@@ -65,7 +66,7 @@ macro_rules! or_error {
 /// response generation, panics, logging, and more.
 #[derive(Clone)]
 pub struct Router {
-  routes:                matchit::Router<Arc<Mutex<Box<dyn RouteResponse>>>>,
+  routes: matchit::Router<Arc<AsyncMutex<Box<dyn RouteResponse>>>>,
   error_handler:         Arc<Mutex<Box<dyn ErrorResponse>>>,
   private_key_file_name: String,
   ca_file_name:          String,
@@ -133,59 +134,41 @@ impl Router {
 
   /// Map routes to URL paths
   ///
+  /// Supports both synchronous and asynchronous handlers
+  ///
   /// # Examples
   ///
   /// ```rust
+  /// use windmark::Response;
+  ///
   /// windmark::Router::new()
-  ///   .mount("/", windmark::success!("This is the index page!"))
-  ///   .mount("/test", windmark::success!("This is a test page!"));
+  ///   .mount("/", |_| {
+  ///     async { Response::success("This is the index page!") }
+  ///   })
+  ///   .mount("/about", |_| async { Response::success("About that...") });
   /// ```
   ///
   /// # Panics
   ///
   /// May panic if the route cannot be mounted.
-  pub fn mount(
-    &mut self,
-    route: impl Into<String> + AsRef<str>,
-    mut handler: impl FnMut(RouteContext<'_>) -> Response + Send + Sync + 'static,
-  ) -> &mut Self {
-    self.mount_async(route, move |context| {
-      let response = handler(context);
-
-      async move { response }
-    });
-
-    self
-  }
-
-  /// Map routes to URL paths; with async support
-  ///
-  /// # Examples
-  ///
-  /// ```rust
-  /// windmark::Router::new().mount_async("/", |_| {
-  ///   async { windmark::Response::success("This is the index page!") }
-  /// });
-  /// ```
-  ///
-  /// # Panics
-  ///
-  /// May panic if the route cannot be mounted.
-  pub fn mount_async<R>(
+  pub fn mount<R>(
     &mut self,
     route: impl Into<String> + AsRef<str>,
     mut handler: impl FnMut(RouteContext<'_>) -> R + Send + Sync + 'static,
   ) -> &mut Self
   where
-    R: std::future::Future<Output = Response> + Send + 'static,
+    R: IntoFuture<Output = Response> + Send + 'static,
+    <R as IntoFuture>::IntoFuture: Send,
   {
     self
       .routes
       .insert(
         route.into(),
-        Arc::new(Mutex::new(Box::new(move |context: RouteContext<'_>| {
-          Box::pin(handler(context))
-        }))),
+        Arc::new(AsyncMutex::new(Box::new(
+          move |context: RouteContext<'_>| {
+            Box::pin(handler(context).into_future())
+          },
+        ))),
       )
       .unwrap();
 
@@ -419,7 +402,8 @@ impl Router {
         ));
       }
 
-      let handler = (*route.value).lock().unwrap().call(RouteContext::new(
+      let mut lock = (*route.value).lock().await;
+      let handler = lock.call(RouteContext::new(
         stream.get_ref(),
         &url,
         &route.params,
@@ -669,7 +653,7 @@ impl Router {
   /// use windmark::Response;
   ///
   /// windmark::Router::new().attach_stateless(|r| {
-  ///   r.mount_async(
+  ///   r.mount(
   ///     "/module",
   ///     Box::new(|_| Response::success("This is a module!")),
   ///   );
@@ -688,7 +672,7 @@ impl Router {
   ///
   /// mod windmark_example {
   ///   pub fn module(router: &mut windmark::Router) {
-  ///     router.mount_async(
+  ///     router.mount(
   ///       "/module",
   ///       Box::new(|_| windmark::Response::success("This is a module!")),
   ///     );

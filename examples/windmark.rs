@@ -200,7 +200,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       )
     }
   });
-  router.mount_async("/async", move |_| {
+  router.mount("/async", move |_| {
     let async_clicks = async_clicks.clone();
 
     async move {
@@ -211,7 +211,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       Response::success(*clicks)
     }
   });
-  router.mount_async("/async-nothing", |_| {
+  router.mount("/async-nothing", |_| {
     async { Response::success("This is an async route.") }
   });
 
