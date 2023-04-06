@@ -344,45 +344,29 @@ impl Router {
       url.path().to_string()
     };
     let route = &mut self.routes.at(&fixed_path);
-
-    for module in &mut *self.async_modules.lock().await {
-      module
-        .on_pre_route(HookContext::new(
-          url.clone(),
-          route
-            .as_ref()
-            .map_or(None, |route| Some(route.params.clone())),
-          stream.ssl().peer_certificate().clone(),
-        ))
-        .await;
-    }
-
-    for module in &mut *self.modules.lock().unwrap() {
-      module.on_pre_route(HookContext::new(
-        url.clone(),
-        route
-          .as_ref()
-          .map_or(None, |route| Some(route.params.clone())),
-        stream.ssl().peer_certificate().clone(),
-      ));
-    }
-
-    (*self.pre_route_callback).lock().unwrap()(HookContext::new(
+    let peer_certificate = stream.ssl().peer_certificate();
+    let hook_context = HookContext::new(
       url.clone(),
       route
         .as_ref()
         .map_or(None, |route| Some(route.params.clone())),
-      stream.ssl().peer_certificate(),
-    ));
+      peer_certificate.clone(),
+    );
 
-    let peer_certificate = stream.ssl().peer_certificate();
+    for module in &mut *self.async_modules.lock().await {
+      module.on_pre_route(hook_context.clone()).await;
+    }
+
+    for module in &mut *self.modules.lock().unwrap() {
+      module.on_pre_route(hook_context.clone());
+    }
+
+    (*self.pre_route_callback).lock().unwrap()(hook_context.clone());
+
     let mut content = if let Ok(ref route) = route {
       let footers_length = (*self.footers.lock().unwrap()).len();
-      let route_context = RouteContext::new(
-        url.clone(),
-        route.params.clone(),
-        stream.ssl().peer_certificate(),
-      );
+      let route_context =
+        RouteContext::new(url.clone(), route.params.clone(), peer_certificate);
 
       for partial_header in &mut *self.headers.lock().unwrap() {
         header
@@ -411,40 +395,20 @@ impl Router {
     } else {
       (*self.error_handler).lock().unwrap()(ErrorContext::new(
         url.clone(),
-        peer_certificate.clone(),
+        peer_certificate,
       ))
     };
 
     for module in &mut *self.async_modules.lock().await {
-      module
-        .on_post_route(HookContext::new(
-          url.clone(),
-          route
-            .as_ref()
-            .map_or(None, |route| Some(route.params.clone())),
-          stream.ssl().peer_certificate().clone(),
-        ))
-        .await;
+      module.on_post_route(hook_context.clone()).await;
     }
 
     for module in &mut *self.modules.lock().unwrap() {
-      module.on_post_route(HookContext::new(
-        url.clone(),
-        route
-          .as_ref()
-          .map_or(None, |route| Some(route.params.clone())),
-        stream.ssl().peer_certificate().clone(),
-      ));
+      module.on_post_route(hook_context.clone());
     }
 
     (*self.post_route_callback).lock().unwrap()(
-      HookContext::new(
-        url.clone(),
-        route
-          .as_ref()
-          .map_or(None, |route| Some(route.params.clone())),
-        stream.ssl().peer_certificate(),
-      ),
+      hook_context.clone(),
       &mut content,
     );
 

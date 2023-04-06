@@ -21,6 +21,7 @@ use openssl::x509::X509;
 use url::Url;
 
 #[allow(clippy::module_name_repetitions)]
+#[derive(Clone)]
 pub struct HookContext<'a> {
   pub url:         Url,
   pub params:      Option<Params<'a, 'a>>,
