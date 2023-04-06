@@ -23,19 +23,22 @@ use url::Url;
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone)]
 pub struct RouteContext<'a> {
-  pub url:         Url,
-  pub params:      Params<'a, 'a>,
-  pub certificate: Option<X509>,
+  pub peer_address: Option<std::net::SocketAddr>,
+  pub url:          Url,
+  pub params:       Params<'a, 'a>,
+  pub certificate:  Option<X509>,
 }
 
 impl<'a> RouteContext<'a> {
   #[must_use]
-  pub const fn new(
+  pub fn new(
+    peer_address: std::io::Result<std::net::SocketAddr>,
     url: Url,
     params: Params<'a, 'a>,
     certificate: Option<X509>,
   ) -> Self {
     Self {
+      peer_address: peer_address.ok(),
       url,
       params,
       certificate,

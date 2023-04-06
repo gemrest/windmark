@@ -22,14 +22,20 @@ use url::Url;
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone)]
 pub struct ErrorContext {
-  pub url:         Url,
-  pub certificate: Option<X509>,
+  pub peer_address: Option<std::net::SocketAddr>,
+  pub url:          Url,
+  pub certificate:  Option<X509>,
 }
 
 impl ErrorContext {
   #[must_use]
-  pub const fn new(url: Url, certificate: Option<X509>) -> Self {
+  pub fn new(
+    peer_address: std::io::Result<std::net::SocketAddr>,
+    url: Url,
+    certificate: Option<X509>,
+  ) -> Self {
     Self {
+      peer_address: peer_address.ok(),
       url,
       certificate,
     }
