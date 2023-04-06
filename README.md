@@ -18,18 +18,18 @@ Check out an example starter project
 # Cargo.toml
 
 [dependencies]
-windmark = "0.3.1"
+windmark = "0.3.2"
 tokio = { version = "1.26.0", features = ["full"] }
 
 # If you would like to use the built-in logger (recommended)
-# windmark = { version = "0.3.1", features = ["logger"] }
+# windmark = { version = "0.3.2", features = ["logger"] }
 
 # If you would like to use the built-in MIME dedection when `Success`-ing a file
 # (recommended)
-# windmark = { version = "0.3.1", features = ["auto-deduce-mime"] }
+# windmark = { version = "0.3.2", features = ["auto-deduce-mime"] }
 
 # If you would like to use macro-based responses (as seen below)
-# windmark = { version = "0.3.1", features = ["response-macros"] }
+# windmark = { version = "0.3.2", features = ["response-macros"] }
 ```
 
 ### Implement a Windmark server
