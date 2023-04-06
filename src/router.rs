@@ -346,6 +346,7 @@ impl Router {
     let route = &mut self.routes.at(&fixed_path);
     let peer_certificate = stream.ssl().peer_certificate();
     let hook_context = HookContext::new(
+      stream.get_ref().peer_addr(),
       url.clone(),
       route
         .as_ref()
@@ -365,8 +366,12 @@ impl Router {
 
     let mut content = if let Ok(ref route) = route {
       let footers_length = (*self.footers.lock().unwrap()).len();
-      let route_context =
-        RouteContext::new(url.clone(), route.params.clone(), peer_certificate);
+      let route_context = RouteContext::new(
+        stream.get_ref().peer_addr(),
+        url.clone(),
+        route.params.clone(),
+        peer_certificate,
+      );
 
       for partial_header in &mut *self.headers.lock().unwrap() {
         header
@@ -394,6 +399,7 @@ impl Router {
       handler.await
     } else {
       (*self.error_handler).lock().unwrap()(ErrorContext::new(
+        stream.get_ref().peer_addr(),
         url.clone(),
         peer_certificate,
       ))
