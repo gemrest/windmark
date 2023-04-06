@@ -19,10 +19,7 @@
 use crate::{context::ErrorContext, Response};
 
 #[allow(clippy::module_name_repetitions)]
-pub trait ErrorResponse:
-  FnMut(ErrorContext<'_>) -> Response + Send + Sync
-{
-}
+pub trait ErrorResponse: FnMut(ErrorContext) -> Response + Send + Sync {}
 
-impl<T> ErrorResponse for T where T: FnMut(ErrorContext<'_>) -> Response + Send + Sync
+impl<T> ErrorResponse for T where T: FnMut(ErrorContext) -> Response + Send + Sync
 {}
