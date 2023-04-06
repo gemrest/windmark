@@ -17,24 +17,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 use openssl::x509::X509;
-use tokio::net::TcpStream;
 use url::Url;
 
 #[allow(clippy::module_name_repetitions)]
-pub struct ErrorContext<'a> {
-  pub tcp:         &'a TcpStream,
-  pub url:         &'a Url,
-  pub certificate: &'a Option<X509>,
+pub struct ErrorContext {
+  pub url:         Url,
+  pub certificate: Option<X509>,
 }
 
-impl<'a> ErrorContext<'a> {
-  pub const fn new(
-    tcp: &'a TcpStream,
-    url: &'a Url,
-    certificate: &'a Option<X509>,
-  ) -> Self {
+impl ErrorContext {
+  #[must_use]
+  pub const fn new(url: Url, certificate: Option<X509>) -> Self {
     Self {
-      tcp,
       url,
       certificate,
     }

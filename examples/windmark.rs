@@ -80,22 +80,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     r.mount("/module", success!("This is a module!"));
   });
   router.attach_async(Clicker::default());
-  router.set_pre_route_callback(|context| {
-    info!(
-      "accepted connection from {} to {}",
-      context.tcp.peer_addr().unwrap().ip(),
-      context.url.to_string()
-    )
-  });
-  router.set_post_route_callback(|context, content| {
-    content.content =
-      content.content.replace("Welcome!", "Welcome to Windmark!");
-
-    info!(
-      "closed connection from {}",
-      context.tcp.peer_addr().unwrap().ip()
-    )
-  });
+  // router.set_pre_route_callback(|context| {
+  //   info!(
+  //     "accepted connection from {} to {}",
+  //     context.tcp.peer_addr().unwrap().ip(),
+  //     context.url.to_string()
+  //   )
+  // });
+  // router.set_post_route_callback(|context, content| {
+  //   content.content =
+  //     content.content.replace("Welcome!", "Welcome to Windmark!");
+  //
+  //   info!(
+  //     "closed connection from {}",
+  //     context.tcp.peer_addr().unwrap().ip()
+  //   )
+  // });
   router.add_header(|_| "```\nART IS COOL\n```\nhi".to_string());
   router.add_footer(|_| "Copyright 2022".to_string());
   router.add_footer(|context| {
@@ -110,13 +110,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       .with_mime("text/plain")
       .clone()
   });
-  router.mount(
-    "/ip",
-    success!(
-      context,
-      format!("Hello, {}", context.tcp.peer_addr().unwrap().ip())
-    ),
-  );
   router.mount("/test", success!("hi there\n=> / back"));
   router.mount(
     "/temporary-failure",
@@ -211,8 +204,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       Response::success(*clicks)
     }
   });
-  router.mount("/async-nothing", |_| {
-    async { Response::success("This is an async route.") }
+  router.mount("/async-nothing", |context| {
+    async move { Response::success(context.url.path()) }
   });
   router.mount(
     "/async-macro",
