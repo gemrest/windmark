@@ -16,8 +16,6 @@
 // Copyright (C) 2022-2022 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-use std::future::Future;
-
 use async_trait::async_trait;
 
 use crate::{context::RouteContext, Response};
@@ -32,7 +30,7 @@ pub trait RouteResponse: Send + Sync {
 impl<T, F> RouteResponse for T
 where
   T: FnMut(RouteContext<'_>) -> F + Send + Sync,
-  F: Future<Output = Response> + Send + 'static,
+  F: std::future::Future<Output = Response> + Send + 'static,
 {
   async fn call(&mut self, context: RouteContext<'_>) -> Response {
     (*self)(context).await
