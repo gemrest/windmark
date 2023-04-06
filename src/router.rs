@@ -75,7 +75,7 @@ macro_rules! or_error {
 #[derive(Clone)]
 pub struct Router {
   routes: matchit::Router<Arc<AsyncMutex<Box<dyn RouteResponse>>>>,
-  error_handler:         Arc<Mutex<Box<dyn ErrorResponse<Output = Response>>>>,
+  error_handler:         Arc<AsyncMutex<Box<dyn ErrorResponse>>>,
   private_key_file_name: String,
   ca_file_name:          String,
   headers:               Arc<Mutex<Vec<Box<dyn Partial<Output = String>>>>>,
@@ -190,11 +190,17 @@ impl Router {
   ///   windmark::success!("You have encountered an error!")
   /// });
   /// ```
-  pub fn set_error_handler(
+  pub fn set_error_handler<R>(
     &mut self,
-    handler: impl ErrorResponse + 'static,
-  ) -> &mut Self {
-    self.error_handler = Arc::new(Mutex::new(Box::new(handler)));
+    mut handler: impl FnMut(ErrorContext) -> R + Send + Sync + 'static,
+  ) -> &mut Self
+  where
+    R: IntoFuture<Output = Response> + Send + 'static,
+    <R as IntoFuture>::IntoFuture: Send,
+  {
+    self.error_handler = Arc::new(AsyncMutex::new(Box::new(move |context| {
+      handler(context).into_future()
+    })));
 
     self
   }
@@ -398,11 +404,15 @@ impl Router {
 
       handler.await
     } else {
-      (*self.error_handler).lock().unwrap()(ErrorContext::new(
-        stream.get_ref().peer_addr(),
-        url.clone(),
-        peer_certificate,
-      ))
+      (*self.error_handler)
+        .lock()
+        .await
+        .call(ErrorContext::new(
+          stream.get_ref().peer_addr(),
+          url.clone(),
+          peer_certificate,
+        ))
+        .await
     };
 
     for module in &mut *self.async_modules.lock().await {
@@ -855,10 +865,12 @@ impl Default for Router {
   fn default() -> Self {
     Self {
       routes: matchit::Router::new(),
-      error_handler: Arc::new(Mutex::new(Box::new(|_| {
-        Response::not_found(
-          "This capsule has not implemented an error handler...",
-        )
+      error_handler: Arc::new(AsyncMutex::new(Box::new(|_| {
+        async {
+          Response::not_found(
+            "This capsule has not implemented an error handler...",
+          )
+        }
       }))),
       private_key_file_name: String::new(),
       ca_file_name: String::new(),

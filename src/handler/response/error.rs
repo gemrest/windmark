@@ -16,10 +16,23 @@
 // Copyright (C) 2022-2022 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
+use async_trait::async_trait;
+
 use crate::{context::ErrorContext, Response};
 
 #[allow(clippy::module_name_repetitions)]
-pub trait ErrorResponse: FnMut(ErrorContext) -> Response + Send + Sync {}
+#[async_trait]
+pub trait ErrorResponse: Send + Sync {
+  async fn call(&mut self, context: ErrorContext) -> Response;
+}
 
-impl<T> ErrorResponse for T where T: FnMut(ErrorContext) -> Response + Send + Sync
-{}
+#[async_trait]
+impl<T, F> ErrorResponse for T
+where
+  T: FnMut(ErrorContext) -> F + Send + Sync,
+  F: std::future::Future<Output = Response> + Send + 'static,
+{
+  async fn call(&mut self, context: ErrorContext) -> Response {
+    (*self)(context).await
+  }
+}
