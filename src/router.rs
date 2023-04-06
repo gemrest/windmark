@@ -162,7 +162,7 @@ impl Router {
   pub fn mount<R>(
     &mut self,
     route: impl Into<String> + AsRef<str>,
-    mut handler: impl FnMut(RouteContext<'_>) -> R + Send + Sync + 'static,
+    mut handler: impl FnMut(RouteContext) -> R + Send + Sync + 'static,
   ) -> &mut Self
   where
     R: IntoFuture<Output = Response> + Send + 'static,
@@ -172,9 +172,9 @@ impl Router {
       .routes
       .insert(
         route.into(),
-        Arc::new(AsyncMutex::new(Box::new(
-          move |context: RouteContext<'_>| handler(context).into_future(),
-        ))),
+        Arc::new(AsyncMutex::new(Box::new(move |context: RouteContext| {
+          handler(context).into_future()
+        }))),
       )
       .unwrap();
 
@@ -375,7 +375,7 @@ impl Router {
       let route_context = RouteContext::new(
         stream.get_ref().peer_addr(),
         url.clone(),
-        route.params.clone(),
+        &route.params,
         peer_certificate,
       );
 

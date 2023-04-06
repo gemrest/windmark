@@ -31,3 +31,13 @@ pub fn queries_from_url(url: &url::Url) -> HashMap<String, String> {
 
   queries
 }
+
+#[must_use]
+pub fn params_to_hashmap(
+  params: &matchit::Params<'_, '_>,
+) -> HashMap<String, String> {
+  params
+    .iter()
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .collect()
+}
