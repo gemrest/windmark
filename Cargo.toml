@@ -38,3 +38,5 @@ regex = "1.5.5"
 matchit = "0.6.0"
 
 tree_magic = { version = "0.2.3", optional = true } # MIME
+
+paste = "1.0.12" # Token Pasting

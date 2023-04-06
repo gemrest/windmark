@@ -214,6 +214,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   router.mount("/async-nothing", |_| {
     async { Response::success("This is an async route.") }
   });
+  router.mount(
+    "/async-macro",
+    windmark::success_async!(async { "hi" }.await),
+  );
 
   router.run().await
 }

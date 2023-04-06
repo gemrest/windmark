@@ -16,7 +16,7 @@
 // Copyright (C) 2022-2022 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-macro_rules! response {
+macro_rules! sync_response {
   ($($name:tt),*) => {
     $(
       /// Trailing commas are not supported at the moment!
@@ -33,25 +33,54 @@ macro_rules! response {
   };
 }
 
-response!(input);
-response!(sensitive_input);
-response!(success);
+macro_rules! async_response {
+  ($($name:tt),*) => {
+    $(::paste::paste! {
+      /// Trailing commas are not supported at the moment!
+      #[macro_export]
+      macro_rules! [< $name _async >] {
+        ($body:expr /* $(,)? */) => {
+          |_: ::windmark::context::RouteContext<'_>| async { ::windmark::Response::$name($body) }
+        };
+        ($context:ident, $body:expr /* $(,)? */) => {
+          |$context: ::windmark::context::RouteContext<'_>| async { ::windmark::Response::$name($body) }
+        };
+      }
+    })*
+  };
+}
+
+macro_rules! response {
+  ($($name:tt),* $(,)?) => {
+    $(
+      sync_response!($name);
+      async_response!($name);
+    )*
+  };
+}
+
+response!(
+  input,
+  sensitive_input,
+  success,
+  temporary_redirect,
+  permanent_redirect,
+  temporary_failure,
+  server_unavailable,
+  cgi_error,
+  proxy_error,
+  slow_down,
+  permanent_failure,
+  not_found,
+  gone,
+  proxy_refused,
+  bad_request,
+  client_certificate_required,
+  certificate_not_valid,
+);
+
 #[cfg(feature = "auto-deduce-mime")]
 response!(binary_success_auto);
-response!(temporary_redirect);
-response!(permanent_redirect);
-response!(temporary_failure);
-response!(server_unavailable);
-response!(cgi_error);
-response!(proxy_error);
-response!(slow_down);
-response!(permanent_failure);
-response!(not_found);
-response!(gone);
-response!(proxy_refused);
-response!(bad_request);
-response!(client_certificate_required);
-response!(certificate_not_valid);
 
 /// Trailing commas are not supported at the moment!
 #[macro_export]
