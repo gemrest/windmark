@@ -27,7 +27,7 @@ use url::Url;
 pub struct HookContext {
   pub peer_address: Option<std::net::SocketAddr>,
   pub url:          Url,
-  pub params:       Option<HashMap<String, String>>,
+  pub parameters:   Option<HashMap<String, String>>,
   pub certificate:  Option<X509>,
 }
 
@@ -36,14 +36,13 @@ impl HookContext {
   pub fn new(
     peer_address: std::io::Result<std::net::SocketAddr>,
     url: Url,
-    params: Option<Params<'_, '_>>,
+    parameters: Option<Params<'_, '_>>,
     certificate: Option<X509>,
   ) -> Self {
     Self {
       peer_address: peer_address.ok(),
       url,
-      params: params
-        .map(|parameters| crate::utilities::params_to_hashmap(&parameters)),
+      parameters: parameters.map(|p| crate::utilities::params_to_hashmap(&p)),
       certificate,
     }
   }
