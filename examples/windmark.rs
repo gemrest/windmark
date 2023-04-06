@@ -133,7 +133,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     "/param/:lang",
     success!(
       context,
-      format!("Parameter lang is {}", context.params.get("lang").unwrap())
+      format!(
+        "Parameter lang is {}",
+        context.parameters.get("lang").unwrap()
+      )
     ),
   );
   router.mount(
@@ -142,8 +145,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       context,
       format!(
         "{} {}",
-        context.params.get("first").unwrap(),
-        context.params.get("last").unwrap()
+        context.parameters.get("first").unwrap(),
+        context.parameters.get("last").unwrap()
       )
     ),
   );

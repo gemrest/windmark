@@ -27,7 +27,7 @@ use url::Url;
 pub struct RouteContext {
   pub peer_address: Option<std::net::SocketAddr>,
   pub url:          Url,
-  pub params:       HashMap<String, String>,
+  pub parameters:   HashMap<String, String>,
   pub certificate:  Option<X509>,
 }
 
@@ -36,13 +36,13 @@ impl RouteContext {
   pub fn new(
     peer_address: std::io::Result<std::net::SocketAddr>,
     url: Url,
-    params: &Params<'_, '_>,
+    parameters: &Params<'_, '_>,
     certificate: Option<X509>,
   ) -> Self {
     Self {
       peer_address: peer_address.ok(),
       url,
-      params: crate::utilities::params_to_hashmap(params),
+      parameters: crate::utilities::params_to_hashmap(parameters),
       certificate,
     }
   }
