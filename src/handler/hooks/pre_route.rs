@@ -19,6 +19,6 @@
 use crate::context::HookContext;
 
 #[allow(clippy::module_name_repetitions)]
-pub trait PreRouteHook: FnMut(HookContext<'_>) + Send + Sync {}
+pub trait PreRouteHook: FnMut(HookContext) + Send + Sync {}
 
-impl<T> PreRouteHook for T where T: FnMut(HookContext<'_>) + Send + Sync {}
+impl<T> PreRouteHook for T where T: FnMut(HookContext) + Send + Sync {}

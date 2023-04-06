@@ -16,31 +16,34 @@
 // Copyright (C) 2022-2022 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
+use std::collections::HashMap;
+
 use matchit::Params;
 use openssl::x509::X509;
 use url::Url;
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone)]
-pub struct HookContext<'a> {
+pub struct HookContext {
   pub peer_address: Option<std::net::SocketAddr>,
   pub url:          Url,
-  pub params:       Option<Params<'a, 'a>>,
+  pub params:       Option<HashMap<String, String>>,
   pub certificate:  Option<X509>,
 }
 
-impl<'a> HookContext<'a> {
+impl HookContext {
   #[must_use]
   pub fn new(
     peer_address: std::io::Result<std::net::SocketAddr>,
     url: Url,
-    params: Option<Params<'a, 'a>>,
+    params: Option<Params<'_, '_>>,
     certificate: Option<X509>,
   ) -> Self {
     Self {
       peer_address: peer_address.ok(),
       url,
-      params,
+      params: params
+        .map(|parameters| crate::utilities::params_to_hashmap(&parameters)),
       certificate,
     }
   }
