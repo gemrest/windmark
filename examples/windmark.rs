@@ -80,22 +80,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     r.mount("/module", success!("This is a module!"));
   });
   router.attach_async(Clicker::default());
-  // router.set_pre_route_callback(|context| {
-  //   info!(
-  //     "accepted connection from {} to {}",
-  //     context.tcp.peer_addr().unwrap().ip(),
-  //     context.url.to_string()
-  //   )
-  // });
-  // router.set_post_route_callback(|context, content| {
-  //   content.content =
-  //     content.content.replace("Welcome!", "Welcome to Windmark!");
-  //
-  //   info!(
-  //     "closed connection from {}",
-  //     context.tcp.peer_addr().unwrap().ip()
-  //   )
-  // });
+  router.set_pre_route_callback(|context| {
+    info!(
+      "accepted connection from {} to {}",
+      context.peer_address.unwrap().ip(),
+      context.url.to_string()
+    )
+  });
+  router.set_post_route_callback(|context, content| {
+    content.content =
+      content.content.replace("Welcome!", "Welcome to Windmark!");
+
+    info!(
+      "closed connection from {}",
+      context.peer_address.unwrap().ip()
+    )
+  });
   router.add_header(|_| "```\nART IS COOL\n```\nhi".to_string());
   router.add_footer(|_| "Copyright 2022".to_string());
   router.add_footer(|context| {
