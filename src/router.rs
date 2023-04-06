@@ -348,44 +348,45 @@ impl Router {
     for module in &mut *self.async_modules.lock().await {
       module
         .on_pre_route(HookContext::new(
-          stream.get_ref(),
-          &url,
-          route.as_ref().map_or(None, |route| Some(&route.params)),
-          &stream.ssl().peer_certificate(),
+          url.clone(),
+          route
+            .as_ref()
+            .map_or(None, |route| Some(route.params.clone())),
+          stream.ssl().peer_certificate().clone(),
         ))
         .await;
     }
 
     for module in &mut *self.modules.lock().unwrap() {
       module.on_pre_route(HookContext::new(
-        stream.get_ref(),
-        &url,
-        route.as_ref().map_or(None, |route| Some(&route.params)),
-        &stream.ssl().peer_certificate(),
+        url.clone(),
+        route
+          .as_ref()
+          .map_or(None, |route| Some(route.params.clone())),
+        stream.ssl().peer_certificate().clone(),
       ));
     }
 
     (*self.pre_route_callback).lock().unwrap()(HookContext::new(
-      stream.get_ref(),
-      &url,
-      route.as_ref().map_or(None, |route| Some(&route.params)),
-      &stream.ssl().peer_certificate(),
+      url.clone(),
+      route
+        .as_ref()
+        .map_or(None, |route| Some(route.params.clone())),
+      stream.ssl().peer_certificate(),
     ));
 
     let peer_certificate = stream.ssl().peer_certificate();
     let mut content = if let Ok(ref route) = route {
       let footers_length = (*self.footers.lock().unwrap()).len();
+      let route_context = RouteContext::new(
+        url.clone(),
+        route.params.clone(),
+        stream.ssl().peer_certificate(),
+      );
 
       for partial_header in &mut *self.headers.lock().unwrap() {
-        header.push_str(&format!(
-          "{}\n",
-          partial_header(RouteContext::new(
-            stream.get_ref(),
-            &url,
-            &route.params,
-            &stream.ssl().peer_certificate()
-          )),
-        ));
+        header
+          .push_str(&format!("{}\n", partial_header(route_context.clone()),));
       }
 
       for (i, partial_footer) in {
@@ -394,12 +395,7 @@ impl Router {
       } {
         footer.push_str(&format!(
           "{}{}",
-          partial_footer(RouteContext::new(
-            stream.get_ref(),
-            &url,
-            &route.params,
-            &stream.ssl().peer_certificate()
-          )),
+          partial_footer(route_context.clone()),
           if footers_length > 1 && i != footers_length - 1 {
             "\n"
           } else {
@@ -409,48 +405,45 @@ impl Router {
       }
 
       let mut lock = (*route.value).lock().await;
-      let handler = lock.call(RouteContext::new(
-        stream.get_ref(),
-        &url,
-        &route.params,
-        &peer_certificate,
-      ));
+      let handler = lock.call(route_context);
 
       handler.await
     } else {
       (*self.error_handler).lock().unwrap()(ErrorContext::new(
-        stream.get_ref(),
-        &url,
-        &peer_certificate,
+        url.clone(),
+        peer_certificate.clone(),
       ))
     };
 
     for module in &mut *self.async_modules.lock().await {
       module
         .on_post_route(HookContext::new(
-          stream.get_ref(),
-          &url,
-          route.as_ref().map_or(None, |route| Some(&route.params)),
-          &stream.ssl().peer_certificate(),
+          url.clone(),
+          route
+            .as_ref()
+            .map_or(None, |route| Some(route.params.clone())),
+          stream.ssl().peer_certificate().clone(),
         ))
         .await;
     }
 
     for module in &mut *self.modules.lock().unwrap() {
       module.on_post_route(HookContext::new(
-        stream.get_ref(),
-        &url,
-        route.as_ref().map_or(None, |route| Some(&route.params)),
-        &stream.ssl().peer_certificate(),
+        url.clone(),
+        route
+          .as_ref()
+          .map_or(None, |route| Some(route.params.clone())),
+        stream.ssl().peer_certificate().clone(),
       ));
     }
 
     (*self.post_route_callback).lock().unwrap()(
       HookContext::new(
-        stream.get_ref(),
-        &url,
-        route.as_ref().map_or(None, |route| Some(&route.params)),
-        &stream.ssl().peer_certificate(),
+        url.clone(),
+        route
+          .as_ref()
+          .map_or(None, |route| Some(route.params.clone())),
+        stream.ssl().peer_certificate(),
       ),
       &mut content,
     );

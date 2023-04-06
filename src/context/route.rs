@@ -18,26 +18,24 @@
 
 use matchit::Params;
 use openssl::x509::X509;
-use tokio::net::TcpStream;
 use url::Url;
 
 #[allow(clippy::module_name_repetitions)]
+#[derive(Clone)]
 pub struct RouteContext<'a> {
-  pub tcp:         &'a TcpStream,
-  pub url:         &'a Url,
-  pub params:      &'a Params<'a, 'a>,
-  pub certificate: &'a Option<X509>,
+  pub url:         Url,
+  pub params:      Params<'a, 'a>,
+  pub certificate: Option<X509>,
 }
 
 impl<'a> RouteContext<'a> {
+  #[must_use]
   pub const fn new(
-    tcp: &'a TcpStream,
-    url: &'a Url,
-    params: &'a Params<'a, 'a>,
-    certificate: &'a Option<X509>,
+    url: Url,
+    params: Params<'a, 'a>,
+    certificate: Option<X509>,
   ) -> Self {
     Self {
-      tcp,
       url,
       params,
       certificate,
