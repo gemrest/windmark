@@ -165,9 +165,7 @@ impl Router {
       .insert(
         route.into(),
         Arc::new(AsyncMutex::new(Box::new(
-          move |context: RouteContext<'_>| {
-            Box::pin(handler(context).into_future())
-          },
+          move |context: RouteContext<'_>| handler(context).into_future(),
         ))),
       )
       .unwrap();
