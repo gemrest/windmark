@@ -45,6 +45,14 @@ use crate::{
   response::Response,
 };
 
+macro_rules! block {
+  ($body:expr) => {
+    tokio::task::block_in_place(|| {
+      tokio::runtime::Handle::current().block_on(async { $body });
+    });
+  };
+}
+
 macro_rules! or_error {
   ($stream:ident, $operation:expr, $error_format:literal) => {
     match $operation {
@@ -740,12 +748,10 @@ impl Router {
     &mut self,
     mut module: impl AsyncModule + 'static + Send,
   ) -> &mut Self {
-    tokio::task::block_in_place(|| {
-      tokio::runtime::Handle::current().block_on(async {
-        module.on_attach(self).await;
+    block!({
+      module.on_attach(self).await;
 
-        (*self.async_modules.lock().await).push(Box::new(module));
-      });
+      (*self.async_modules.lock().await).push(Box::new(module));
     });
 
     self
