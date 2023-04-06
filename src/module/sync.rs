@@ -23,8 +23,8 @@ pub trait Module {
   fn on_attach(&mut self, _: &mut Router) {}
 
   /// Called before a route is mounted.
-  fn on_pre_route(&mut self, _: HookContext<'_>) {}
+  fn on_pre_route(&mut self, _: HookContext) {}
 
   /// Called after a route is mounted.
-  fn on_post_route(&mut self, _: HookContext<'_>) {}
+  fn on_post_route(&mut self, _: HookContext) {}
 }

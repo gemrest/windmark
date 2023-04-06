@@ -18,6 +18,6 @@
 
 use crate::context::RouteContext;
 
-pub trait Partial: FnMut(RouteContext<'_>) -> String + Send + Sync {}
+pub trait Partial: FnMut(RouteContext) -> String + Send + Sync {}
 
-impl<T> Partial for T where T: FnMut(RouteContext<'_>) -> String + Send + Sync {}
+impl<T> Partial for T where T: FnMut(RouteContext) -> String + Send + Sync {}

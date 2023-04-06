@@ -39,7 +39,7 @@ impl windmark::AsyncModule for Clicker {
     println!("clicker has been attached!");
   }
 
-  async fn on_pre_route(&mut self, context: HookContext<'_>) {
+  async fn on_pre_route(&mut self, context: HookContext) {
     self.clicks += 1;
 
     info!(
@@ -49,7 +49,7 @@ impl windmark::AsyncModule for Clicker {
     );
   }
 
-  async fn on_post_route(&mut self, context: HookContext<'_>) {
+  async fn on_post_route(&mut self, context: HookContext) {
     info!(
       "clicker has been called post-route on {} with {} clicks!",
       context.url.path(),

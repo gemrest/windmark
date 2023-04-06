@@ -20,9 +20,9 @@ use crate::{context::HookContext, Response};
 
 #[allow(clippy::module_name_repetitions)]
 pub trait PostRouteHook:
-  FnMut(HookContext<'_>, &mut Response) + Send + Sync
+  FnMut(HookContext, &mut Response) + Send + Sync
 {
 }
 
-impl<T> PostRouteHook for T where T: FnMut(HookContext<'_>, &mut Response) + Send + Sync
+impl<T> PostRouteHook for T where T: FnMut(HookContext, &mut Response) + Send + Sync
 {}
