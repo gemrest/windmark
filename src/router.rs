@@ -47,8 +47,8 @@ use crate::{
 
 macro_rules! block {
   ($body:expr) => {
-    tokio::task::block_in_place(|| {
-      tokio::runtime::Handle::current().block_on(async { $body });
+    ::tokio::task::block_in_place(|| {
+      ::tokio::runtime::Handle::current().block_on(async { $body });
     });
   };
 }
