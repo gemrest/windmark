@@ -1,9 +1,12 @@
-# Rust
-target/
+# Cargo
+target
 Cargo.lock
 
-# IDE
-.idea/
+# CLion
+.idea
 
-# Development
+# Privacy-Enhanced Mail
 *.pem
+
+# Visual Studio Code
+.vscode
