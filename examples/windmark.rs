@@ -98,7 +98,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   });
   router.add_header(|_| "```\nART IS COOL\n```\nhi".to_string());
   router.add_footer(|_| "Copyright 2022".to_string());
-  router.add_footer(|context| {
+  router.add_footer(|context: RouteContext| {
     format!("Another footer, but lower! (from {})", context.url.path())
   });
   router.mount(
