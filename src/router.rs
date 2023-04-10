@@ -78,8 +78,8 @@ pub struct Router {
   error_handler:         Arc<AsyncMutex<Box<dyn ErrorResponse>>>,
   private_key_file_name: String,
   ca_file_name:          String,
-  headers:               Arc<Mutex<Vec<Box<dyn Partial<Output = String>>>>>,
-  footers:               Arc<Mutex<Vec<Box<dyn Partial<Output = String>>>>>,
+  headers:               Arc<Mutex<Vec<Box<dyn Partial>>>>,
+  footers:               Arc<Mutex<Vec<Box<dyn Partial>>>>,
   ssl_acceptor:          Arc<SslAcceptor>,
   #[cfg(feature = "logger")]
   default_logger:        bool,
@@ -380,8 +380,10 @@ impl Router {
       );
 
       for partial_header in &mut *self.headers.lock().unwrap() {
-        header
-          .push_str(&format!("{}\n", partial_header(route_context.clone()),));
+        header.push_str(&format!(
+          "{}\n",
+          partial_header.call(route_context.clone()),
+        ));
       }
 
       for (i, partial_footer) in {
@@ -390,7 +392,7 @@ impl Router {
       } {
         footer.push_str(&format!(
           "{}{}",
-          partial_footer(route_context.clone()),
+          partial_footer.call(route_context.clone()),
           if footers_length > 1 && i != footers_length - 1 {
             "\n"
           } else {
