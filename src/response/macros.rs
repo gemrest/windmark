@@ -17,7 +17,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 macro_rules! sync_response {
-  ($($name:tt),*) => {
+  ($($name:ident),*) => {
     $(
       /// Trailing commas are not supported at the moment!
       #[macro_export]
@@ -34,7 +34,7 @@ macro_rules! sync_response {
 }
 
 macro_rules! async_response {
-  ($($name:tt),*) => {
+  ($($name:ident),*) => {
     $(::paste::paste! {
       /// Trailing commas are not supported at the moment!
       #[macro_export]
@@ -51,7 +51,7 @@ macro_rules! async_response {
 }
 
 macro_rules! response {
-  ($($name:tt),* $(,)?) => {
+  ($($name:ident),* $(,)?) => {
     $(
       sync_response!($name);
       async_response!($name);
