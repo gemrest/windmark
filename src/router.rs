@@ -83,8 +83,8 @@ pub struct Router {
   ssl_acceptor:          Arc<SslAcceptor>,
   #[cfg(feature = "logger")]
   default_logger:        bool,
-  pre_route_callback:    Arc<Mutex<Box<dyn PreRouteHook<Output = ()>>>>,
-  post_route_callback:   Arc<Mutex<Box<dyn PostRouteHook<Output = ()>>>>,
+  pre_route_callback:    Arc<Mutex<Box<dyn PreRouteHook>>>,
+  post_route_callback:   Arc<Mutex<Box<dyn PostRouteHook>>>,
   character_set:         String,
   languages:             Vec<String>,
   port:                  i32,
@@ -368,7 +368,10 @@ impl Router {
       module.on_pre_route(hook_context.clone());
     }
 
-    (*self.pre_route_callback).lock().unwrap()(hook_context.clone());
+    (*self.pre_route_callback)
+      .lock()
+      .unwrap()
+      .call(hook_context.clone());
 
     let mut content = if let Ok(ref route) = route {
       let footers_length = (*self.footers.lock().unwrap()).len();
@@ -425,10 +428,10 @@ impl Router {
       module.on_post_route(hook_context.clone());
     }
 
-    (*self.post_route_callback).lock().unwrap()(
-      hook_context.clone(),
-      &mut content,
-    );
+    (*self.post_route_callback)
+      .lock()
+      .unwrap()
+      .call(hook_context.clone(), &mut content);
 
     stream
       .write_all(
@@ -886,7 +889,9 @@ impl Default for Router {
       #[cfg(feature = "logger")]
       default_logger: false,
       pre_route_callback: Arc::new(Mutex::new(Box::new(|_| {}))),
-      post_route_callback: Arc::new(Mutex::new(Box::new(|_, _| {}))),
+      post_route_callback: Arc::new(Mutex::new(Box::new(
+        |_, _: &'_ mut Response| {},
+      ))),
       character_set: "utf-8".to_string(),
       languages: vec!["en".to_string()],
       port: 1965,
