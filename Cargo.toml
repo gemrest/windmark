@@ -15,6 +15,7 @@ keywords = ["gemini"]
 categories = ["web-programming"]
 
 [features]
+default = ["tokio"]
 logger = ["pretty_env_logger"]
 auto-deduce-mime = ["tree_magic"]
 response-macros = []
