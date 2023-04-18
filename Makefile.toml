@@ -4,12 +4,12 @@ command = "cargo"
 toolchain = "nightly"
 
 [tasks.check]
-args = ["check", "--features", "logger,auto-deduce-mime,response-macros,${@}"]
+args = ["check", "--no-default-features", "--features", "logger,auto-deduce-mime,response-macros,${@}"]
 command = "cargo"
 toolchain = "nightly"
 
 [tasks.clippy]
-args = ["clippy", "--features", "logger,auto-deduce-mime,response-macros,${@}"]
+args = ["clippy", "--no-default-features", "--features", "logger,auto-deduce-mime,response-macros,${@}"]
 command = "cargo"
 toolchain = "nightly"
 
