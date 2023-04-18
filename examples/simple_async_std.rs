@@ -16,34 +16,14 @@
 // Copyright (C) 2022-2022 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-#![deny(
-  clippy::all,
-  clippy::nursery,
-  clippy::pedantic,
-  future_incompatible,
-  nonstandard_style,
-  rust_2018_idioms,
-  unsafe_code,
-  unused,
-  warnings
-)]
-#![doc = include_str!("../README.md")]
-#![recursion_limit = "128"]
+//! `cargo run --example simple_async_std --features async-std`
 
-pub mod context;
-pub mod handler;
-pub mod module;
-pub mod response;
-pub mod router;
-pub mod utilities;
-
-#[macro_use]
-extern crate log;
-
-#[cfg(feature = "async-std")]
-pub use async_std::main;
-pub use module::{AsyncModule, Module};
-pub use response::Response;
-pub use router::Router;
-#[cfg(feature = "tokio")]
-pub use tokio::main;
+#[windmark::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+  windmark::Router::new()
+    .set_private_key_file("windmark_private.pem")
+    .set_certificate_file("windmark_public.pem")
+    .mount("/", |_| windmark::Response::success("Hello, async-std!"))
+    .run()
+    .await
+}

@@ -25,7 +25,13 @@ use std::{
   time,
 };
 
+#[cfg(feature = "async-std")]
+use async_std::{
+  io::{ReadExt, WriteExt},
+  sync::Mutex as AsyncMutex,
+};
 use openssl::ssl::{self, SslAcceptor, SslMethod};
+#[cfg(feature = "tokio")]
 use tokio::{
   io::{AsyncReadExt, AsyncWriteExt},
   sync::Mutex as AsyncMutex,
@@ -47,9 +53,12 @@ use crate::{
 
 macro_rules! block {
   ($body:expr) => {
+    #[cfg(feature = "tokio")]
     ::tokio::task::block_in_place(|| {
       ::tokio::runtime::Handle::current().block_on(async { $body });
     });
+    #[cfg(feature = "async-std")]
+    ::async_std::task::block_on(async { $body });
   };
 }
 
@@ -69,6 +78,11 @@ macro_rules! or_error {
     }
   };
 }
+
+#[cfg(feature = "tokio")]
+type Stream = tokio_openssl::SslStream<tokio::net::TcpStream>;
+#[cfg(feature = "async-std")]
+type Stream = async_std_openssl::SslStream<async_std::net::TcpStream>;
 
 /// A router which takes care of all tasks a Windmark server should handle:
 /// response generation, panics, logging, and more.
@@ -266,8 +280,13 @@ impl Router {
       pretty_env_logger::init();
     }
 
+    #[cfg(feature = "tokio")]
     let listener =
       tokio::net::TcpListener::bind(format!("0.0.0.0:{}", self.port)).await?;
+    #[cfg(feature = "async-std")]
+    let listener =
+      async_std::net::TcpListener::bind(format!("0.0.0.0:{}", self.port))
+        .await?;
 
     #[cfg(feature = "logger")]
     info!("windmark is listening for connections");
@@ -277,8 +296,12 @@ impl Router {
         Ok((stream, _)) => {
           let mut self_clone = self.clone();
           let acceptor = self_clone.ssl_acceptor.clone();
+          #[cfg(feature = "tokio")]
+          let spawner = tokio::spawn;
+          #[cfg(feature = "async-std")]
+          let spawner = async_std::task::spawn;
 
-          tokio::spawn(async move {
+          spawner(async move {
             let ssl = match ssl::Ssl::new(acceptor.context()) {
               Ok(ssl) => ssl,
               Err(e) => {
@@ -288,7 +311,12 @@ impl Router {
               }
             };
 
-            match tokio_openssl::SslStream::new(ssl, stream) {
+            #[cfg(feature = "tokio")]
+            let quick_stream = tokio_openssl::SslStream::new(ssl, stream);
+            #[cfg(feature = "async-std")]
+            let quick_stream = async_std_openssl::SslStream::new(ssl, stream);
+
+            match quick_stream {
               Ok(mut stream) => {
                 if let Err(e) = std::pin::Pin::new(&mut stream).accept().await {
                   println!("stream accept error: {e:?}");
@@ -312,7 +340,7 @@ impl Router {
   #[allow(clippy::too_many_lines)]
   async fn handle(
     &mut self,
-    stream: &mut tokio_openssl::SslStream<tokio::net::TcpStream>,
+    stream: &mut Stream,
   ) -> Result<(), Box<dyn Error>> {
     let mut buffer = [0u8; 1024];
     let mut url = Url::parse("gemini://fuwn.me/")?;
@@ -473,7 +501,10 @@ impl Router {
       )
       .await?;
 
+    #[cfg(feature = "tokio")]
     stream.shutdown().await?;
+    #[cfg(feature = "async-std")]
+    stream.get_mut().shutdown(std::net::Shutdown::Both)?;
 
     Ok(())
   }
