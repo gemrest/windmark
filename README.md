@@ -11,27 +11,24 @@ Now supporting both [Tokio](https://github.com/tokio-rs/tokio) and [`async-std`]
 
 ## Usage
 
-Check out an example starter project
-[here](https://github.com/gemrest/windmark-starter-project)!
-
 ### Add Windmark and Tokio as Dependencies
 
 ```toml
 # Cargo.toml
 
 [dependencies]
-windmark = "0.3.5"
+windmark = "0.3.6"
 tokio = { version = "1.26.0", features = ["full"] }
 
 # If you would like to use the built-in logger (recommended)
-# windmark = { version = "0.3.5", features = ["logger"] }
+# windmark = { version = "0.3.6", features = ["logger"] }
 
 # If you would like to use the built-in MIME dedection when `Success`-ing a file
 # (recommended)
-# windmark = { version = "0.3.5", features = ["auto-deduce-mime"] }
+# windmark = { version = "0.3.6", features = ["auto-deduce-mime"] }
 
 # If you would like to use macro-based responses (as seen below)
-# windmark = { version = "0.3.5", features = ["response-macros"] }
+# windmark = { version = "0.3.6", features = ["response-macros"] }
 ```
 
 ### Implement a Windmark server
