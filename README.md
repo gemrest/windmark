@@ -7,6 +7,8 @@
 Windmark is an elegant and highly performant, async Gemini server framework for
 the modern age!
 
+Now supporting both [Tokio](https://github.com/tokio-rs/tokio) and [`async-std`](https://github.com/async-rs/async-std)!
+
 ## Usage
 
 Check out an example starter project
