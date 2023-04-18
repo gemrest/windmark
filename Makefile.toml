@@ -14,10 +14,22 @@ command = "cargo"
 toolchain = "nightly"
 
 [tasks.checkf]
-dependencies = ["fmt", "check"]
+script_runner = "@shell"
+script = '''
+cargo make fmt
+cargo make check tokio
+cargo make check async-std
+'''
 
 [tasks.checkfc]
-dependencies = ["fmt", "check", "clippy"]
+script_runner = "@shell"
+script = '''
+cargo make fmt
+cargo make check tokio
+cargo make check async-std
+cargo make clippy tokio
+cargo make clippy async-std
+'''
 
 [tasks.genkey]
 command = "openssl"
