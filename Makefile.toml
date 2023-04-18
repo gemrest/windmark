@@ -14,16 +14,18 @@ command = "cargo"
 toolchain = "nightly"
 
 [tasks.checkf]
-script_runner = "@shell"
 script = '''
+#!@shell
+
 cargo make fmt
 cargo make check tokio
 cargo make check async-std
 '''
 
 [tasks.checkfc]
-script_runner = "@shell"
 script = '''
+#!@shell
+
 cargo make fmt
 cargo make check tokio
 cargo make check async-std
@@ -61,5 +63,12 @@ command = "cargo"
 args = ["doc", "--open", "--no-deps"]
 
 [tasks.example]
-command = "cargo"
-args = ["run", "--example", "${@}", "--all-features"]
+script = '''
+#!@duckscript
+
+if is_empty ${2}
+  exec cargo run --example ${1} --no-default-features --features logger,auto-deduce-mime,response-macros,tokio
+else
+  exec cargo run --example ${1} --no-default-features --features logger,auto-deduce-mime,response-macros,${2}
+end
+'''
