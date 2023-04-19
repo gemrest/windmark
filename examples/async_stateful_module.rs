@@ -15,7 +15,7 @@
 // Copyright (C) 2022-2023 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-//! `cargo run --example async_stateful_module`
+//! `cargo run --example async_stateful_module --features response-macros`
 
 use std::sync::{Arc, Mutex};
 

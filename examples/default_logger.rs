@@ -15,7 +15,7 @@
 // Copyright (C) 2022-2023 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-//! `cargo run --example default_logger --features logger`
+//! `cargo run --example default_logger --features logger,response-macros`
 
 #[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
