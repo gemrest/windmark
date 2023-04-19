@@ -15,7 +15,7 @@
 // Copyright (C) 2022-2023 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-//! `cargo run --example async`
+//! `cargo run --example async --features response-macros`
 
 #[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

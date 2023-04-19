@@ -15,7 +15,7 @@
 // Copyright (C) 2022-2023 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-//! `cargo run --example binary`
+//! `cargo run --example binary --features response-macros`
 //!
 //! Optionally, you can run this example with the `auto-deduce-mime` feature
 //! enabled.
