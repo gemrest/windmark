@@ -55,7 +55,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ## Examples
 
 Examples can be found within the
-[`examples/`](https://github.com/gemrest/windmark/tree/main/examples) directory.
+[`examples/`](https://github.com/gemrest/windmark/tree/main/examples) directory
+along with a rundown of each of their purposes and useful facts.
 
 An example of a fully featured Gemini capsule written using Windmark can be
 found [here](https://github.com/gemrest/locus). This example Gemini capsule also
