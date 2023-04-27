@@ -200,7 +200,7 @@ impl Router {
   ///
   /// ```rust
   /// windmark::Router::new().set_error_handler(|_| {
-  ///   windmark::success!("You have encountered an error!")
+  ///   windmark::Response::success("You have encountered an error!")
   /// });
   /// ```
   pub fn set_error_handler<R>(
@@ -227,9 +227,11 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().add_header(|context| {
-  ///   format!("This is displayed at the top of {}!", context.url.path())
-  /// });
+  /// windmark::Router::new().add_header(
+  ///   |context: windmark::context::RouteContext| {
+  ///     format!("This is displayed at the top of {}!", context.url.path())
+  ///   },
+  /// );
   /// ```
   pub fn add_header(&mut self, handler: impl Partial + 'static) -> &mut Self {
     (*self.headers.lock().unwrap()).push(Box::new(handler));
@@ -246,9 +248,11 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().add_footer(|context| {
-  ///   format!("This is displayed at the bottom of {}!", context.url.path())
-  /// });
+  /// windmark::Router::new().add_footer(
+  ///   |context: windmark::context::RouteContext| {
+  ///     format!("This is displayed at the bottom of {}!", context.url.path())
+  ///   },
+  /// );
   /// ```
   pub fn add_footer(&mut self, handler: impl Partial + 'static) -> &mut Self {
     (*self.footers.lock().unwrap()).push(Box::new(handler));
@@ -615,12 +619,14 @@ impl Router {
   /// ```rust
   /// use log::info;
   ///
-  /// windmark::Router::new().set_pre_route_callback(|context| {
-  ///   info!(
-  ///     "accepted connection from {}",
-  ///     context.stream.peer_addr().unwrap().ip(),
-  ///   )
-  /// });
+  /// windmark::Router::new().set_pre_route_callback(
+  ///   |context: windmark::context::HookContext| {
+  ///     info!(
+  ///       "accepted connection from {}",
+  ///       context.peer_address.unwrap().ip(),
+  ///     )
+  ///   },
+  /// );
   /// ```
   pub fn set_pre_route_callback(
     &mut self,
@@ -638,12 +644,15 @@ impl Router {
   /// ```rust
   /// use log::info;
   ///
-  /// windmark::Router::new().set_post_route_callback(|context, _| {
-  ///   info!(
-  ///     "closed connection from {}",
-  ///     context.stream.peer_addr().unwrap().ip(),
-  ///   )
-  /// });
+  /// windmark::Router::new().set_post_route_callback(
+  ///   |context: windmark::context::HookContext,
+  ///    _content: &mut windmark::Response| {
+  ///     info!(
+  ///       "closed connection from {}",
+  ///       context.peer_address.unwrap().ip(),
+  ///     )
+  ///   },
+  /// );
   /// ```
   pub fn set_post_route_callback(
     &mut self,
@@ -731,7 +740,7 @@ impl Router {
   ///     info!("clicker has been attached!");
   ///   }
   ///
-  ///   async fn on_pre_route(&mut self, context: HookContext<'_>) {
+  ///   async fn on_pre_route(&mut self, context: HookContext) {
   ///     self.clicks += 1;
   ///
   ///     info!(
@@ -741,7 +750,7 @@ impl Router {
   ///     );
   ///   }
   ///
-  ///   async fn on_post_route(&mut self, context: HookContext<'_>) {
+  ///   async fn on_post_route(&mut self, context: HookContext) {
   ///     info!(
   ///       "clicker has been called post-route on {} with {} clicks!",
   ///       context.url.path(),
@@ -793,7 +802,7 @@ impl Router {
   ///     info!("clicker has been attached!");
   ///   }
   ///
-  ///   fn on_pre_route(&mut self, context: HookContext<'_>) {
+  ///   fn on_pre_route(&mut self, context: HookContext) {
   ///     self.clicks += 1;
   ///
   ///     info!(
@@ -803,7 +812,7 @@ impl Router {
   ///     );
   ///   }
   ///
-  ///   fn on_post_route(&mut self, context: HookContext<'_>) {
+  ///   fn on_post_route(&mut self, context: HookContext) {
   ///     info!(
   ///       "clicker has been called post-route on {} with {} clicks!",
   ///       context.url.path(),
@@ -854,7 +863,7 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().set_languages("en"); 
+  /// windmark::Router::new().set_languages(["en"]); 
   /// ```
   pub fn set_languages<S>(&mut self, language: impl AsRef<[S]>) -> &mut Self
   where S: Into<String> + AsRef<str> {

@@ -20,7 +20,10 @@
 #[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
   let mut router = windmark::Router::new();
+  #[cfg(feature = "tokio")]
   let async_clicks = std::sync::Arc::new(tokio::sync::Mutex::new(0));
+  #[cfg(feature = "async-std")]
+  let async_clicks = std::sync::Arc::new(async_std::sync::Mutex::new(0));
 
   router.set_private_key_file("windmark_private.pem");
   router.set_certificate_file("windmark_public.pem");
