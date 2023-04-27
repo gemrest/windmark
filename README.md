@@ -44,8 +44,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .set_private_key_file("windmark_private.pem")
     .set_certificate_file("windmark_public.pem")
     .mount("/", windmark::success!("Hello, World!"))
-    .set_error_handler(
-      windmark::permanent_failure!("This route does not exist!")
+    .set_error_handler(|_|
+      windmark::Response::permanent_failure("This route does not exist!")
     )
     .run()
     .await
