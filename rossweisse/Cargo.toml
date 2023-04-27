@@ -5,7 +5,12 @@ name = "rossweisse"
 version = "0.0.0"
 authors = ["Fuwn <contact@fuwn.me>"]
 edition = "2021"
+description = "`struct`-based Router Framework for Windmark"
+documentation = "https://docs.rs/rossweisse"
+repository = "https://github.com/gemrest/windmark"
 license = "GPL-3.0-only"
+keywords = ["gemini", "windmark"]
+categories = ["network-programming"]
 
 [lib]
 proc-macro = true
