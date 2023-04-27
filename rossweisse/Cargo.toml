@@ -7,6 +7,7 @@ authors = ["Fuwn <contact@fuwn.me>"]
 edition = "2021"
 description = "`struct`-based Router Framework for Windmark"
 documentation = "https://docs.rs/rossweisse"
+readme = "README.md"
 repository = "https://github.com/gemrest/windmark"
 license = "GPL-3.0-only"
 keywords = ["gemini", "windmark"]
