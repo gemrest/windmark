@@ -1,5 +1,8 @@
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[workspace]
+members = ["rossweisse"]
+
 [package]
 name = "windmark"
 version = "0.3.6"
@@ -45,3 +48,6 @@ matchit = "0.6.0"
 tree_magic = { version = "0.2.3", optional = true } # MIME
 
 paste = "1.0.12" # Token Pasting
+
+[dev-dependencies]
+rossweisse = { version = "*", path = "./rossweisse" }
