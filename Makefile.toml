@@ -16,6 +16,11 @@ args = ["clippy", "--no-default-features", "--features", "logger,auto-deduce-mim
 command = "cargo"
 toolchain = "nightly"
 
+[tasks.test]
+args = ["test", "--no-default-features", "--features", "logger,auto-deduce-mime,response-macros,${@}"]
+command = "cargo"
+toolchain = "1.68.2"
+
 [tasks.checkf]
 script = '''
 #!@shell
