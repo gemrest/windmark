@@ -11,6 +11,10 @@ Now supporting both [Tokio](https://tokio.rs/) and [`async-std`](https://async.r
 
 ## Usage
 
+A macro-based "`struct`-router" is currently being developed for Windmark. A
+subset of Windmark's features are currently available for use through it. Check
+out [Rossweisse](./rossweisse/) for more information!
+
 ### Add Windmark and Tokio as Dependencies
 
 ```toml
