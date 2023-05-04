@@ -5,7 +5,7 @@ members = ["rossweisse"]
 
 [package]
 name = "windmark"
-version = "0.3.7"
+version = "0.3.8"
 authors = ["Fuwn <contact@fuwn.me>"]
 edition = "2021"
 description = "An elegant and highly performant async Gemini server framework"
@@ -50,4 +50,4 @@ tree_magic = { version = "0.2.3", optional = true } # MIME
 paste = "1.0.12" # Token Pasting
 
 [dev-dependencies]
-rossweisse = { version = "0.0.0", path = "./rossweisse" }
+rossweisse = { version = "0.0.1", path = "./rossweisse" }
