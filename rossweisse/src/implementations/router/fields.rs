@@ -20,8 +20,9 @@ use quote::quote;
 use syn::parse_macro_input;
 
 pub fn fields(arguments: TokenStream, item: syn::ItemStruct) -> TokenStream {
-  let field_initializers =
-    parse_macro_input!(arguments as super::parser::FieldInitializers);
+  let field_initializers = parse_macro_input!(
+    arguments as super::parser::FieldInitializers<syn::Expr>
+  );
   let router_identifier = item.ident;
   let named_fields = match item.fields {
     syn::Fields::Named(fields) => fields,

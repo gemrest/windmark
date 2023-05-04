@@ -15,16 +15,16 @@
 // Copyright (C) 2022-2023 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-use syn::parse;
+use syn::parse::{self, Parse};
 
-pub struct FieldInitializer {
+pub struct FieldInitializer<T: Parse> {
   pub ident: syn::Ident,
   #[allow(unused)]
   eq_token:  syn::Token![=],
-  pub expr:  syn::Expr,
+  pub expr:  T,
 }
 
-impl parse::Parse for FieldInitializer {
+impl<T: Parse> parse::Parse for FieldInitializer<T> {
   fn parse(input: parse::ParseStream<'_>) -> syn::Result<Self> {
     let ident = input.parse()?;
     let eq_token = input.parse()?;

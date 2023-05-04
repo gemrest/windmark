@@ -26,7 +26,7 @@ struct Router {
 
 #[rossweisse::router]
 impl Router {
-  #[route]
+  #[route(index)]
   pub fn index(
     _context: windmark::context::RouteContext,
   ) -> windmark::Response {

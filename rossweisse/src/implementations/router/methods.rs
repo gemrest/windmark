@@ -17,21 +17,35 @@
 
 use proc_macro::TokenStream;
 
-pub fn methods(_arguments: TokenStream, item: syn::ItemImpl) -> TokenStream {
+pub fn methods(
+  _arguments: TokenStream,
+  mut item: syn::ItemImpl,
+) -> TokenStream {
   let routes = item
     .items
-    .iter()
+    .iter_mut()
     .filter_map(|item| {
       if let syn::ImplItem::Fn(method) = item {
-        if method
-          .attrs
-          .iter()
-          .any(|attribute| attribute.path().is_ident("route"))
-        {
-          Some(method.sig.ident.clone())
-        } else {
-          None
+        for attribute in method.attrs.iter() {
+          if attribute.path().is_ident("route") {
+            let arguments = quote::ToTokens::into_token_stream(attribute)
+              .to_string()
+              .trim_end_matches(")]")
+              .trim_start_matches("#[route(")
+              .to_string();
+
+            if arguments == "index" {
+              method.sig.ident =
+                syn::Ident::new("__router_index", method.sig.ident.span());
+            }
+
+            return Some(method.sig.ident.clone());
+          } else {
+            return None;
+          }
         }
+
+        None
       } else {
         None
       }
@@ -42,7 +56,16 @@ pub fn methods(_arguments: TokenStream, item: syn::ItemImpl) -> TokenStream {
   let name = &item.self_ty;
   let route_paths = routes
     .iter()
-    .map(|route| format!("/{}", route))
+    .map(|route| {
+      format!(
+        "/{}",
+        if route == "__router_index" {
+          "".to_string()
+        } else {
+          route.to_string()
+        }
+      )
+    })
     .collect::<Vec<_>>();
 
   quote::quote! {
