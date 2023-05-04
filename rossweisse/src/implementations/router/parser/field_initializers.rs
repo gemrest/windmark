@@ -15,14 +15,14 @@
 // Copyright (C) 2022-2023 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-use syn::parse;
+use syn::parse::{self, Parse};
 
 use super::field_initializer::FieldInitializer;
 
-pub struct FieldInitializers(pub Vec<FieldInitializer>);
+pub struct FieldInitializers<T: Parse>(pub Vec<FieldInitializer<T>>);
 
-impl parse::Parse for FieldInitializers {
+impl<T: Parse> parse::Parse for FieldInitializers<T> {
   fn parse(input: parse::ParseStream<'_>) -> syn::Result<Self> {
-    Ok(Self(syn::punctuated::Punctuated::<FieldInitializer, syn::Token![,]>::parse_terminated(input)?.into_iter().collect()))
+    Ok(Self(syn::punctuated::Punctuated::<FieldInitializer<T>, syn::Token![,]>::parse_terminated(input)?.into_iter().collect()))
   }
 }
