@@ -17,13 +17,13 @@
 
 //! `cargo run --example error_handler`
 
-use windmark::Response;
+use windmark::response::Response;
 
 #[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
   let mut error_count = 0;
 
-  windmark::Router::new()
+  windmark::router::Router::new()
     .set_private_key_file("windmark_private.pem")
     .set_certificate_file("windmark_public.pem")
     .set_error_handler(move |_| {

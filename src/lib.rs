@@ -32,6 +32,8 @@
 pub mod context;
 pub mod handler;
 pub mod module;
+#[cfg(feature = "prelude")]
+pub mod prelude;
 pub mod response;
 pub mod router;
 pub mod utilities;
@@ -41,8 +43,5 @@ extern crate log;
 
 #[cfg(feature = "async-std")]
 pub use async_std::main;
-pub use module::{AsyncModule, Module};
-pub use response::Response;
-pub use router::Router;
 #[cfg(feature = "tokio")]
 pub use tokio::main;

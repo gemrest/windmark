@@ -17,7 +17,7 @@
 
 use async_trait::async_trait;
 
-use crate::{context::ErrorContext, Response};
+use crate::{context::ErrorContext, response::Response};
 
 #[allow(clippy::module_name_repetitions)]
 #[async_trait]

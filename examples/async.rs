@@ -19,7 +19,7 @@
 
 #[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-  let mut router = windmark::Router::new();
+  let mut router = windmark::router::Router::new();
   #[cfg(feature = "tokio")]
   let async_clicks = std::sync::Arc::new(tokio::sync::Mutex::new(0));
   #[cfg(feature = "async-std")]
@@ -35,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
       *clicks += 1;
 
-      windmark::Response::success(*clicks)
+      windmark::response::Response::success(*clicks)
     }
   });
   router.mount(
