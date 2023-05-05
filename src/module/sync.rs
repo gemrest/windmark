@@ -15,11 +15,11 @@
 // Copyright (C) 2022-2023 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-use crate::{context::HookContext, Router};
+use crate::context::HookContext;
 
 pub trait Module {
   /// Called right after the module is attached.
-  fn on_attach(&mut self, _: &mut Router) {}
+  fn on_attach(&mut self, _: &mut crate::Router) {}
 
   /// Called before a route is mounted.
   fn on_pre_route(&mut self, _: HookContext) {}

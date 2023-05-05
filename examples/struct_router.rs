@@ -17,8 +17,6 @@
 
 //! `cargo run --example struct_router`
 
-use rossweisse::route;
-
 #[rossweisse::router]
 struct Router {
   _phantom: (),
@@ -26,7 +24,7 @@ struct Router {
 
 #[rossweisse::router]
 impl Router {
-  #[route(index)]
+  #[rossweisse::route(index)]
   pub fn index(
     _context: windmark::context::RouteContext,
   ) -> windmark::Response {

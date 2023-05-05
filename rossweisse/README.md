@@ -9,8 +9,6 @@ Rossweisse is in it's infancy, and a much comprehensive interface is planned.
 For now, a simple Rosswiesse router can be implemented like this:
 
 ```rust
-use rossweisse::route;
-
 #[rossweisse::router]
 struct Router {
   _phantom: (),
@@ -18,7 +16,7 @@ struct Router {
 
 #[rossweisse::router]
 impl Router {
-  #[route(index)]
+  #[rossweisse::route(index)]
   pub fn index(
     _context: windmark::context::RouteContext,
   ) -> windmark::Response {

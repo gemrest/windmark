@@ -17,13 +17,11 @@
 
 //! `cargo run --example async_stateful_module --features response-macros`
 
-use std::sync::{Arc, Mutex};
-
 use windmark::{context::HookContext, Router};
 
 #[derive(Default)]
 struct Clicker {
-  clicks: Arc<Mutex<usize>>,
+  clicks: std::sync::Arc<std::sync::Mutex<usize>>,
 }
 
 #[async_trait::async_trait]

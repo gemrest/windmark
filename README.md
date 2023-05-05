@@ -40,8 +40,6 @@ tokio = { version = "1.26.0", features = ["full"] }
 ```rust
 // src/main.rs
 
-use windmark::Response;
-
 #[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
   windmark::Router::new()

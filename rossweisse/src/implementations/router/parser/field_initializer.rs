@@ -24,7 +24,7 @@ pub struct FieldInitializer<T: Parse> {
   pub expr:  T,
 }
 
-impl<T: Parse> parse::Parse for FieldInitializer<T> {
+impl<T: Parse> Parse for FieldInitializer<T> {
   fn parse(input: parse::ParseStream<'_>) -> syn::Result<Self> {
     let ident = input.parse()?;
     let eq_token = input.parse()?;

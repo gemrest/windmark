@@ -15,12 +15,12 @@
 // Copyright (C) 2022-2023 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-use crate::{context::HookContext, Router};
+use crate::context::HookContext;
 
 #[async_trait::async_trait]
 pub trait AsyncModule: Send + Sync {
   /// Called right after the module is attached.
-  async fn on_attach(&mut self, _: &mut Router) {}
+  async fn on_attach(&mut self, _: &mut crate::Router) {}
 
   /// Called before a route is mounted.
   async fn on_pre_route(&mut self, _: HookContext) {}
