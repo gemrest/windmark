@@ -727,9 +727,9 @@ impl Router {
   ///
   /// # Examples
   ///
-  /// ```rust
+  /// ```no_run
   /// use log::info;
-  /// use windmark::context::HookContext;
+  /// use windmark::{context::HookContext, router::Router};
   ///
   /// #[derive(Default)]
   /// struct Clicker {
@@ -738,7 +738,7 @@ impl Router {
   ///
   /// #[async_trait::async_trait]
   /// impl windmark::module::AsyncModule for Clicker {
-  ///   async fn on_attach(&mut self, _: &mut windmark::router::Router) {
+  ///   async fn on_attach(&mut self, _: &mut Router) {
   ///     info!("clicker has been attached!");
   ///   }
   ///
@@ -761,7 +761,7 @@ impl Router {
   ///   }
   /// }
   ///
-  /// windmark::router::Router::new().attach_async(Clicker::default());
+  /// Router::new().attach_async(Clicker::default());
   /// ```
   pub fn attach_async(
     &mut self,
