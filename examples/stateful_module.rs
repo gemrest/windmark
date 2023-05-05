@@ -17,14 +17,14 @@
 
 //! `cargo run --example stateful_module --features response-macros`
 
-use windmark::{context::HookContext, Router};
+use windmark::{context::HookContext, router::Router};
 
 #[derive(Default)]
 struct Clicker {
   clicks: usize,
 }
 
-impl windmark::Module for Clicker {
+impl windmark::module::Module for Clicker {
   fn on_attach(&mut self, _router: &mut Router) {
     println!("module 'clicker' has been attached!");
   }

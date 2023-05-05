@@ -21,7 +21,7 @@ use windmark::context::HookContext;
 
 #[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-  windmark::Router::new()
+  windmark::router::Router::new()
     .set_private_key_file("windmark_private.pem")
     .set_certificate_file("windmark_public.pem")
     .mount("/", windmark::success!("Hello!"))
@@ -33,7 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       )
     })
     .set_post_route_callback(
-      |context: HookContext, content: &mut windmark::Response| {
+      |context: HookContext, content: &mut windmark::response::Response| {
         content.content = content.content.replace("Hello", "Hi");
 
         println!(

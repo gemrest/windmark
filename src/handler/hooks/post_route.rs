@@ -15,7 +15,7 @@
 // Copyright (C) 2022-2023 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-use crate::{context::HookContext, Response};
+use crate::{context::HookContext, response::Response};
 
 #[allow(clippy::module_name_repetitions)]
 pub trait PostRouteHook: Send + Sync {

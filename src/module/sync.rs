@@ -19,7 +19,7 @@ use crate::context::HookContext;
 
 pub trait Module {
   /// Called right after the module is attached.
-  fn on_attach(&mut self, _: &mut crate::Router) {}
+  fn on_attach(&mut self, _: &mut crate::router::Router) {}
 
   /// Called before a route is mounted.
   fn on_pre_route(&mut self, _: HookContext) {}

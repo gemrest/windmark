@@ -17,7 +17,7 @@
 
 //! `cargo run --example async_stateful_module --features response-macros`
 
-use windmark::{context::HookContext, Router};
+use windmark::{context::HookContext, router::Router};
 
 #[derive(Default)]
 struct Clicker {
@@ -25,7 +25,7 @@ struct Clicker {
 }
 
 #[async_trait::async_trait]
-impl windmark::AsyncModule for Clicker {
+impl windmark::module::AsyncModule for Clicker {
   async fn on_attach(&mut self, _router: &mut Router) {
     println!("module 'clicker' has been attached!");
   }
