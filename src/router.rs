@@ -112,7 +112,7 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// let _router = windmark::Router::new(); 
+  /// windmark::Router::new(); 
   /// ```
   ///
   /// # Panics
