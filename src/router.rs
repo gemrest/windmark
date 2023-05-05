@@ -359,7 +359,7 @@ impl Router {
 
       url = or_error!(
         stream,
-        url::Url::parse(&request.replace("\r\n", "")),
+        Url::parse(&request.replace("\r\n", "")),
         "59 The server (Windmark) received a bad request: {}"
       );
 

@@ -17,10 +17,9 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::parse_macro_input;
 
 pub fn fields(arguments: TokenStream, item: syn::ItemStruct) -> TokenStream {
-  let field_initializers = parse_macro_input!(
+  let field_initializers = syn::parse_macro_input!(
     arguments as super::parser::FieldInitializers<syn::Expr>
   );
   let router_identifier = item.ident;
