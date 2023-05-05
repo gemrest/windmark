@@ -58,7 +58,7 @@ pub fn fields(arguments: TokenStream, item: syn::ItemStruct) -> TokenStream {
     fn _new() -> Self {
       Self {
         #(#new_method_fields)*
-        router: ::windmark::Router::new(),
+        router: ::windmark::router::Router::new(),
       }
     }
 
@@ -66,7 +66,7 @@ pub fn fields(arguments: TokenStream, item: syn::ItemStruct) -> TokenStream {
       self.router.run().await
     }
 
-    pub fn router(&mut self) -> &mut ::windmark::Router {
+    pub fn router(&mut self) -> &mut ::windmark::router::Router {
       &mut self.router
     }
   };
@@ -74,7 +74,7 @@ pub fn fields(arguments: TokenStream, item: syn::ItemStruct) -> TokenStream {
   let output = quote! {
     struct #router_identifier {
       #output_fields
-      router: ::windmark::Router,
+      router: ::windmark::router::Router,
     }
 
     impl #router_identifier {

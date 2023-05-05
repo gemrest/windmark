@@ -15,23 +15,9 @@
 // Copyright (C) 2022-2023 Fuwn <contact@fuwn.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-use async_trait::async_trait;
-
-use crate::{context::RouteContext, response::Response};
-
-#[allow(clippy::module_name_repetitions)]
-#[async_trait]
-pub trait RouteResponse: Send + Sync {
-  async fn call(&mut self, context: RouteContext) -> Response;
-}
-
-#[async_trait]
-impl<T, F> RouteResponse for T
-where
-  T: FnMut(RouteContext) -> F + Send + Sync,
-  F: std::future::Future<Output = Response> + Send + 'static,
-{
-  async fn call(&mut self, context: RouteContext) -> Response {
-    (*self)(context).await
-  }
-}
+pub use crate::{
+  context,
+  module::{AsyncModule, Module},
+  response::Response,
+  router::Router,
+};

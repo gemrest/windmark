@@ -24,6 +24,7 @@ auto-deduce-mime = ["tree_magic"]
 response-macros = []
 tokio = ["dep:tokio", "tokio-openssl"]
 async-std = ["dep:async-std", "async-std-openssl"]
+prelude = []
 
 [dependencies]
 # SSL

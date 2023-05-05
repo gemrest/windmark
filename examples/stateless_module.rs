@@ -17,10 +17,10 @@
 
 //! `cargo run --example stateless_module`
 
-use windmark::Router;
+use windmark::{response::Response, router::Router};
 
-fn smiley(_context: windmark::context::RouteContext) -> windmark::Response {
-  windmark::Response::success("😀")
+fn smiley(_context: windmark::context::RouteContext) -> Response {
+  Response::success("😀")
 }
 
 fn emojis(router: &mut Router) { router.mount("/smiley", smiley); }

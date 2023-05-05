@@ -22,10 +22,10 @@ macro_rules! sync_response {
       #[macro_export]
       macro_rules! $name {
         ($body:expr /* $(,)? */) => {
-          |_: $crate::context::RouteContext| $crate::Response::$name($body)
+          |_: $crate::context::RouteContext| $crate::response::Response::$name($body)
         };
         ($context:ident, $body:expr /* $(,)? */) => {
-          |$context: $crate::context::RouteContext| $crate::Response::$name($body)
+          |$context: $crate::context::RouteContext| $crate::response::Response::$name($body)
         };
       }
     )*
@@ -39,10 +39,10 @@ macro_rules! async_response {
       #[macro_export]
       macro_rules! [< $name _async >] {
         ($body:expr /* $(,)? */) => {
-          |_: $crate::context::RouteContext| async { $crate::Response::$name($body) }
+          |_: $crate::context::RouteContext| async { $crate::response::Response::$name($body) }
         };
         ($context:ident, $body:expr /* $(,)? */) => {
-          |$context: $crate::context::RouteContext| async { $crate::Response::$name($body) }
+          |$context: $crate::context::RouteContext| async { $crate::response::Response::$name($body) }
         };
       }
     })*
@@ -86,7 +86,7 @@ response!(binary_success_auto);
 macro_rules! binary_success {
   ($body:expr, $mime:expr) => {
     |_: $crate::context::RouteContext| {
-      $crate::Response::binary_success($body, $mime)
+      $crate::response::Response::binary_success($body, $mime)
     }
   };
   ($body:expr) => {{
@@ -98,16 +98,19 @@ macro_rules! binary_success {
 
     |_: $crate::context::RouteContext| {
       #[cfg(feature = "auto-deduce-mime")]
-      return $crate::Response::binary_success_auto($body);
+      return $crate::response::Response::binary_success_auto($body);
 
       // Suppress item not found warning
       #[cfg(not(feature = "auto-deduce-mime"))]
-      $crate::Response::binary_success($body, "application/octet-stream")
+      $crate::response::Response::binary_success(
+        $body,
+        "application/octet-stream",
+      )
     }
   }};
   ($context:ident, $body:expr, $mime:expr) => {
     |$context: $crate::context::RouteContext| {
-      $crate::Response::binary_success($body, $mime)
+      $crate::response::Response::binary_success($body, $mime)
     }
   };
   ($context:ident, $body:expr) => {{
@@ -119,11 +122,14 @@ macro_rules! binary_success {
 
     |$context: $crate::context::RouteContext| {
       #[cfg(feature = "auto-deduce-mime")]
-      return $crate::Response::binary_success_auto($body);
+      return $crate::response::Response::binary_success_auto($body);
 
       // Suppress item not found warning
       #[cfg(not(feature = "auto-deduce-mime"))]
-      $crate::Response::binary_success($body, "application/octet-stream")
+      $crate::response::Response::binary_success(
+        $body,
+        "application/octet-stream",
+      )
     }
   }};
 }
