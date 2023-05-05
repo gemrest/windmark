@@ -10,6 +10,7 @@ For now, a simple Rosswiesse router can be implemented like this:
 
 ```rust
 use rossweisse::route;
+use windmark::response::Response;
 
 #[rossweisse::router]
 struct Router {
@@ -21,8 +22,8 @@ impl Router {
   #[route(index)]
   pub fn index(
     _context: windmark::context::RouteContext,
-  ) -> windmark::Response {
-    windmark::Response::success("Hello, World!")
+  ) -> Response {
+    Response::success("Hello, World!")
   }
 }
 

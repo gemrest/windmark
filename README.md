@@ -42,12 +42,12 @@ tokio = { version = "1.26.0", features = ["full"] }
 
 #[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-  windmark::Router::new()
+  windmark::router::Router::new()
     .set_private_key_file("windmark_private.pem")
     .set_certificate_file("windmark_public.pem")
     .mount("/", windmark::success!("Hello, World!"))
     .set_error_handler(|_|
-      windmark::Response::permanent_failure("This route does not exist!")
+      windmark::response::Response::permanent_failure("This route does not exist!")
     )
     .run()
     .await
