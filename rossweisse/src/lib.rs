@@ -39,6 +39,9 @@ use syn::Item;
 /// # Examples
 ///
 /// ```rust
+/// use rossweisse::route;
+/// use windmark::response::Response;
+///
 /// #[rossweisse::router]
 /// struct Router {
 ///   _phantom: (),
@@ -47,10 +50,8 @@ use syn::Item;
 /// #[rossweisse::router]
 /// impl Router {
 ///   #[route]
-///   pub fn index(
-///     _context: windmark::context::RouteContext,
-///   ) -> windmark::Response {
-///     windmark::Response::success("Hello, World!")
+///   pub fn index(_context: windmark::context::RouteContext) -> Response {
+///     Response::success("Hello, World!")
 ///   }
 /// }
 /// ```
@@ -70,13 +71,14 @@ pub fn router(arguments: TokenStream, item: TokenStream) -> TokenStream {
 /// # Examples
 ///
 /// ```rust
+/// use rossweisse::route;
+/// use windmark::response::Response;
+///
 /// #[rossweisse::router]
 /// impl Router {
 ///   #[route]
-///   pub fn index(
-///     _context: windmark::context::RouteContext,
-///   ) -> windmark::Response {
-///     windmark::Response::success("Hello, World!")
+///   pub fn index(_context: windmark::context::RouteContext) -> Response {
+///     Response::success("Hello, World!")
 ///   }
 /// }
 /// ```

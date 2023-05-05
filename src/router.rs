@@ -112,7 +112,7 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new(); 
+  /// windmark::router::Router::new(); 
   /// ```
   ///
   /// # Panics
@@ -126,7 +126,7 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().set_private_key_file("windmark_private.pem");
+  /// windmark::router::Router::new().set_private_key_file("windmark_private.pem");
   /// ```
   pub fn set_private_key_file(
     &mut self,
@@ -142,7 +142,7 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().set_certificate_file("windmark_public.pem");
+  /// windmark::router::Router::new().set_certificate_file("windmark_public.pem");
   /// ```
   pub fn set_certificate_file(
     &mut self,
@@ -160,9 +160,9 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// use windmark::Response;
+  /// use windmark::response::Response;
   ///
-  /// windmark::Router::new()
+  /// windmark::router::Router::new()
   ///   .mount("/", |_| {
   ///     async { Response::success("This is the index page!") }
   ///   })
@@ -199,8 +199,8 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().set_error_handler(|_| {
-  ///   windmark::Response::success("You have encountered an error!")
+  /// windmark::router::Router::new().set_error_handler(|_| {
+  ///   windmark::response::Response::success("You have encountered an error!")
   /// });
   /// ```
   pub fn set_error_handler<R>(
@@ -227,7 +227,7 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().add_header(
+  /// windmark::router::Router::new().add_header(
   ///   |context: windmark::context::RouteContext| {
   ///     format!("This is displayed at the top of {}!", context.url.path())
   ///   },
@@ -248,7 +248,7 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().add_footer(
+  /// windmark::router::Router::new().add_footer(
   ///   |context: windmark::context::RouteContext| {
   ///     format!("This is displayed at the bottom of {}!", context.url.path())
   ///   },
@@ -265,7 +265,7 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().run(); 
+  /// windmark::router::Router::new().run(); 
   /// ```
   ///
   /// # Panics
@@ -542,7 +542,7 @@ impl Router {
   /// ```rust
   /// use openssl::ssl;
   ///
-  /// windmark::Router::new().set_ssl_acceptor({
+  /// windmark::router::Router::new().set_ssl_acceptor({
   ///   let mut builder =
   ///     ssl::SslAcceptor::mozilla_intermediate(ssl::SslMethod::tls()).unwrap();
   ///
@@ -588,7 +588,7 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new()
+  /// windmark::router::Router::new()
   ///   .enable_default_logger(true)
   ///   .set_log_level("your_crate_name=trace", true);
   /// // If you would only like to log, logs from your crate:
@@ -619,7 +619,7 @@ impl Router {
   /// ```rust
   /// use log::info;
   ///
-  /// windmark::Router::new().set_pre_route_callback(
+  /// windmark::router::Router::new().set_pre_route_callback(
   ///   |context: windmark::context::HookContext| {
   ///     info!(
   ///       "accepted connection from {}",
@@ -644,9 +644,9 @@ impl Router {
   /// ```rust
   /// use log::info;
   ///
-  /// windmark::Router::new().set_post_route_callback(
+  /// windmark::router::Router::new().set_post_route_callback(
   ///   |context: windmark::context::HookContext,
-  ///    _content: &mut windmark::Response| {
+  ///    _content: &mut windmark::response::Response| {
   ///     info!(
   ///       "closed connection from {}",
   ///       context.peer_address.unwrap().ip(),
@@ -673,9 +673,9 @@ impl Router {
   /// ## Integrated Module
   ///
   /// ```rust
-  /// use windmark::Response;
+  /// use windmark::response::Response;
   ///
-  /// windmark::Router::new().attach_stateless(|r| {
+  /// windmark::router::Router::new().attach_stateless(|r| {
   ///   r.mount(
   ///     "/module",
   ///     Box::new(|_| Response::success("This is a module!")),
@@ -691,18 +691,20 @@ impl Router {
   /// ## External Module
   ///
   /// ```rust
-  /// use windmark::Response;
+  /// use windmark::response::Response;
   ///
   /// mod windmark_example {
-  ///   pub fn module(router: &mut windmark::Router) {
+  ///   pub fn module(router: &mut windmark::router::Router) {
   ///     router.mount(
   ///       "/module",
-  ///       Box::new(|_| windmark::Response::success("This is a module!")),
+  ///       Box::new(|_| {
+  ///         windmark::response::Response::success("This is a module!")
+  ///       }),
   ///     );
   ///   }
   /// }
   ///
-  /// windmark::Router::new().attach_stateless(windmark_example::module);
+  /// windmark::router::Router::new().attach_stateless(windmark_example::module);
   /// ```
   pub fn attach_stateless<F>(&mut self, mut module: F) -> &mut Self
   where F: FnMut(&mut Self) {
@@ -727,7 +729,7 @@ impl Router {
   ///
   /// ```rust
   /// use log::info;
-  /// use windmark::{context::HookContext, Response, Router};
+  /// use windmark::context::HookContext;
   ///
   /// #[derive(Default)]
   /// struct Clicker {
@@ -735,8 +737,8 @@ impl Router {
   /// }
   ///
   /// #[async_trait::async_trait]
-  /// impl windmark::AsyncModule for Clicker {
-  ///   async fn on_attach(&mut self, _: &mut Router) {
+  /// impl windmark::module::AsyncModule for Clicker {
+  ///   async fn on_attach(&mut self, _: &mut windmark::router::Router) {
   ///     info!("clicker has been attached!");
   ///   }
   ///
@@ -759,7 +761,7 @@ impl Router {
   ///   }
   /// }
   ///
-  /// Router::new().attach_async(Clicker::default());
+  /// windmark::router::Router::new().attach_async(Clicker::default());
   /// ```
   pub fn attach_async(
     &mut self,
@@ -790,14 +792,14 @@ impl Router {
   ///
   /// ```rust
   /// use log::info;
-  /// use windmark::{context::HookContext, Response, Router};
+  /// use windmark::{context::HookContext, response::Response, router::Router};
   ///
   /// #[derive(Default)]
   /// struct Clicker {
   ///   clicks: isize,
   /// }
   ///
-  /// impl windmark::Module for Clicker {
+  /// impl windmark::module::Module for Clicker {
   ///   fn on_attach(&mut self, _: &mut Router) {
   ///     info!("clicker has been attached!");
   ///   }
@@ -843,7 +845,7 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().set_character_set("utf-8"); 
+  /// windmark::router::Router::new().set_character_set("utf-8"); 
   /// ```
   pub fn set_character_set(
     &mut self,
@@ -863,7 +865,7 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().set_languages(["en"]); 
+  /// windmark::router::Router::new().set_languages(["en"]); 
   /// ```
   pub fn set_languages<S>(&mut self, language: impl AsRef<[S]>) -> &mut Self
   where S: Into<String> + AsRef<str> {
@@ -883,7 +885,7 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().set_port(1965); 
+  /// windmark::router::Router::new().set_port(1965); 
   /// ```
   pub fn set_port(&mut self, port: i32) -> &mut Self {
     self.port = port;
@@ -897,7 +899,7 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// windmark::Router::new().set_fix_path(true); 
+  /// windmark::router::Router::new().set_fix_path(true); 
   /// ```
   pub fn set_fix_path(&mut self, fix_path: bool) -> &mut Self {
     self.fix_path = fix_path;
