@@ -33,7 +33,7 @@ tokio-openssl = { version = "0.6.3", optional = true }
 async-std-openssl = { version = "0.6.3", optional = true }
 
 # Non-blocking I/O
-tokio = { version = "1.26.0", features = ["full"], optional = true }
+tokio = { version = "1.26.0", default-features = false, features = ["rt-multi-thread", "sync", "net", "io-util", "macros"], optional = true }
 async-trait = "0.1.68"
 async-std = { version = "1.12.0", features = ["attributes"], optional = true }
 
