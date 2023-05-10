@@ -43,7 +43,6 @@ log = "0.4.16"
 
 # URL
 url = "2.2.2"
-regex = "1.5.5"
 matchit = "0.6.0"
 
 tree_magic = { version = "0.2.3", optional = true } # MIME
