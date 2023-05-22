@@ -727,7 +727,7 @@ impl Router {
   ///
   /// # Examples
   ///
-  /// ```no_run
+  /// ```rust
   /// use log::info;
   /// use windmark::{context::HookContext, router::Router};
   ///
