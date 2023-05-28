@@ -38,7 +38,7 @@ async-trait = "0.1.68"
 async-std = { version = "1.12.0", features = ["attributes"], optional = true }
 
 # Logging
-pretty_env_logger = { version = "0.4.0", optional = true }
+pretty_env_logger = { version = "0.5.0", optional = true }
 log = "0.4.16"
 
 # URL
