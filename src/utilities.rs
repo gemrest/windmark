@@ -24,7 +24,7 @@ use std::collections::HashMap;
 pub fn queries_from_url(url: &url::Url) -> HashMap<String, String> {
   let mut queries = HashMap::new();
 
-  for (key, value) in url.query_pairs().collect::<Vec<(_, _)>>() {
+  for (key, value) in url.query_pairs() {
     queries.insert(key.to_string(), value.to_string());
   }
 
