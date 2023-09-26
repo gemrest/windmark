@@ -421,7 +421,7 @@ impl Router {
       }
 
       for (i, partial_footer) in {
-        #[allow(clippy::needless_borrow)]
+        #[allow(clippy::needless_borrow, clippy::explicit_auto_deref)]
         (&mut *self.footers.lock().unwrap()).iter_mut().enumerate()
       } {
         footer.push_str(&format!(
