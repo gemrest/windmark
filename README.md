@@ -17,15 +17,15 @@ out [Rossweisse](./rossweisse/) for more information!
 
 ### Features
 
-| Feature | Description |
-| - | - |
-| `default` | Base Windmark framework using [Tokio](https://tokio.rs/) |
-| `logger` | Enables the default [`pretty_env_logger`](https://github.com/seanmonstar/pretty-env-logger) integration |
-| `auto-deduce-mime` | Exposes `Response`s and macros that automatically fill MIMEs for non-Gemini responses |
-| `response-macros` | Simple macros for all `Response`s |
-| `tokio` | Marks [Tokio](https://tokio.rs/) as the asynchronous runtime |
-| `async-std` | Marks [`async-std`](https://async.rs/) as the asynchronous runtime |
-| `prelude` | Exposes the `prelude` module containing the most used Windmark features |
+| Feature            | Description                                                                                             |
+| ------------------ | ------------------------------------------------------------------------------------------------------- |
+| `default`          | Base Windmark framework using [Tokio](https://tokio.rs/)                                                |
+| `logger`           | Enables the default [`pretty_env_logger`](https://github.com/seanmonstar/pretty-env-logger) integration |
+| `auto-deduce-mime` | Exposes `Response`s and macros that automatically fill MIMEs for non-Gemini responses                   |
+| `response-macros`  | Simple macros for all `Response`s                                                                       |
+| `tokio`            | Marks [Tokio](https://tokio.rs/) as the asynchronous runtime                                            |
+| `async-std`        | Marks [`async-std`](https://async.rs/) as the asynchronous runtime                                      |
+| `prelude`          | Exposes the `prelude` module containing the most used Windmark features                                 |
 
 ### Add Windmark and Tokio as Dependencies
 
@@ -52,6 +52,8 @@ tokio = { version = "1.26.0", features = ["full"] }
 ```rust
 // src/main.rs
 
+// ...
+
 #[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
   windmark::router::Router::new()
@@ -64,6 +66,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .run()
     .await
 }
+```
+
+### Implement a Windmark server using Rossweisse
+
+```rust
+// src/main.rs
+
+// ...
+
+#[rossweisse::router]
+struct Router;
+
+#[rossweisse::router]
+impl Router {
+  #[route(index)]
+  pub fn index(
+    _context: windmark::context::RouteContext,
+  ) -> Response {
+    Response::success("Hello, World!")
+  }
+}
+
+// ...
 ```
 
 ## Examples
