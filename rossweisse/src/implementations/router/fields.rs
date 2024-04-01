@@ -23,13 +23,19 @@ pub fn fields(arguments: TokenStream, item: syn::ItemStruct) -> TokenStream {
     arguments as super::parser::FieldInitializers<syn::Expr>
   );
   let router_identifier = item.ident;
-  let named_fields = match item.fields {
-    syn::Fields::Named(fields) => fields,
-    _ =>
-      panic!(
-        "`#[rossweisse::router]` can only be used on `struct`s with named \
-         fields"
-      ),
+  let (named_fields, has_fields) = match item.fields {
+    syn::Fields::Named(fields) => (fields, true),
+    syn::Fields::Unit => (
+      syn::FieldsNamed {
+        brace_token: syn::token::Brace::default(),
+        named: Default::default(),
+      },
+      false,
+    ),
+    _ => panic!(
+      "`#[rossweisse::router]` can only be used on `struct`s with named \
+         fields or unit structs"
+    ),
   };
   let mut default_expressions = vec![];
   let new_method_fields = named_fields.named.iter().map(|field| {
@@ -54,20 +60,22 @@ pub fn fields(arguments: TokenStream, item: syn::ItemStruct) -> TokenStream {
         #name: #initialiser,
     }
   });
-  let new_methods = quote! {
-    fn _new() -> Self {
-      Self {
-        #(#new_method_fields)*
-        router: ::windmark::router::Router::new(),
+  let new_methods = if has_fields {
+    quote! {
+      fn _new() -> Self {
+        Self {
+          #(#new_method_fields)*
+          router: ::windmark::router::Router::new(),
+        }
       }
     }
-
-    pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-      self.router.run().await
-    }
-
-    pub fn router(&mut self) -> &mut ::windmark::router::Router {
-      &mut self.router
+  } else {
+    quote! {
+      fn _new() -> Self {
+        Self {
+          router: ::windmark::router::Router::new(),
+        }
+      }
     }
   };
   let output_fields = named_fields.named;
@@ -79,6 +87,14 @@ pub fn fields(arguments: TokenStream, item: syn::ItemStruct) -> TokenStream {
 
     impl #router_identifier {
       #new_methods
+
+      pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        self.router.run().await
+      }
+
+      pub fn router(&mut self) -> &mut ::windmark::router::Router {
+        &mut self.router
+      }
     }
   };
 

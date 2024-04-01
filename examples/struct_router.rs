@@ -21,9 +21,7 @@ use rossweisse::route;
 use windmark::response::Response;
 
 #[rossweisse::router]
-struct Router {
-  _phantom: (),
-}
+struct Router;
 
 #[rossweisse::router]
 impl Router {
