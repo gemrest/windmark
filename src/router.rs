@@ -765,7 +765,7 @@ impl Router {
   /// ```
   pub fn attach_async(
     &mut self,
-    mut module: impl AsyncModule + 'static + Send,
+    mut module: impl AsyncModule + 'static,
   ) -> &mut Self {
     block!({
       module.on_attach(self).await;
