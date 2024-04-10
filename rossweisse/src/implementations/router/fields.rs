@@ -25,17 +25,19 @@ pub fn fields(arguments: TokenStream, item: syn::ItemStruct) -> TokenStream {
   let router_identifier = item.ident;
   let (named_fields, has_fields) = match item.fields {
     syn::Fields::Named(fields) => (fields, true),
-    syn::Fields::Unit => (
-      syn::FieldsNamed {
-        brace_token: syn::token::Brace::default(),
-        named: Default::default(),
-      },
-      false,
-    ),
-    _ => panic!(
-      "`#[rossweisse::router]` can only be used on `struct`s with named \
+    syn::Fields::Unit =>
+      (
+        syn::FieldsNamed {
+          brace_token: syn::token::Brace::default(),
+          named:       Default::default(),
+        },
+        false,
+      ),
+    _ =>
+      panic!(
+        "`#[rossweisse::router]` can only be used on `struct`s with named \
          fields or unit structs"
-    ),
+      ),
   };
   let mut default_expressions = vec![];
   let new_method_fields = named_fields.named.iter().map(|field| {
