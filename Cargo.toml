@@ -33,7 +33,13 @@ tokio-openssl = { version = "0.6.3", optional = true }
 async-std-openssl = { version = "0.6.3", optional = true }
 
 # Non-blocking I/O
-tokio = { version = "1.26.0", default-features = false, features = ["rt-multi-thread", "sync", "net", "io-util", "macros"], optional = true }
+tokio = { version = "1.26.0", default-features = false, features = [
+  "rt-multi-thread",
+  "sync",
+  "net",
+  "io-util",
+  "macros",
+], optional = true }
 async-trait = "0.1.68"
 async-std = { version = "1.12.0", features = ["attributes"], optional = true }
 
@@ -50,4 +56,4 @@ tree_magic = { version = "0.2.3", optional = true } # MIME
 paste = "1.0.12" # Token Pasting
 
 [dev-dependencies]
-rossweisse = { version = "0.0.2", path = "./rossweisse" }
+rossweisse = { version = "0.0.3", path = "./rossweisse" }
