@@ -97,7 +97,7 @@ impl Response {
   #[must_use]
   pub fn binary_success_auto(content: &[u8]) -> Self {
     Self::new(22, String::from_utf8_lossy(content))
-      .with_mime(&tree_magic::from_u8(content))
+      .with_mime(tree_magic::from_u8(content))
       .clone()
   }
 
