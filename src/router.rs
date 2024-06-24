@@ -90,7 +90,9 @@ pub struct Router {
   routes: matchit::Router<Arc<AsyncMutex<Box<dyn RouteResponse>>>>,
   error_handler:         Arc<AsyncMutex<Box<dyn ErrorResponse>>>,
   private_key_file_name: String,
-  ca_file_name:          String,
+  private_key_content:   Option<String>,
+  certificate_file_name: String,
+  certificate_content:   Option<String>,
   headers:               Arc<Mutex<Vec<Box<dyn Partial>>>>,
   footers:               Arc<Mutex<Vec<Box<dyn Partial>>>>,
   ssl_acceptor:          Arc<SslAcceptor>,
@@ -137,6 +139,22 @@ impl Router {
     self
   }
 
+  /// Set the content of the private key
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// windmark::router::Router::new().set_private_key("..."); 
+  /// ```
+  pub fn set_private_key(
+    &mut self,
+    private_key_content: impl Into<String> + AsRef<str>,
+  ) -> &mut Self {
+    self.private_key_content = Some(private_key_content.into());
+
+    self
+  }
+
   /// Set the filename of the certificate chain file.
   ///
   /// # Examples
@@ -148,7 +166,23 @@ impl Router {
     &mut self,
     certificate_name: impl Into<String> + AsRef<str>,
   ) -> &mut Self {
-    self.ca_file_name = certificate_name.into();
+    self.certificate_file_name = certificate_name.into();
+
+    self
+  }
+
+  /// Set the content of the certificate chain file.
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// windmark::router::Router::new().set_certificate("..."); 
+  /// ```
+  pub fn set_certificate(
+    &mut self,
+    certificate_content: impl Into<String> + AsRef<str>,
+  ) -> &mut Self {
+    self.certificate_content = Some(certificate_content.into());
 
     self
   }
@@ -340,7 +374,11 @@ impl Router {
     // Ok(())
   }
 
-  #[allow(clippy::too_many_lines)]
+  #[allow(
+    clippy::too_many_lines,
+    clippy::needless_pass_by_ref_mut,
+    clippy::significant_drop_in_scrutinee
+  )]
   async fn handle(
     &mut self,
     stream: &mut Stream,
@@ -515,11 +553,34 @@ impl Router {
   fn create_acceptor(&mut self) -> Result<(), Box<dyn Error>> {
     let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls())?;
 
-    builder.set_private_key_file(
-      &self.private_key_file_name,
-      ssl::SslFiletype::PEM,
-    )?;
-    builder.set_certificate_file(&self.ca_file_name, ssl::SslFiletype::PEM)?;
+    if self.certificate_content.is_some() {
+      builder.set_certificate(
+        openssl::x509::X509::from_pem(
+          self.certificate_content.clone().unwrap().as_bytes(),
+        )?
+        .as_ref(),
+      )?;
+    } else {
+      builder.set_certificate_file(
+        &self.certificate_file_name,
+        ssl::SslFiletype::PEM,
+      )?;
+    }
+
+    if self.private_key_content.is_some() {
+      builder.set_private_key(
+        openssl::pkey::PKey::private_key_from_pem(
+          self.private_key_content.clone().unwrap().as_bytes(),
+        )?
+        .as_ref(),
+      )?;
+    } else {
+      builder.set_private_key_file(
+        &self.private_key_file_name,
+        ssl::SslFiletype::PEM,
+      )?;
+    }
+
     builder.check_private_key()?;
     builder.set_verify_callback(ssl::SslVerifyMode::PEER, |_, _| true);
     builder.set_session_id_context(
@@ -919,7 +980,7 @@ impl Default for Router {
         }
       }))),
       private_key_file_name: String::new(),
-      ca_file_name: String::new(),
+      certificate_file_name: String::new(),
       headers: Arc::new(Mutex::new(vec![])),
       footers: Arc::new(Mutex::new(vec![])),
       ssl_acceptor: Arc::new(
@@ -939,6 +1000,8 @@ impl Default for Router {
       modules: Arc::new(Mutex::new(vec![])),
       async_modules: Arc::new(AsyncMutex::new(vec![])),
       fix_path: false,
+      private_key_content: None,
+      certificate_content: None,
     }
   }
 }
