@@ -5,7 +5,7 @@ members = ["rossweisse"]
 
 [package]
 name = "windmark"
-version = "0.3.9"
+version = "0.3.10"
 authors = ["Fuwn <contact@fuwn.me>"]
 edition = "2021"
 description = "An elegant and highly performant async Gemini server framework"
