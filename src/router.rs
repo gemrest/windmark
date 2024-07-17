@@ -433,14 +433,15 @@ impl Router {
       module.on_pre_route(hook_context.clone()).await;
     }
 
-    for module in &mut *self.modules.lock().unwrap() {
-      module.on_pre_route(hook_context.clone());
+    if let Ok(mut modules) = self.modules.lock() {
+      for module in &mut *modules {
+        module.on_pre_route(hook_context.clone());
+      }
     }
 
-    (*self.pre_route_callback)
-      .lock()
-      .unwrap()
-      .call(hook_context.clone());
+    if let Ok(mut callback) = self.pre_route_callback.lock() {
+      callback.call(hook_context.clone());
+    }
 
     let mut content = if let Ok(ref route) = route {
       let footers_length = (*self.footers.lock().unwrap()).len();
@@ -451,11 +452,13 @@ impl Router {
         peer_certificate,
       );
 
-      for partial_header in &mut *self.headers.lock().unwrap() {
-        header.push_str(&format!(
-          "{}\n",
-          partial_header.call(route_context.clone()),
-        ));
+      if let Ok(mut headers) = self.headers.lock() {
+        for partial_header in &mut *headers {
+          header.push_str(&format!(
+            "{}\n",
+            partial_header.call(route_context.clone()),
+          ));
+        }
       }
 
       for (i, partial_footer) in {
@@ -493,14 +496,15 @@ impl Router {
       module.on_post_route(hook_context.clone()).await;
     }
 
-    for module in &mut *self.modules.lock().unwrap() {
-      module.on_post_route(hook_context.clone());
+    if let Ok(mut modules) = self.modules.lock() {
+      for module in &mut *modules {
+        module.on_post_route(hook_context.clone());
+      }
     }
 
-    (*self.post_route_callback)
-      .lock()
-      .unwrap()
-      .call(hook_context.clone(), &mut content);
+    if let Ok(mut callback) = self.post_route_callback.lock() {
+      callback.call(hook_context.clone(), &mut content);
+    }
 
     stream
       .write_all(
