@@ -47,7 +47,7 @@ tokio = { version = "1.26.0", features = ["full"] }
 # windmark = { version = "0.3.9", features = ["response-macros"] }
 ```
 
-### Implement a Windmark server
+### Implementing a Windmark Server
 
 ```rust
 // src/main.rs
@@ -68,7 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### Implement a Windmark server using Rossweisse
+### Implementing a Windmark Server Using Rossweisse
 
 ```rust
 // src/main.rs
@@ -97,25 +97,21 @@ Examples can be found within the
 [`examples/`](https://github.com/gemrest/windmark/tree/main/examples) directory
 along with a rundown of each of their purposes and useful facts.
 
-An example of a fully featured Gemini capsule written using Windmark can be
-found [here](https://github.com/gemrest/locus). This example Gemini capsule also
-happens to be the source code for [Fuwn's](https://github.com/Fuwn) (this
-library's author) personal Gemini capsule!
+Run an example by cloning this repository and running `cargo run --example example_name`.
 
 ## Modules
 
-Modules are reusable extensions which can be procedurally mounted onto Windmark
+Modules are composable extensions which can be procedurally mounted onto Windmark
 routers.
 
-[Add yours!](https://github.com/gemrest/windmark/edit/main/README.md)
+### Examples
 
-- [Windmark Comments](https://github.com/gemrest/windmark-comments)
-
-## Capsules using Windmark
-
-[Add yours!](https://github.com/gemrest/windmark/edit/main/README.md)
-
-- <https://fuwn.me/>
+- [Simple Stateless Module](https://github.com/gemrest/windmark/blob/main/examples/stateless_module.rs)
+  \- Mounts the `/smiley` route, returning an 😀 emoji
+- [Simple Stateful Module](https://github.com/gemrest/windmark/blob/main/examples/stateful_module.rs)
+  \- Adds a click tracker (route hit tracker) that additionally notifies before and after route visits
+- [Windmark Comments](https://github.com/gemrest/windmark-comments) - A fully featured comment engine
+  for your capsule
 
 ## License
 
