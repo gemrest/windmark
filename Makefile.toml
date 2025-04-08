@@ -7,19 +7,30 @@ command = "cargo"
 toolchain = "nightly"
 
 [tasks.check]
-args = ["check", "--no-default-features", "--features", "logger,auto-deduce-mime,response-macros,${@}"]
+args = [
+  "check",
+  "--no-default-features",
+  "--features=logger,auto-deduce-mime,response-macros,${@}",
+]
 command = "cargo"
 toolchain = "nightly"
 
 [tasks.clippy]
-args = ["clippy", "--no-default-features", "--features", "logger,auto-deduce-mime,response-macros,${@}"]
+args = [
+  "clippy",
+  "--no-default-features",
+  "--features=logger,auto-deduce-mime,response-macros,${@}",
+]
 command = "cargo"
 toolchain = "nightly"
 
 [tasks.test]
-args = ["test", "--no-default-features", "--features", "logger,auto-deduce-mime,response-macros,${@}"]
+args = [
+  "test",
+  "--no-default-features",
+  "--features=logger,auto-deduce-mime,response-macros,${@}",
+]
 command = "cargo"
-toolchain = "1.68.2"
 
 [tasks.checkf]
 script = '''
@@ -75,8 +86,8 @@ script = '''
 #!@duckscript
 
 if is_empty ${2}
-  exec cargo run --example ${1} --no-default-features --features logger,auto-deduce-mime,response-macros,tokio
+  exec cargo run --example ${1} --no-default-features --features=logger,auto-deduce-mime,response-macros,tokio
 else
-  exec cargo run --example ${1} --no-default-features --features logger,auto-deduce-mime,response-macros,${2}
+  exec cargo run --example ${1} --no-default-features --features=logger,auto-deduce-mime,response-macros,${2}
 end
 '''
