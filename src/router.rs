@@ -19,6 +19,7 @@
 
 use std::{
   error::Error,
+  fmt::Write,
   future::IntoFuture,
   sync::{Arc, Mutex},
   time,
@@ -342,7 +343,7 @@ impl Router {
             let ssl = match ssl::Ssl::new(acceptor.context()) {
               Ok(ssl) => ssl,
               Err(e) => {
-                error!("ssl context error: {:?}", e);
+                error!("ssl context error: {e:?}");
 
                 return;
               }
@@ -360,14 +361,14 @@ impl Router {
                 }
 
                 if let Err(e) = self_clone.handle(&mut stream).await {
-                  error!("handle error: {}", e);
+                  error!("handle error: {e}");
                 }
               }
-              Err(e) => error!("ssl stream error: {:?}", e),
+              Err(e) => error!("ssl stream error: {e:?}"),
             }
           });
         }
-        Err(e) => error!("tcp stream error: {:?}", e),
+        Err(e) => error!("tcp stream error: {e:?}"),
       }
     }
 
@@ -454,10 +455,12 @@ impl Router {
 
       if let Ok(mut headers) = self.headers.lock() {
         for partial_header in &mut *headers {
-          header.push_str(&format!(
-            "{}\n",
+          writeln!(
+            &mut header,
+            "{}",
             partial_header.call(route_context.clone()),
-          ));
+          )
+          .unwrap();
         }
       }
 
@@ -465,7 +468,8 @@ impl Router {
         #[allow(clippy::needless_borrow, clippy::explicit_auto_deref)]
         (&mut *self.footers.lock().unwrap()).iter_mut().enumerate()
       } {
-        footer.push_str(&format!(
+        let _ = write!(
+          &mut footer,
           "{}{}",
           partial_footer.call(route_context.clone()),
           if footers_length > 1 && i != footers_length - 1 {
@@ -473,7 +477,7 @@ impl Router {
           } else {
             ""
           },
-        ));
+        );
       }
 
       let mut lock = (*route.value).lock().await;
@@ -952,7 +956,7 @@ impl Router {
   /// ```rust
   /// windmark::router::Router::new().set_port(1965); 
   /// ```
-  pub fn set_port(&mut self, port: i32) -> &mut Self {
+  pub const fn set_port(&mut self, port: i32) -> &mut Self {
     self.port = port;
 
     self
@@ -966,7 +970,7 @@ impl Router {
   /// ```rust
   /// windmark::router::Router::new().set_fix_path(true); 
   /// ```
-  pub fn set_fix_path(&mut self, fix_path: bool) -> &mut Self {
+  pub const fn set_fix_path(&mut self, fix_path: bool) -> &mut Self {
     self.fix_path = fix_path;
 
     self
