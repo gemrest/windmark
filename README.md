@@ -33,18 +33,18 @@ out [Rossweisse](./rossweisse/) for more information!
 # Cargo.toml
 
 [dependencies]
-windmark = "0.3.9"
+windmark = "0.3.11"
 tokio = { version = "1.26.0", features = ["full"] }
 
 # If you would like to use the built-in logger (recommended)
-# windmark = { version = "0.3.9", features = ["logger"] }
+# windmark = { version = "0.3.11", features = ["logger"] }
 
 # If you would like to use the built-in MIME dedection when `Success`-ing a file
 # (recommended)
-# windmark = { version = "0.3.9", features = ["auto-deduce-mime"] }
+# windmark = { version = "0.3.11", features = ["auto-deduce-mime"] }
 
 # If you would like to use macro-based responses (as seen below)
-# windmark = { version = "0.3.9", features = ["response-macros"] }
+# windmark = { version = "0.3.11", features = ["response-macros"] }
 ```
 
 ### Implementing a Windmark Server
