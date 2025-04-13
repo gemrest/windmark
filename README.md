@@ -4,16 +4,17 @@
 [![docs.rs](https://docs.rs/windmark/badge.svg)](https://docs.rs/windmark)
 [![github.com](https://github.com/gemrest/windmark/actions/workflows/check.yaml/badge.svg?branch=main)](https://github.com/gemrest/windmark/actions/workflows/check.yaml)
 
-Windmark is an elegant and highly performant, async Gemini server framework for
+Windmark is an elegant and highly performant async Gemini server framework for
 the modern age!
 
 Now supporting both [Tokio](https://tokio.rs/) and [`async-std`](https://async.rs/)!
 
 ## Usage
 
-A macro-based "`struct`-router" is currently being developed for Windmark. A
-subset of Windmark's features are currently available for use through it. Check
-out [Rossweisse](./rossweisse/) for more information!
+> [!NOTE]
+> A macro-based "`struct`-router" is in active development as a simplified
+> alternative to the standard server creation approach. Check out
+> [Rossweisse](./rossweisse/) for more information!
 
 ### Features
 
@@ -39,7 +40,7 @@ tokio = { version = "1.26.0", features = ["full"] }
 # If you would like to use the built-in logger (recommended)
 # windmark = { version = "0.3.11", features = ["logger"] }
 
-# If you would like to use the built-in MIME dedection when `Success`-ing a file
+# If you would like to use the built-in MIME deduction when `Success`-ing a file
 # (recommended)
 # windmark = { version = "0.3.11", features = ["auto-deduce-mime"] }
 
