@@ -107,6 +107,7 @@ pub struct Router {
   async_modules:         Arc<AsyncMutex<Vec<Box<dyn AsyncModule + Send>>>>,
   modules:               Arc<Mutex<Vec<Box<dyn Module + Send>>>>,
   fix_path:              bool,
+  listener_address:      String,
 }
 
 impl Router {
@@ -319,12 +320,17 @@ impl Router {
     }
 
     #[cfg(feature = "tokio")]
-    let listener =
-      tokio::net::TcpListener::bind(format!("0.0.0.0:{}", self.port)).await?;
+    let listener = tokio::net::TcpListener::bind(format!(
+      "{}:{}",
+      self.listener_address, self.port
+    ))
+    .await?;
     #[cfg(feature = "async-std")]
-    let listener =
-      async_std::net::TcpListener::bind(format!("0.0.0.0:{}", self.port))
-        .await?;
+    let listener = async_std::net::TcpListener::bind(format!(
+      "{}:{}",
+      self.listener_address, self.port
+    ))
+    .await?;
 
     #[cfg(feature = "logger")]
     info!("windmark is listening for connections");
@@ -975,7 +981,26 @@ impl Router {
 
     self
   }
+
+  /// Specify a custom listener address.
+  ///
+  /// Defaults to `"0.0.0.0"`.
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// windmark::router::Router::new().set_listener_address("[::]"); 
+  /// ```
+  pub fn set_listener_address(
+    &mut self,
+    address: impl Into<String> + AsRef<str>,
+  ) -> &mut Self {
+    self.listener_address = address.into();
+
+    self
+  }
 }
+
 impl Default for Router {
   fn default() -> Self {
     Self {
@@ -1010,6 +1035,7 @@ impl Default for Router {
       fix_path: false,
       private_key_content: None,
       certificate_content: None,
+      listener_address: "0.0.0.0".to_string(),
     }
   }
 }
