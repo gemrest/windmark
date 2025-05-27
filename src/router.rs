@@ -413,14 +413,14 @@ impl Router {
       }
     }
 
+    if url.path().is_empty() {
+      url.set_path("/");
+    }
+
     let fixed_path = if self.fix_path {
       self
         .routes
-        .fix_path(if url.path().is_empty() {
-          "/"
-        } else {
-          url.path()
-        })
+        .fix_path(url.path())
         .unwrap_or_else(|| url.path().to_string())
     } else {
       url.path().to_string()
