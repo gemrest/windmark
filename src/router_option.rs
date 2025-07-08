@@ -3,7 +3,7 @@
 pub enum RouterOption {
   /// Trim trailing slashes from the URL path if it is present and a route
   /// match exists
-  TrimTrailingSlashes,
+  RemoveExtraTrailingSlash,
   /// Add a trailing slash to the URL path if it is missing and a route
   /// match exists
   AddMissingTrailingSlash,
