@@ -53,16 +53,16 @@ tokio = { version = "1.26.0", features = ["full"] }
 ```rust
 // src/main.rs
 
-// ...
+use windmark::response::Response;
 
 #[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
   windmark::router::Router::new()
     .set_private_key_file("windmark_private.pem")
     .set_certificate_file("windmark_public.pem")
-    .mount("/", windmark::success!("Hello, World!"))
+    .mount("/", |_| Response::success("Hello, World!"))
     .set_error_handler(|_|
-      windmark::response::Response::permanent_failure("This route does not exist!")
+      Response::permanent_failure("This route does not exist!")
     )
     .run()
     .await
@@ -74,14 +74,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```rust
 // src/main.rs
 
-// ...
+use windmark::response::Response;
 
 #[rossweisse::router]
 struct Router;
 
 #[rossweisse::router]
 impl Router {
-  #[route(index)]
+  #[rossweisse::route(index)]
   pub fn index(
     _context: windmark::context::RouteContext,
   ) -> Response {
