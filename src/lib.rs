@@ -36,6 +36,7 @@ pub mod module;
 pub mod prelude;
 pub mod response;
 pub mod router;
+pub mod router_option;
 pub mod utilities;
 
 #[macro_use]
