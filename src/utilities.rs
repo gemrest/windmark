@@ -40,3 +40,30 @@ pub fn params_to_hashmap(
     .map(|(k, v)| (k.to_string(), v.to_string()))
     .collect()
 }
+
+/// Normalizes a path by removing all trailing slashes, unless it's the root
+/// path "/".
+///
+/// # Examples
+///
+/// ```rust
+/// assert_eq!(
+///   windmark::utilities::normalize_path_slashes("/foo///"),
+///   "/foo"
+/// );
+/// assert_eq!(windmark::utilities::normalize_path_slashes("/foo/"), "/foo");
+/// assert_eq!(windmark::utilities::normalize_path_slashes("/foo"), "/foo");
+/// assert_eq!(windmark::utilities::normalize_path_slashes("/"), "/");
+/// ```
+#[must_use]
+pub fn normalize_path_slashes(path: &str) -> String {
+  if path == "/" {
+    return "/".to_string();
+  }
+
+  if path.ends_with('/') {
+    path.trim_end_matches('/').to_string()
+  } else {
+    path.to_string()
+  }
+}
