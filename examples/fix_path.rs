@@ -22,7 +22,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   windmark::router::Router::new()
     .set_private_key_file("windmark_private.pem")
     .set_certificate_file("windmark_public.pem")
-    .add_options(&[windmark::router_option::RouterOption::TrimTrailingSlashes])
+    .add_options(&[
+      windmark::router_option::RouterOption::TrimTrailingSlashes,
+      windmark::router_option::RouterOption::AddMissingTrailingSlash,
+    ])
     .mount(
       "/close",
       windmark::success!("Visit '/close/'; you should be close enough!"),

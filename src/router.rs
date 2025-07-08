@@ -423,13 +423,25 @@ impl Router {
     let mut path = url.path().to_string();
     let mut route = self.routes.at(&path);
 
-    if route.is_err()
-      && self.options.contains(&RouterOption::TrimTrailingSlashes)
-      && path.ends_with('/')
-      && path != "/"
-    {
-      path = path.trim_end_matches('/').to_string();
-      route = self.routes.at(&path);
+    if route.is_err() {
+      if self.options.contains(&RouterOption::TrimTrailingSlashes)
+        && path.ends_with('/')
+        && path != "/"
+      {
+        path = path.trim_end_matches('/').to_string();
+        route = self.routes.at(&path);
+      } else if self
+        .options
+        .contains(&RouterOption::AddMissingTrailingSlash)
+        && !path.ends_with('/')
+      {
+        let path_with_slash = format!("{path}/");
+
+        if self.routes.at(&path_with_slash).is_ok() {
+          path = path_with_slash;
+          route = self.routes.at(&path);
+        }
+      }
     }
 
     let peer_certificate = stream.ssl().peer_certificate();
