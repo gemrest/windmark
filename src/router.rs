@@ -51,7 +51,6 @@ use crate::{
   module::{AsyncModule, Module},
   response::Response,
   router_option::RouterOption,
-  utilities,
 };
 
 macro_rules! block {
@@ -421,13 +420,18 @@ impl Router {
       url.set_path("/");
     }
 
-    let fixed_path =
-      if self.options.contains(&RouterOption::TrimTrailingSlashes) {
-        utilities::normalize_path_slashes(url.path())
-      } else {
-        url.path().to_string()
-      };
-    let route = &mut self.routes.at(&fixed_path);
+    let mut path = url.path().to_string();
+    let mut route = self.routes.at(&path);
+
+    if route.is_err()
+      && self.options.contains(&RouterOption::TrimTrailingSlashes)
+      && path.ends_with('/')
+      && path != "/"
+    {
+      path = path.trim_end_matches('/').to_string();
+      route = self.routes.at(&path);
+    }
+
     let peer_certificate = stream.ssl().peer_certificate();
     let hook_context = HookContext::new(
       stream.get_ref().peer_addr(),
