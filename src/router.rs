@@ -864,7 +864,7 @@ impl Router {
   ///   }
   /// }
   ///
-  /// Router::new().attach_async(Clicker::default());
+  /// // Router::new().attach_async(Clicker::default());
   /// ```
   pub fn attach_async(
     &mut self,
@@ -1004,7 +1004,7 @@ impl Router {
   /// use windmark::router_option::RouterOption;
   ///
   /// windmark::router::Router::new()
-  ///   .add_options(&[RouterOption::TrimTrailingSlashes]);
+  ///   .add_options(&[RouterOption::RemoveExtraTrailingSlash]);
   /// ```
   pub fn add_options(&mut self, options: &[RouterOption]) -> &mut Self {
     for option in options {
@@ -1022,7 +1022,7 @@ impl Router {
   /// use windmark::router_option::RouterOption;
   ///
   /// windmark::router::Router::new()
-  ///   .toggle_options(&[RouterOption::TrimTrailingSlashes]);
+  ///   .toggle_options(&[RouterOption::RemoveExtraTrailingSlash]);
   /// ```
   pub fn toggle_options(&mut self, options: &[RouterOption]) -> &mut Self {
     for option in options {
@@ -1044,7 +1044,7 @@ impl Router {
   /// use windmark::router_option::RouterOption;
   ///
   /// windmark::router::Router::new()
-  ///   .remove_options(&[RouterOption::TrimTrailingSlashes]);
+  ///   .remove_options(&[RouterOption::RemoveExtraTrailingSlash]);
   /// ```
   pub fn remove_options(&mut self, options: &[RouterOption]) -> &mut Self {
     for option in options {
