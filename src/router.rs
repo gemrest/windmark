@@ -18,6 +18,7 @@
 #![allow(clippy::significant_drop_tightening)]
 
 use std::{
+  collections::HashSet,
   error::Error,
   fmt::Write,
   future::IntoFuture,
@@ -49,6 +50,7 @@ use crate::{
   },
   module::{AsyncModule, Module},
   response::Response,
+  router_option::RouterOption,
   utilities,
 };
 
@@ -107,7 +109,7 @@ pub struct Router {
   port:                  i32,
   async_modules:         Arc<AsyncMutex<Vec<Box<dyn AsyncModule + Send>>>>,
   modules:               Arc<Mutex<Vec<Box<dyn Module + Send>>>>,
-  fix_path:              bool,
+  options:               HashSet<RouterOption>,
   listener_address:      String,
 }
 
@@ -419,11 +421,12 @@ impl Router {
       url.set_path("/");
     }
 
-    let fixed_path = if self.fix_path {
-      utilities::normalize_path_slashes(url.path())
-    } else {
-      url.path().to_string()
-    };
+    let fixed_path =
+      if self.options.contains(&RouterOption::TrimTrailingSlashes) {
+        utilities::normalize_path_slashes(url.path())
+      } else {
+        url.path().to_string()
+      };
     let route = &mut self.routes.at(&fixed_path);
     let peer_certificate = stream.ssl().peer_certificate();
     let hook_context = HookContext::new(
@@ -967,16 +970,60 @@ impl Router {
     self
   }
 
-  /// Performs a case-insensitive lookup of routes, using the case corrected
-  /// path if successful. Missing/ extra trailing slashes are also corrected.
+  /// Add optional features to the router
   ///
   /// # Examples
   ///
   /// ```rust
-  /// windmark::router::Router::new().set_fix_path(true); 
+  /// use windmark::router_option::RouterOption;
+  ///
+  /// windmark::router::Router::new()
+  ///   .add_options(&[RouterOption::TrimTrailingSlashes]);
   /// ```
-  pub const fn set_fix_path(&mut self, fix_path: bool) -> &mut Self {
-    self.fix_path = fix_path;
+  pub fn add_options(&mut self, options: &[RouterOption]) -> &mut Self {
+    for option in options {
+      self.options.insert(*option);
+    }
+
+    self
+  }
+
+  /// Toggle optional features for the router
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// use windmark::router_option::RouterOption;
+  ///
+  /// windmark::router::Router::new()
+  ///   .toggle_options(&[RouterOption::TrimTrailingSlashes]);
+  /// ```
+  pub fn toggle_options(&mut self, options: &[RouterOption]) -> &mut Self {
+    for option in options {
+      if self.options.contains(option) {
+        self.options.remove(option);
+      } else {
+        self.options.insert(*option);
+      }
+    }
+
+    self
+  }
+
+  /// Remove optional features from the router
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// use windmark::router_option::RouterOption;
+  ///
+  /// windmark::router::Router::new()
+  ///   .remove_options(&[RouterOption::TrimTrailingSlashes]);
+  /// ```
+  pub fn remove_options(&mut self, options: &[RouterOption]) -> &mut Self {
+    for option in options {
+      self.options.remove(option);
+    }
 
     self
   }
@@ -1031,7 +1078,7 @@ impl Default for Router {
       port: 1965,
       modules: Arc::new(Mutex::new(vec![])),
       async_modules: Arc::new(AsyncMutex::new(vec![])),
-      fix_path: false,
+      options: HashSet::new(),
       private_key_content: None,
       certificate_content: None,
       listener_address: "0.0.0.0".to_string(),
