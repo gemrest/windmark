@@ -424,7 +424,9 @@ impl Router {
     let mut route = self.routes.at(&path);
 
     if route.is_err() {
-      if self.options.contains(&RouterOption::TrimTrailingSlashes)
+      if self
+        .options
+        .contains(&RouterOption::RemoveExtraTrailingSlash)
         && path.ends_with('/')
         && path != "/"
       {

@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .set_private_key_file("windmark_private.pem")
     .set_certificate_file("windmark_public.pem")
     .add_options(&[
-      windmark::router_option::RouterOption::TrimTrailingSlashes,
+      windmark::router_option::RouterOption::RemoveExtraTrailingSlash,
       windmark::router_option::RouterOption::AddMissingTrailingSlash,
     ])
     .mount(
