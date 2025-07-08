@@ -7,4 +7,7 @@ pub enum RouterOption {
   /// If enabled, adds a trailing slash to the request URL path if a route
   /// exists for the path with the slash (e.g., `/foo` becomes `/foo/`).
   AddMissingTrailingSlash,
+  /// If enabled, the router will perform case-insensitive matching for
+  /// incoming request URL paths (e.g., `/foo` will match `/Foo` or `/FOO`).
+  AllowCaseInsensitiveLookup,
 }

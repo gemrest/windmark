@@ -421,6 +421,14 @@ impl Router {
     }
 
     let mut path = url.path().to_string();
+
+    if self
+      .options
+      .contains(&RouterOption::AllowCaseInsensitiveLookup)
+    {
+      path = path.to_lowercase();
+    }
+
     let mut route = self.routes.at(&path);
 
     if route.is_err() {
