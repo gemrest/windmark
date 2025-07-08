@@ -49,6 +49,7 @@ use crate::{
   },
   module::{AsyncModule, Module},
   response::Response,
+  utilities,
 };
 
 macro_rules! block {
@@ -384,7 +385,8 @@ impl Router {
   #[allow(
     clippy::too_many_lines,
     clippy::needless_pass_by_ref_mut,
-    clippy::significant_drop_in_scrutinee
+    clippy::significant_drop_in_scrutinee,
+    clippy::cognitive_complexity
   )]
   async fn handle(
     &mut self,
@@ -418,10 +420,7 @@ impl Router {
     }
 
     let fixed_path = if self.fix_path {
-      self
-        .routes
-        .fix_path(url.path())
-        .unwrap_or_else(|| url.path().to_string())
+      utilities::normalize_path_slashes(url.path())
     } else {
       url.path().to_string()
     };
