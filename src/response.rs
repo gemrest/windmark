@@ -76,11 +76,14 @@ impl Response {
 
   #[allow(clippy::needless_pass_by_value)]
   pub fn success(content: impl ToString) -> Self {
-    Self::new(20, content.to_string())
+    let mut response = Self::new(20, content.to_string());
+
+    response
       .with_mime("text/gemini")
       .with_languages(["en"])
-      .with_character_set("utf-8")
-      .clone()
+      .with_character_set("utf-8");
+
+    response
   }
 
   #[must_use]
@@ -88,17 +91,21 @@ impl Response {
     content: impl AsRef<[u8]>,
     mime: impl Into<String> + AsRef<str>,
   ) -> Self {
-    Self::new(21, String::from_utf8_lossy(content.as_ref()))
-      .with_mime(mime)
-      .clone()
+    let mut response = Self::new(21, String::from_utf8_lossy(content.as_ref()));
+
+    response.with_mime(mime);
+
+    response
   }
 
   #[cfg(feature = "auto-deduce-mime")]
   #[must_use]
   pub fn binary_success_auto(content: &[u8]) -> Self {
-    Self::new(22, String::from_utf8_lossy(content))
-      .with_mime(tree_magic::from_u8(content))
-      .clone()
+    let mut response = Self::new(22, String::from_utf8_lossy(content));
+
+    response.with_mime(tree_magic::from_u8(content));
+
+    response
   }
 
   #[must_use]
