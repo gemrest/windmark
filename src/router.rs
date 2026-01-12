@@ -340,8 +340,18 @@ impl Router {
     loop {
       match listener.accept().await {
         Ok((stream, _)) => {
-          let mut self_clone = self.clone();
-          let acceptor = self_clone.ssl_acceptor.clone();
+          let routes = self.routes.clone();
+          let error_handler = self.error_handler.clone();
+          let headers = self.headers.clone();
+          let footers = self.footers.clone();
+          let async_modules = self.async_modules.clone();
+          let modules = self.modules.clone();
+          let pre_route_callback = self.pre_route_callback.clone();
+          let post_route_callback = self.post_route_callback.clone();
+          let character_set = self.character_set.clone();
+          let languages = self.languages.clone();
+          let options = self.options.clone();
+          let acceptor = self.ssl_acceptor.clone();
           #[cfg(feature = "tokio")]
           let spawner = tokio::spawn;
           #[cfg(feature = "async-std")]
@@ -368,7 +378,30 @@ impl Router {
                   println!("stream accept error: {e:?}");
                 }
 
-                if let Err(e) = self_clone.handle(&mut stream).await {
+                let router_instance = Self {
+                  routes,
+                  error_handler,
+                  private_key_file_name: String::new(),
+                  private_key_content: None,
+                  certificate_file_name: String::new(),
+                  certificate_content: None,
+                  headers,
+                  footers,
+                  ssl_acceptor: acceptor,
+                  #[cfg(feature = "logger")]
+                  default_logger: false,
+                  pre_route_callback,
+                  post_route_callback,
+                  character_set,
+                  languages,
+                  port: 0,
+                  async_modules,
+                  modules,
+                  options,
+                  listener_address: String::new(),
+                };
+
+                if let Err(e) = router_instance.handle(&mut stream).await {
                   error!("handle error: {e}");
                 }
               }
@@ -385,14 +418,10 @@ impl Router {
 
   #[allow(
     clippy::too_many_lines,
-    clippy::needless_pass_by_ref_mut,
     clippy::significant_drop_in_scrutinee,
     clippy::cognitive_complexity
   )]
-  async fn handle(
-    &mut self,
-    stream: &mut Stream,
-  ) -> Result<(), Box<dyn Error>> {
+  async fn handle(&self, stream: &mut Stream) -> Result<(), Box<dyn Error>> {
     let mut buffer = [0u8; 1024];
     let mut url = Url::parse("gemini://fuwn.me/")?;
     let mut footer = String::new();
@@ -401,13 +430,16 @@ impl Router {
     while let Ok(size) = stream.read(&mut buffer).await {
       let request = or_error!(
         stream,
-        String::from_utf8(buffer[0..size].to_vec()),
+        std::str::from_utf8(&buffer[0..size]).map(ToString::to_string),
         "59 The server (Windmark) received a bad request: {}"
       );
+      let request_trimmed = request
+        .find("\r\n")
+        .map_or(&request[..], |pos| &request[..pos]);
 
       url = or_error!(
         stream,
-        Url::parse(&request.replace("\r\n", "")),
+        Url::parse(request_trimmed),
         "59 The server (Windmark) received a bad request: {}"
       );
 
@@ -438,14 +470,21 @@ impl Router {
         && path.ends_with('/')
         && path != "/"
       {
-        path = path.trim_end_matches('/').to_string();
-        route = self.routes.at(&path);
+        let trimmed = path.trim_end_matches('/');
+
+        if trimmed != path {
+          path = trimmed.to_string();
+          route = self.routes.at(&path);
+        }
       } else if self
         .options
         .contains(&RouterOption::AddMissingTrailingSlash)
         && !path.ends_with('/')
       {
-        let path_with_slash = format!("{path}/");
+        let mut path_with_slash = String::with_capacity(path.len() + 1);
+
+        path_with_slash.push_str(&path);
+        path_with_slash.push('/');
 
         if self.routes.at(&path_with_slash).is_ok() {
           path = path_with_slash;
@@ -455,22 +494,24 @@ impl Router {
     }
 
     let peer_certificate = stream.ssl().peer_certificate();
+    let url_clone = url.clone();
     let hook_context = HookContext::new(
       stream.get_ref().peer_addr(),
-      url.clone(),
-      route
-        .as_ref()
-        .map_or(None, |route| Some(route.params.clone())),
+      url_clone.clone(),
+      route.as_ref().ok().map(|route| route.params.clone()),
       peer_certificate.clone(),
     );
+    let hook_context_clone = hook_context.clone();
 
     for module in &mut *self.async_modules.lock().await {
-      module.on_pre_route(hook_context.clone()).await;
+      module.on_pre_route(hook_context_clone.clone()).await;
     }
+
+    let hook_context_clone = hook_context.clone();
 
     if let Ok(mut modules) = self.modules.lock() {
       for module in &mut *modules {
-        module.on_pre_route(hook_context.clone());
+        module.on_pre_route(hook_context_clone.clone());
       }
     }
 
@@ -479,15 +520,16 @@ impl Router {
     }
 
     let mut content = if let Ok(ref route) = route {
-      let footers_length = (*self.footers.lock().unwrap()).len();
       let route_context = RouteContext::new(
         stream.get_ref().peer_addr(),
-        url.clone(),
+        url_clone,
         &route.params,
         peer_certificate,
       );
 
-      if let Ok(mut headers) = self.headers.lock() {
+      {
+        let mut headers = self.headers.lock().unwrap();
+
         for partial_header in &mut *headers {
           writeln!(
             &mut header,
@@ -498,20 +540,22 @@ impl Router {
         }
       }
 
-      for (i, partial_footer) in {
-        #[allow(clippy::needless_borrow, clippy::explicit_auto_deref)]
-        (&mut *self.footers.lock().unwrap()).iter_mut().enumerate()
-      } {
-        let _ = write!(
-          &mut footer,
-          "{}{}",
-          partial_footer.call(route_context.clone()),
-          if footers_length > 1 && i != footers_length - 1 {
-            "\n"
-          } else {
-            ""
-          },
-        );
+      {
+        let mut footers = self.footers.lock().unwrap();
+        let length = footers.len();
+
+        for (i, partial_footer) in footers.iter_mut().enumerate() {
+          let _ = write!(
+            &mut footer,
+            "{}{}",
+            partial_footer.call(route_context.clone()),
+            if length > 1 && i != length - 1 {
+              "\n"
+            } else {
+              ""
+            },
+          );
+        }
       }
 
       let mut lock = (*route.value).lock().await;
@@ -524,66 +568,92 @@ impl Router {
         .await
         .call(ErrorContext::new(
           stream.get_ref().peer_addr(),
-          url.clone(),
+          url_clone,
           peer_certificate,
         ))
         .await
     };
 
+    let hook_context_clone = hook_context.clone();
+
     for module in &mut *self.async_modules.lock().await {
-      module.on_post_route(hook_context.clone()).await;
+      module.on_post_route(hook_context_clone.clone()).await;
     }
+
+    let hook_context_clone = hook_context.clone();
 
     if let Ok(mut modules) = self.modules.lock() {
       for module in &mut *modules {
-        module.on_post_route(hook_context.clone());
+        module.on_post_route(hook_context_clone.clone());
       }
     }
 
     if let Ok(mut callback) = self.post_route_callback.lock() {
-      callback.call(hook_context.clone(), &mut content);
+      callback.call(hook_context, &mut content);
     }
 
-    stream
-      .write_all(
-        format!(
-          "{}{}\r\n{}",
-          if content.status == 21
-            || content.status == 22
-            || content.status == 23
-          {
-            20
-          } else {
-            content.status
-          },
-          match content.status {
-            20 =>
-              format!(
-                " {}; charset={}; lang={}",
-                content.mime.unwrap_or_else(|| "text/gemini".to_string()),
-                content
-                  .character_set
-                  .unwrap_or_else(|| self.character_set.clone()),
-                content
-                  .languages
-                  .unwrap_or_else(|| self.languages.clone())
-                  .join(","),
-              ),
-            21 => content.mime.unwrap_or_default(),
-            #[cfg(feature = "auto-deduce-mime")]
-            22 => format!(" {}", content.mime.unwrap_or_default()),
-            _ => format!(" {}", content.content),
-          },
-          match content.status {
-            20 => format!("{header}{}\n{footer}", content.content),
-            21 | 22 => content.content,
-            _ => String::new(),
-          }
-        )
-        .as_bytes(),
-      )
-      .await?;
+    let status_code =
+      if content.status == 21 || content.status == 22 || content.status == 23 {
+        20
+      } else {
+        content.status
+      };
+    let status_line = match content.status {
+      20 => {
+        let mime = content.mime.as_deref().unwrap_or("text/gemini");
+        let charset = content
+          .character_set
+          .as_deref()
+          .unwrap_or(&self.character_set);
+        let lang = content
+          .languages
+          .as_ref()
+          .map_or_else(|| self.languages.join(","), |l| l.join(","));
 
+        format!("{status_code} {mime}; charset={charset}; lang={lang}")
+      }
+      21 => {
+        format!(
+          "{} {}",
+          status_code,
+          content.mime.as_deref().unwrap_or_default()
+        )
+      }
+      #[cfg(feature = "auto-deduce-mime")]
+      22 => {
+        format!(
+          "{} {}",
+          status_code,
+          content.mime.as_deref().unwrap_or_default()
+        )
+      }
+      _ => {
+        format!("{} {}", status_code, content.content)
+      }
+    };
+    let body = match content.status {
+      20 => {
+        let mut body = String::with_capacity(
+          header.len() + content.content.len() + footer.len() + 1,
+        );
+
+        body.push_str(&header);
+        body.push_str(&content.content);
+        body.push('\n');
+        body.push_str(&footer);
+
+        body
+      }
+      21 | 22 => content.content,
+      _ => String::new(),
+    };
+    let mut response =
+      String::with_capacity(status_line.len() + body.len() + 2);
+
+    response.push_str(&status_line);
+    response.push_str("\r\n");
+    response.push_str(&body);
+    stream.write_all(response.as_bytes()).await?;
     #[cfg(feature = "tokio")]
     stream.shutdown().await?;
     #[cfg(feature = "async-std")]
@@ -595,12 +665,9 @@ impl Router {
   fn create_acceptor(&mut self) -> Result<(), Box<dyn Error>> {
     let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls())?;
 
-    if self.certificate_content.is_some() {
+    if let Some(ref cert_content) = self.certificate_content {
       builder.set_certificate(
-        openssl::x509::X509::from_pem(
-          self.certificate_content.clone().unwrap().as_bytes(),
-        )?
-        .as_ref(),
+        openssl::x509::X509::from_pem(cert_content.as_bytes())?.as_ref(),
       )?;
     } else {
       builder.set_certificate_file(
@@ -609,12 +676,10 @@ impl Router {
       )?;
     }
 
-    if self.private_key_content.is_some() {
+    if let Some(ref key_content) = self.private_key_content {
       builder.set_private_key(
-        openssl::pkey::PKey::private_key_from_pem(
-          self.private_key_content.clone().unwrap().as_bytes(),
-        )?
-        .as_ref(),
+        openssl::pkey::PKey::private_key_from_pem(key_content.as_bytes())?
+          .as_ref(),
       )?;
     } else {
       builder.set_private_key_file(
