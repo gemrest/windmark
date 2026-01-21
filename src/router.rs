@@ -101,6 +101,8 @@ pub struct Router {
   ssl_acceptor:          Arc<SslAcceptor>,
   #[cfg(feature = "logger")]
   default_logger:        bool,
+  #[cfg(feature = "logger")]
+  log_filter:            String,
   pre_route_callback:    Arc<Mutex<Box<dyn PreRouteHook>>>,
   post_route_callback:   Arc<Mutex<Box<dyn PostRouteHook>>>,
   character_set:         String,
@@ -318,7 +320,9 @@ impl Router {
 
     #[cfg(feature = "logger")]
     if self.default_logger {
-      pretty_env_logger::init();
+      pretty_env_logger::formatted_builder()
+        .parse_filters(&self.log_filter)
+        .init();
     }
 
     #[cfg(feature = "tokio")]
@@ -390,6 +394,8 @@ impl Router {
                   ssl_acceptor: acceptor,
                   #[cfg(feature = "logger")]
                   default_logger: false,
+                  #[cfg(feature = "logger")]
+                  log_filter: String::new(),
                   pre_route_callback,
                   post_route_callback,
                   character_set,
@@ -737,8 +743,7 @@ impl Router {
   #[cfg(feature = "logger")]
   pub fn enable_default_logger(&mut self, enable: bool) -> &mut Self {
     self.default_logger = enable;
-
-    std::env::set_var("RUST_LOG", "windmark=trace");
+    self.log_filter = "windmark=trace".to_string();
 
     self
   }
@@ -768,13 +773,10 @@ impl Router {
     log_level: impl Into<String> + AsRef<str>,
     log_windmark: bool,
   ) -> &mut Self {
-    std::env::set_var(
-      "RUST_LOG",
-      format!(
-        "{}{}",
-        if log_windmark { "windmark," } else { "" },
-        log_level.into()
-      ),
+    self.log_filter = format!(
+      "{}{}",
+      if log_windmark { "windmark," } else { "" },
+      log_level.into()
     );
 
     self
@@ -1160,6 +1162,8 @@ impl Default for Router {
       ),
       #[cfg(feature = "logger")]
       default_logger: false,
+      #[cfg(feature = "logger")]
+      log_filter: String::new(),
       pre_route_callback: Arc::new(Mutex::new(Box::new(|_| {}))),
       post_route_callback: Arc::new(Mutex::new(Box::new(
         |_, _: &'_ mut Response| {},
