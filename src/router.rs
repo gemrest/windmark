@@ -381,7 +381,7 @@ impl Router {
             match quick_stream {
               Ok(mut stream) => {
                 if let Err(e) = std::pin::Pin::new(&mut stream).accept().await {
-                  println!("stream accept error: {e:?}");
+                  warn!("stream accept error: {e:?}");
                 }
 
                 let router_instance = Self {
