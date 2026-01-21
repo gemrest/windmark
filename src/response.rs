@@ -103,7 +103,7 @@ impl Response {
   pub fn binary_success_auto(content: &[u8]) -> Self {
     let mut response = Self::new(22, String::from_utf8_lossy(content));
 
-    response.with_mime(tree_magic::from_u8(content));
+    response.with_mime(tree_magic_mini::from_u8(content));
 
     response
   }
