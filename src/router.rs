@@ -418,8 +418,6 @@ impl Router {
         Err(e) => error!("tcp stream error: {e:?}"),
       }
     }
-
-    // Ok(())
   }
 
   #[allow(
