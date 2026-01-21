@@ -114,314 +114,21 @@ pub struct Router {
   listener_address:      String,
 }
 
-impl Router {
-  /// Create a new `Router`
-  ///
-  /// # Examples
-  ///
-  /// ```rust
-  /// windmark::router::Router::new(); 
-  /// ```
-  ///
-  /// # Panics
-  ///
-  /// if a default `SslAcceptor` could not be built.
-  #[must_use]
-  pub fn new() -> Self { Self::default() }
+struct RequestHandler {
+  routes:              matchit::Router<Arc<AsyncMutex<Box<dyn RouteResponse>>>>,
+  error_handler:       Arc<AsyncMutex<Box<dyn ErrorResponse>>>,
+  headers:             Arc<Mutex<Vec<Box<dyn Partial>>>>,
+  footers:             Arc<Mutex<Vec<Box<dyn Partial>>>>,
+  pre_route_callback:  Arc<Mutex<Box<dyn PreRouteHook>>>,
+  post_route_callback: Arc<Mutex<Box<dyn PostRouteHook>>>,
+  character_set:       String,
+  languages:           Vec<String>,
+  async_modules:       Arc<AsyncMutex<Vec<Box<dyn AsyncModule + Send>>>>,
+  modules:             Arc<Mutex<Vec<Box<dyn Module + Send>>>>,
+  options:             HashSet<RouterOption>,
+}
 
-  /// Set the filename of the private key file.
-  ///
-  /// # Examples
-  ///
-  /// ```rust
-  /// windmark::router::Router::new().set_private_key_file("windmark_private.pem");
-  /// ```
-  pub fn set_private_key_file(
-    &mut self,
-    private_key_file_name: impl Into<String> + AsRef<str>,
-  ) -> &mut Self {
-    self.private_key_file_name = private_key_file_name.into();
-
-    self
-  }
-
-  /// Set the content of the private key
-  ///
-  /// # Examples
-  ///
-  /// ```rust
-  /// windmark::router::Router::new().set_private_key("..."); 
-  /// ```
-  pub fn set_private_key(
-    &mut self,
-    private_key_content: impl Into<String> + AsRef<str>,
-  ) -> &mut Self {
-    self.private_key_content = Some(private_key_content.into());
-
-    self
-  }
-
-  /// Set the filename of the certificate chain file.
-  ///
-  /// # Examples
-  ///
-  /// ```rust
-  /// windmark::router::Router::new().set_certificate_file("windmark_public.pem");
-  /// ```
-  pub fn set_certificate_file(
-    &mut self,
-    certificate_name: impl Into<String> + AsRef<str>,
-  ) -> &mut Self {
-    self.certificate_file_name = certificate_name.into();
-
-    self
-  }
-
-  /// Set the content of the certificate chain file.
-  ///
-  /// # Examples
-  ///
-  /// ```rust
-  /// windmark::router::Router::new().set_certificate("..."); 
-  /// ```
-  pub fn set_certificate(
-    &mut self,
-    certificate_content: impl Into<String> + AsRef<str>,
-  ) -> &mut Self {
-    self.certificate_content = Some(certificate_content.into());
-
-    self
-  }
-
-  /// Map routes to URL paths
-  ///
-  /// Supports both synchronous and asynchronous handlers
-  ///
-  /// # Examples
-  ///
-  /// ```rust
-  /// use windmark::response::Response;
-  ///
-  /// windmark::router::Router::new()
-  ///   .mount("/", |_| {
-  ///     async { Response::success("This is the index page!") }
-  ///   })
-  ///   .mount("/about", |_| async { Response::success("About that...") });
-  /// ```
-  ///
-  /// # Panics
-  ///
-  /// May panic if the route cannot be mounted.
-  pub fn mount<R>(
-    &mut self,
-    route: impl Into<String> + AsRef<str>,
-    mut handler: impl FnMut(RouteContext) -> R + Send + Sync + 'static,
-  ) -> &mut Self
-  where
-    R: IntoFuture<Output = Response> + Send + 'static,
-    <R as IntoFuture>::IntoFuture: Send,
-  {
-    self
-      .routes
-      .insert(
-        route.into(),
-        Arc::new(AsyncMutex::new(Box::new(move |context: RouteContext| {
-          handler(context).into_future()
-        }))),
-      )
-      .expect("failed to mount route");
-
-    self
-  }
-
-  /// Create an error handler which will be displayed on any error.
-  ///
-  /// # Examples
-  ///
-  /// ```rust
-  /// windmark::router::Router::new().set_error_handler(|_| {
-  ///   windmark::response::Response::success("You have encountered an error!")
-  /// });
-  /// ```
-  pub fn set_error_handler<R>(
-    &mut self,
-    mut handler: impl FnMut(ErrorContext) -> R + Send + Sync + 'static,
-  ) -> &mut Self
-  where
-    R: IntoFuture<Output = Response> + Send + 'static,
-    <R as IntoFuture>::IntoFuture: Send,
-  {
-    self.error_handler = Arc::new(AsyncMutex::new(Box::new(move |context| {
-      handler(context).into_future()
-    })));
-
-    self
-  }
-
-  /// Add a header for the `Router` which should be displayed on every route.
-  ///
-  /// # Panics
-  ///
-  /// May panic if the header cannot be added.
-  ///
-  /// # Examples
-  ///
-  /// ```rust
-  /// windmark::router::Router::new().add_header(
-  ///   |context: windmark::context::RouteContext| {
-  ///     format!("This is displayed at the top of {}!", context.url.path())
-  ///   },
-  /// );
-  /// ```
-  pub fn add_header(&mut self, handler: impl Partial + 'static) -> &mut Self {
-    (*self.headers.lock().expect("headers lock poisoned"))
-      .push(Box::new(handler));
-
-    self
-  }
-
-  /// Add a footer for the `Router` which should be displayed on every route.
-  ///
-  /// # Panics
-  ///
-  /// May panic if the header cannot be added.
-  ///
-  /// # Examples
-  ///
-  /// ```rust
-  /// windmark::router::Router::new().add_footer(
-  ///   |context: windmark::context::RouteContext| {
-  ///     format!("This is displayed at the bottom of {}!", context.url.path())
-  ///   },
-  /// );
-  /// ```
-  pub fn add_footer(&mut self, handler: impl Partial + 'static) -> &mut Self {
-    (*self.footers.lock().expect("footers lock poisoned"))
-      .push(Box::new(handler));
-
-    self
-  }
-
-  /// Run the `Router` and wait for requests
-  ///
-  /// # Examples
-  ///
-  /// ```rust
-  /// windmark::router::Router::new().run(); 
-  /// ```
-  ///
-  /// # Panics
-  ///
-  /// if the client could not be accepted.
-  ///
-  /// # Errors
-  ///
-  /// if the `TcpListener` could not be bound.
-  pub async fn run(&mut self) -> Result<(), Box<dyn Error>> {
-    self.create_acceptor()?;
-
-    #[cfg(feature = "logger")]
-    if self.default_logger {
-      pretty_env_logger::formatted_builder()
-        .parse_filters(&self.log_filter)
-        .init();
-    }
-
-    #[cfg(feature = "tokio")]
-    let listener = tokio::net::TcpListener::bind(format!(
-      "{}:{}",
-      self.listener_address, self.port
-    ))
-    .await?;
-    #[cfg(feature = "async-std")]
-    let listener = async_std::net::TcpListener::bind(format!(
-      "{}:{}",
-      self.listener_address, self.port
-    ))
-    .await?;
-
-    #[cfg(feature = "logger")]
-    info!("windmark is listening for connections");
-
-    loop {
-      match listener.accept().await {
-        Ok((stream, _)) => {
-          let routes = self.routes.clone();
-          let error_handler = self.error_handler.clone();
-          let headers = self.headers.clone();
-          let footers = self.footers.clone();
-          let async_modules = self.async_modules.clone();
-          let modules = self.modules.clone();
-          let pre_route_callback = self.pre_route_callback.clone();
-          let post_route_callback = self.post_route_callback.clone();
-          let character_set = self.character_set.clone();
-          let languages = self.languages.clone();
-          let options = self.options.clone();
-          let acceptor = self.ssl_acceptor.clone();
-          #[cfg(feature = "tokio")]
-          let spawner = tokio::spawn;
-          #[cfg(feature = "async-std")]
-          let spawner = async_std::task::spawn;
-
-          spawner(async move {
-            let ssl = match ssl::Ssl::new(acceptor.context()) {
-              Ok(ssl) => ssl,
-              Err(e) => {
-                error!("ssl context error: {e:?}");
-
-                return;
-              }
-            };
-
-            #[cfg(feature = "tokio")]
-            let quick_stream = tokio_openssl::SslStream::new(ssl, stream);
-            #[cfg(feature = "async-std")]
-            let quick_stream = async_std_openssl::SslStream::new(ssl, stream);
-
-            match quick_stream {
-              Ok(mut stream) => {
-                if let Err(e) = std::pin::Pin::new(&mut stream).accept().await {
-                  warn!("stream accept error: {e:?}");
-                }
-
-                let router_instance = Self {
-                  routes,
-                  error_handler,
-                  private_key_file_name: String::new(),
-                  private_key_content: None,
-                  certificate_file_name: String::new(),
-                  certificate_content: None,
-                  headers,
-                  footers,
-                  ssl_acceptor: acceptor,
-                  #[cfg(feature = "logger")]
-                  default_logger: false,
-                  #[cfg(feature = "logger")]
-                  log_filter: String::new(),
-                  pre_route_callback,
-                  post_route_callback,
-                  character_set,
-                  languages,
-                  port: 0,
-                  async_modules,
-                  modules,
-                  options,
-                  listener_address: String::new(),
-                };
-
-                if let Err(e) = router_instance.handle(&mut stream).await {
-                  error!("handle error: {e}");
-                }
-              }
-              Err(e) => error!("ssl stream error: {e:?}"),
-            }
-          });
-        }
-        Err(e) => error!("tcp stream error: {e:?}"),
-      }
-    }
-  }
-
+impl RequestHandler {
   #[allow(
     clippy::too_many_lines,
     clippy::significant_drop_in_scrutinee,
@@ -666,6 +373,294 @@ impl Router {
     stream.get_mut().shutdown(std::net::Shutdown::Both)?;
 
     Ok(())
+  }
+}
+
+impl Router {
+  /// Create a new `Router`
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// windmark::router::Router::new(); 
+  /// ```
+  ///
+  /// # Panics
+  ///
+  /// if a default `SslAcceptor` could not be built.
+  #[must_use]
+  pub fn new() -> Self { Self::default() }
+
+  /// Set the filename of the private key file.
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// windmark::router::Router::new().set_private_key_file("windmark_private.pem");
+  /// ```
+  pub fn set_private_key_file(
+    &mut self,
+    private_key_file_name: impl Into<String> + AsRef<str>,
+  ) -> &mut Self {
+    self.private_key_file_name = private_key_file_name.into();
+
+    self
+  }
+
+  /// Set the content of the private key
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// windmark::router::Router::new().set_private_key("..."); 
+  /// ```
+  pub fn set_private_key(
+    &mut self,
+    private_key_content: impl Into<String> + AsRef<str>,
+  ) -> &mut Self {
+    self.private_key_content = Some(private_key_content.into());
+
+    self
+  }
+
+  /// Set the filename of the certificate chain file.
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// windmark::router::Router::new().set_certificate_file("windmark_public.pem");
+  /// ```
+  pub fn set_certificate_file(
+    &mut self,
+    certificate_name: impl Into<String> + AsRef<str>,
+  ) -> &mut Self {
+    self.certificate_file_name = certificate_name.into();
+
+    self
+  }
+
+  /// Set the content of the certificate chain file.
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// windmark::router::Router::new().set_certificate("..."); 
+  /// ```
+  pub fn set_certificate(
+    &mut self,
+    certificate_content: impl Into<String> + AsRef<str>,
+  ) -> &mut Self {
+    self.certificate_content = Some(certificate_content.into());
+
+    self
+  }
+
+  /// Map routes to URL paths
+  ///
+  /// Supports both synchronous and asynchronous handlers
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// use windmark::response::Response;
+  ///
+  /// windmark::router::Router::new()
+  ///   .mount("/", |_| {
+  ///     async { Response::success("This is the index page!") }
+  ///   })
+  ///   .mount("/about", |_| async { Response::success("About that...") });
+  /// ```
+  ///
+  /// # Panics
+  ///
+  /// May panic if the route cannot be mounted.
+  pub fn mount<R>(
+    &mut self,
+    route: impl Into<String> + AsRef<str>,
+    mut handler: impl FnMut(RouteContext) -> R + Send + Sync + 'static,
+  ) -> &mut Self
+  where
+    R: IntoFuture<Output = Response> + Send + 'static,
+    <R as IntoFuture>::IntoFuture: Send,
+  {
+    self
+      .routes
+      .insert(
+        route.into(),
+        Arc::new(AsyncMutex::new(Box::new(move |context: RouteContext| {
+          handler(context).into_future()
+        }))),
+      )
+      .expect("failed to mount route");
+
+    self
+  }
+
+  /// Create an error handler which will be displayed on any error.
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// windmark::router::Router::new().set_error_handler(|_| {
+  ///   windmark::response::Response::success("You have encountered an error!")
+  /// });
+  /// ```
+  pub fn set_error_handler<R>(
+    &mut self,
+    mut handler: impl FnMut(ErrorContext) -> R + Send + Sync + 'static,
+  ) -> &mut Self
+  where
+    R: IntoFuture<Output = Response> + Send + 'static,
+    <R as IntoFuture>::IntoFuture: Send,
+  {
+    self.error_handler = Arc::new(AsyncMutex::new(Box::new(move |context| {
+      handler(context).into_future()
+    })));
+
+    self
+  }
+
+  /// Add a header for the `Router` which should be displayed on every route.
+  ///
+  /// # Panics
+  ///
+  /// May panic if the header cannot be added.
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// windmark::router::Router::new().add_header(
+  ///   |context: windmark::context::RouteContext| {
+  ///     format!("This is displayed at the top of {}!", context.url.path())
+  ///   },
+  /// );
+  /// ```
+  pub fn add_header(&mut self, handler: impl Partial + 'static) -> &mut Self {
+    (*self.headers.lock().expect("headers lock poisoned"))
+      .push(Box::new(handler));
+
+    self
+  }
+
+  /// Add a footer for the `Router` which should be displayed on every route.
+  ///
+  /// # Panics
+  ///
+  /// May panic if the header cannot be added.
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// windmark::router::Router::new().add_footer(
+  ///   |context: windmark::context::RouteContext| {
+  ///     format!("This is displayed at the bottom of {}!", context.url.path())
+  ///   },
+  /// );
+  /// ```
+  pub fn add_footer(&mut self, handler: impl Partial + 'static) -> &mut Self {
+    (*self.footers.lock().expect("footers lock poisoned"))
+      .push(Box::new(handler));
+
+    self
+  }
+
+  /// Run the `Router` and wait for requests
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// windmark::router::Router::new().run(); 
+  /// ```
+  ///
+  /// # Panics
+  ///
+  /// if the client could not be accepted.
+  ///
+  /// # Errors
+  ///
+  /// if the `TcpListener` could not be bound.
+  pub async fn run(&mut self) -> Result<(), Box<dyn Error>> {
+    self.create_acceptor()?;
+
+    #[cfg(feature = "logger")]
+    if self.default_logger {
+      pretty_env_logger::formatted_builder()
+        .parse_filters(&self.log_filter)
+        .init();
+    }
+
+    #[cfg(feature = "tokio")]
+    let listener = tokio::net::TcpListener::bind(format!(
+      "{}:{}",
+      self.listener_address, self.port
+    ))
+    .await?;
+    #[cfg(feature = "async-std")]
+    let listener = async_std::net::TcpListener::bind(format!(
+      "{}:{}",
+      self.listener_address, self.port
+    ))
+    .await?;
+
+    #[cfg(feature = "logger")]
+    info!("windmark is listening for connections");
+
+    let handler = Arc::new(RequestHandler {
+      routes:              self.routes.clone(),
+      error_handler:       self.error_handler.clone(),
+      headers:             self.headers.clone(),
+      footers:             self.footers.clone(),
+      pre_route_callback:  self.pre_route_callback.clone(),
+      post_route_callback: self.post_route_callback.clone(),
+      character_set:       self.character_set.clone(),
+      languages:           self.languages.clone(),
+      async_modules:       self.async_modules.clone(),
+      modules:             self.modules.clone(),
+      options:             self.options.clone(),
+    });
+
+    loop {
+      match listener.accept().await {
+        Ok((stream, _)) => {
+          let handler = Arc::clone(&handler);
+          let acceptor = self.ssl_acceptor.clone();
+          #[cfg(feature = "tokio")]
+          let spawner = tokio::spawn;
+          #[cfg(feature = "async-std")]
+          let spawner = async_std::task::spawn;
+
+          spawner(async move {
+            let ssl = match ssl::Ssl::new(acceptor.context()) {
+              Ok(ssl) => ssl,
+              Err(e) => {
+                error!("ssl context error: {e:?}");
+
+                return;
+              }
+            };
+
+            #[cfg(feature = "tokio")]
+            let quick_stream = tokio_openssl::SslStream::new(ssl, stream);
+            #[cfg(feature = "async-std")]
+            let quick_stream = async_std_openssl::SslStream::new(ssl, stream);
+
+            match quick_stream {
+              Ok(mut stream) => {
+                if let Err(e) = std::pin::Pin::new(&mut stream).accept().await {
+                  warn!("stream accept error: {e:?}");
+                }
+
+                if let Err(e) = handler.handle(&mut stream).await {
+                  error!("handle error: {e}");
+                }
+              }
+              Err(e) => error!("ssl stream error: {e:?}"),
+            }
+          });
+        }
+        Err(e) => error!("tcp stream error: {e:?}"),
+      }
+    }
   }
 
   fn create_acceptor(&mut self) -> Result<(), Box<dyn Error>> {
