@@ -229,7 +229,7 @@ impl Router {
           handler(context).into_future()
         }))),
       )
-      .unwrap();
+      .expect("failed to mount route");
 
     self
   }
@@ -274,7 +274,8 @@ impl Router {
   /// );
   /// ```
   pub fn add_header(&mut self, handler: impl Partial + 'static) -> &mut Self {
-    (*self.headers.lock().unwrap()).push(Box::new(handler));
+    (*self.headers.lock().expect("headers lock poisoned"))
+      .push(Box::new(handler));
 
     self
   }
@@ -295,7 +296,8 @@ impl Router {
   /// );
   /// ```
   pub fn add_footer(&mut self, handler: impl Partial + 'static) -> &mut Self {
-    (*self.footers.lock().unwrap()).push(Box::new(handler));
+    (*self.footers.lock().expect("footers lock poisoned"))
+      .push(Box::new(handler));
 
     self
   }
@@ -532,7 +534,7 @@ impl Router {
       );
 
       {
-        let mut headers = self.headers.lock().unwrap();
+        let mut headers = self.headers.lock().expect("headers lock poisoned");
 
         for partial_header in &mut *headers {
           writeln!(
@@ -540,12 +542,12 @@ impl Router {
             "{}",
             partial_header.call(route_context.clone()),
           )
-          .unwrap();
+          .expect("failed to write header");
         }
       }
 
       {
-        let mut footers = self.footers.lock().unwrap();
+        let mut footers = self.footers.lock().expect("footers lock poisoned");
         let length = footers.len();
 
         for (i, partial_footer) in footers.iter_mut().enumerate() {
@@ -999,7 +1001,8 @@ impl Router {
   ) -> &mut Self {
     module.on_attach(self);
 
-    (*self.modules.lock().unwrap()).push(Box::new(module));
+    (*self.modules.lock().expect("modules lock poisoned"))
+      .push(Box::new(module));
 
     self
   }
@@ -1155,7 +1158,7 @@ impl Default for Router {
       footers: Arc::new(Mutex::new(vec![])),
       ssl_acceptor: Arc::new(
         SslAcceptor::mozilla_intermediate(SslMethod::tls())
-          .unwrap()
+          .expect("failed to create default SSL acceptor")
           .build(),
       ),
       #[cfg(feature = "logger")]
