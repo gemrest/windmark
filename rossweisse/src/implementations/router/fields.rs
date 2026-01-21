@@ -17,6 +17,7 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
+use syn::punctuated::Punctuated;
 
 pub fn fields(arguments: TokenStream, item: syn::ItemStruct) -> TokenStream {
   let field_initializers = syn::parse_macro_input!(
@@ -29,11 +30,11 @@ pub fn fields(arguments: TokenStream, item: syn::ItemStruct) -> TokenStream {
       (
         syn::FieldsNamed {
           brace_token: syn::token::Brace::default(),
-          named:       Default::default(),
+          named:       Punctuated::default(),
         },
         false,
       ),
-    _ =>
+    syn::Fields::Unnamed(_) =>
       panic!(
         "`#[rossweisse::router]` can only be used on `struct`s with named \
          fields or unit structs"
@@ -46,17 +47,19 @@ pub fn fields(arguments: TokenStream, item: syn::ItemStruct) -> TokenStream {
       .0
       .iter()
       .find(|initialiser| initialiser.ident == name.clone().unwrap())
-      .map(|initialiser| &initialiser.expr)
-      .unwrap_or_else(|| {
-        default_expressions.push({
-          let default_expression: syn::Expr =
-            syn::parse_quote! { ::std::default::Default::default() };
+      .map_or_else(
+        || {
+          default_expressions.push({
+            let default_expression: syn::Expr =
+              syn::parse_quote! { ::std::default::Default::default() };
 
-          default_expression
-        });
+            default_expression
+          });
 
-        default_expressions.last().unwrap()
-      });
+          default_expressions.last().unwrap()
+        },
+        |initialiser| &initialiser.expr,
+      );
 
     quote! {
         #name: #initialiser,

@@ -36,6 +36,10 @@ use syn::Item;
 /// Marks a `struct` as a router or marks an `impl` block as a router
 /// implementation
 ///
+/// # Panics
+///
+/// Panics if used on an item that is not a `struct` or `impl` block.
+///
 /// # Examples
 ///
 /// ```rust
@@ -57,16 +61,18 @@ use syn::Item;
 /// ```
 #[proc_macro_attribute]
 pub fn router(arguments: TokenStream, item: TokenStream) -> TokenStream {
-  let output = match syn::parse::<Item>(item.clone()) {
+  match syn::parse::<Item>(item) {
     Ok(Item::Struct(item)) => implementations::fields(arguments, item),
     Ok(Item::Impl(item)) => implementations::methods(arguments, item),
     _ => panic!("`#[rossweisse::router]` can only be used on `struct`s"),
-  };
-
-  output.into()
+  }
 }
 
 /// Marks a method of a router implementation as a route to mount
+///
+/// # Panics
+///
+/// Panics if used on an item that is not a function.
 ///
 /// # Examples
 ///
@@ -84,10 +90,8 @@ pub fn router(arguments: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn route(arguments: TokenStream, item: TokenStream) -> TokenStream {
-  let output = match syn::parse::<Item>(item.clone()) {
-    Ok(Item::Fn(item)) => implementations::route(arguments, item),
+  match syn::parse::<Item>(item) {
+    Ok(Item::Fn(ref item)) => implementations::route(arguments, item),
     _ => panic!("`#[rossweisse::route]` can only be used on `fn`s"),
-  };
-
-  output.into()
+  }
 }

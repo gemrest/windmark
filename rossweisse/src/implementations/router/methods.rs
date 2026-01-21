@@ -25,30 +25,25 @@ pub fn methods(
     .items
     .iter_mut()
     .filter_map(|item| {
-      if let syn::ImplItem::Fn(method) = item {
-        for attribute in method.attrs.iter() {
-          if attribute.path().is_ident("route") {
-            let arguments = quote::ToTokens::into_token_stream(attribute)
-              .to_string()
-              .trim_end_matches(")]")
-              .trim_start_matches("#[route(")
-              .to_string();
+      let syn::ImplItem::Fn(method) = item else {
+        return None;
+      };
+      let route_attrribute = method
+        .attrs
+        .iter()
+        .find(|attribute| attribute.path().is_ident("route"))?;
+      let arguments = quote::ToTokens::into_token_stream(route_attrribute)
+        .to_string()
+        .trim_end_matches(")]")
+        .trim_start_matches("#[route(")
+        .to_string();
 
-            if arguments == "index" {
-              method.sig.ident =
-                syn::Ident::new("__router_index", method.sig.ident.span());
-            }
-
-            return Some(method.sig.ident.clone());
-          } else {
-            return None;
-          }
-        }
-
-        None
-      } else {
-        None
+      if arguments == "index" {
+        method.sig.ident =
+          syn::Ident::new("__router_index", method.sig.ident.span());
       }
+
+      Some(method.sig.ident.clone())
     })
     .collect::<Vec<_>>();
   let (implementation_generics, type_generics, where_clause) =
@@ -60,7 +55,7 @@ pub fn methods(
       format!(
         "/{}",
         if route == "__router_index" {
-          "".to_string()
+          String::new()
         } else {
           route.to_string()
         }
