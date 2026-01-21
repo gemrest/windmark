@@ -20,7 +20,7 @@ categories = ["web-programming"]
 [features]
 default = ["tokio"]
 logger = ["pretty_env_logger"]
-auto-deduce-mime = ["tree_magic"]
+auto-deduce-mime = ["tree_magic_mini"]
 response-macros = []
 tokio = ["dep:tokio", "tokio-openssl"]
 async-std = ["dep:async-std", "async-std-openssl"]
@@ -51,7 +51,7 @@ log = "0.4.16"
 url = "2.2.2"
 matchit = "0.6.0"
 
-tree_magic = { version = "0.2.3", optional = true } # MIME
+tree_magic_mini = { version = "3.2.2", optional = true } # MIME
 
 paste = "1.0.12" # Token Pasting
 
