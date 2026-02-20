@@ -13,7 +13,7 @@ documentation = "https://docs.rs/windmark"
 readme = "README.md"
 homepage = "https://github.com/gemrest/windmark"
 repository = "https://github.com/gemrest/windmark"
-license = "GPL-3.0-only"
+license = "MIT OR Apache-2.0"
 keywords = ["gemini"]
 categories = ["web-programming"]
 
