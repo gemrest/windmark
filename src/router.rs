@@ -105,7 +105,7 @@ struct RequestHandler {
   pre_route_callback:  Arc<Box<dyn PreRouteHook>>,
   post_route_callback: Arc<Box<dyn PostRouteHook>>,
   character_set:       String,
-  languages:           Vec<String>,
+  languages_joined:    String,
   async_modules:       Arc<AsyncMutex<Vec<Box<dyn AsyncModule + Send>>>>,
   modules:             Arc<Mutex<Vec<Box<dyn Module + Send>>>>,
   options:             HashSet<RouterOption>,
@@ -275,10 +275,10 @@ impl RequestHandler {
           .character_set
           .as_deref()
           .unwrap_or(&self.character_set);
-        let lang = content
-          .languages
-          .as_ref()
-          .map_or_else(|| self.languages.join(","), |l| l.join(","));
+        let lang = content.languages.as_ref().map_or_else(
+          || std::borrow::Cow::Borrowed(self.languages_joined.as_str()),
+          |l| std::borrow::Cow::Owned(l.join(",")),
+        );
 
         format!("{status_code} {mime}; charset={charset}; lang={lang}")
       }
@@ -581,7 +581,7 @@ impl Router {
       pre_route_callback:  self.pre_route_callback.clone(),
       post_route_callback: self.post_route_callback.clone(),
       character_set:       self.character_set.clone(),
-      languages:           self.languages.clone(),
+      languages_joined:    self.languages.join(","),
       async_modules:       self.async_modules.clone(),
       modules:             self.modules.clone(),
       options:             self.options.clone(),
