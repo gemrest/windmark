@@ -12,7 +12,7 @@ impl windmark::module::Module for Clicker {
     println!("module 'clicker' has been attached!");
   }
 
-  fn on_pre_route(&mut self, context: HookContext) {
+  fn on_pre_route(&mut self, context: &HookContext) {
     self.clicks += 1;
 
     println!(
@@ -22,7 +22,7 @@ impl windmark::module::Module for Clicker {
     );
   }
 
-  fn on_post_route(&mut self, context: HookContext) {
+  fn on_post_route(&mut self, context: &HookContext) {
     println!(
       "module 'clicker' clicker has been called after the route '{}' with {} \
        clicks!",

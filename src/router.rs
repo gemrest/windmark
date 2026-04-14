@@ -197,22 +197,18 @@ impl RequestHandler {
       route.as_ref().ok().map(|route| route.params.clone()),
       peer_certificate.clone(),
     );
-    let hook_context_clone = hook_context.clone();
-
     for module in &mut *self.async_modules.lock().await {
-      module.on_pre_route(hook_context_clone.clone()).await;
+      module.on_pre_route(&hook_context).await;
     }
-
-    let hook_context_clone = hook_context.clone();
 
     if let Ok(mut modules) = self.modules.lock() {
       for module in &mut *modules {
-        module.on_pre_route(hook_context_clone.clone());
+        module.on_pre_route(&hook_context);
       }
     }
 
     if let Ok(mut callback) = self.pre_route_callback.lock() {
-      callback.call(hook_context.clone());
+      callback.call(&hook_context);
     }
 
     let mut content = if let Ok(ref route) = route {
@@ -266,22 +262,18 @@ impl RequestHandler {
         .await
     };
 
-    let hook_context_clone = hook_context.clone();
-
     for module in &mut *self.async_modules.lock().await {
-      module.on_post_route(hook_context_clone.clone()).await;
+      module.on_post_route(&hook_context).await;
     }
-
-    let hook_context_clone = hook_context.clone();
 
     if let Ok(mut modules) = self.modules.lock() {
       for module in &mut *modules {
-        module.on_post_route(hook_context_clone.clone());
+        module.on_post_route(&hook_context);
       }
     }
 
     if let Ok(mut callback) = self.post_route_callback.lock() {
-      callback.call(hook_context, &mut content);
+      callback.call(&hook_context, &mut content);
     }
 
     let status_code =
@@ -1138,9 +1130,11 @@ impl Default for Router {
       default_logger: false,
       #[cfg(feature = "logger")]
       log_filter: String::new(),
-      pre_route_callback: Arc::new(Mutex::new(Box::new(|_| {}))),
+      pre_route_callback: Arc::new(Mutex::new(Box::new(
+        (|_| {}) as fn(&HookContext),
+      ))),
       post_route_callback: Arc::new(Mutex::new(Box::new(
-        |_, _: &'_ mut Response| {},
+        (|_, _: &mut Response| {}) as fn(&HookContext, &mut Response),
       ))),
       character_set: "utf-8".to_string(),
       languages: vec!["en".to_string()],
