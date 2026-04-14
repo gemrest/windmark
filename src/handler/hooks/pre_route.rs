@@ -2,11 +2,11 @@ use crate::context::HookContext;
 
 #[allow(clippy::module_name_repetitions)]
 pub trait PreRouteHook: Send + Sync {
-  fn call(&mut self, context: &HookContext);
+  fn call(&self, context: &HookContext);
 }
 
 impl<T> PreRouteHook for T
-where T: FnMut(&HookContext) + Send + Sync
+where T: Fn(&HookContext) + Send + Sync
 {
-  fn call(&mut self, context: &HookContext) { (*self)(context) }
+  fn call(&self, context: &HookContext) { (*self)(context) }
 }

@@ -86,8 +86,8 @@ pub struct Router {
   default_logger:        bool,
   #[cfg(feature = "logger")]
   log_filter:            String,
-  pre_route_callback:    Arc<Mutex<Box<dyn PreRouteHook>>>,
-  post_route_callback:   Arc<Mutex<Box<dyn PostRouteHook>>>,
+  pre_route_callback:    Arc<Box<dyn PreRouteHook>>,
+  post_route_callback:   Arc<Box<dyn PostRouteHook>>,
   character_set:         String,
   languages:             Vec<String>,
   port:                  i32,
@@ -100,10 +100,10 @@ pub struct Router {
 struct RequestHandler {
   routes:              matchit::Router<Arc<Box<dyn RouteResponse>>>,
   error_handler:       Arc<Box<dyn ErrorResponse>>,
-  headers:             Arc<Mutex<Vec<Box<dyn Partial>>>>,
-  footers:             Arc<Mutex<Vec<Box<dyn Partial>>>>,
-  pre_route_callback:  Arc<Mutex<Box<dyn PreRouteHook>>>,
-  post_route_callback: Arc<Mutex<Box<dyn PostRouteHook>>>,
+  headers:             Arc<[Box<dyn Partial>]>,
+  footers:             Arc<[Box<dyn Partial>]>,
+  pre_route_callback:  Arc<Box<dyn PreRouteHook>>,
+  post_route_callback: Arc<Box<dyn PostRouteHook>>,
   character_set:       String,
   languages:           Vec<String>,
   async_modules:       Arc<AsyncMutex<Vec<Box<dyn AsyncModule + Send>>>>,
@@ -207,9 +207,7 @@ impl RequestHandler {
       }
     }
 
-    if let Ok(mut callback) = self.pre_route_callback.lock() {
-      callback.call(&hook_context);
-    }
+    self.pre_route_callback.call(&hook_context);
 
     let mut content = if let Ok(ref route) = route {
       let route_context = RouteContext::new(
@@ -219,20 +217,15 @@ impl RequestHandler {
         peer_certificate,
       );
 
-      {
-        let mut headers = self.headers.lock().expect("headers lock poisoned");
-
-        for partial_header in &mut *headers {
-          writeln!(&mut header, "{}", partial_header.call(&route_context),)
-            .expect("failed to write header");
-        }
+      for partial_header in self.headers.iter() {
+        writeln!(&mut header, "{}", partial_header.call(&route_context))
+          .expect("failed to write header");
       }
 
       {
-        let mut footers = self.footers.lock().expect("footers lock poisoned");
-        let length = footers.len();
+        let length = self.footers.len();
 
-        for (i, partial_footer) in footers.iter_mut().enumerate() {
+        for (i, partial_footer) in self.footers.iter().enumerate() {
           let _ = write!(
             &mut footer,
             "{}{}",
@@ -268,9 +261,7 @@ impl RequestHandler {
       }
     }
 
-    if let Ok(mut callback) = self.post_route_callback.lock() {
-      callback.call(&hook_context, &mut content);
-    }
+    self.post_route_callback.call(&hook_context, &mut content);
 
     let status_code =
       if content.status == 21 || content.status == 22 || content.status == 23 {
@@ -574,8 +565,20 @@ impl Router {
     let handler = Arc::new(RequestHandler {
       routes:              self.routes.clone(),
       error_handler:       self.error_handler.clone(),
-      headers:             self.headers.clone(),
-      footers:             self.footers.clone(),
+      headers:             self
+        .headers
+        .lock()
+        .expect("headers lock poisoned")
+        .drain(..)
+        .collect::<Vec<_>>()
+        .into(),
+      footers:             self
+        .footers
+        .lock()
+        .expect("footers lock poisoned")
+        .drain(..)
+        .collect::<Vec<_>>()
+        .into(),
       pre_route_callback:  self.pre_route_callback.clone(),
       post_route_callback: self.post_route_callback.clone(),
       character_set:       self.character_set.clone(),
@@ -763,7 +766,7 @@ impl Router {
     &mut self,
     callback: impl PreRouteHook + 'static,
   ) -> &mut Self {
-    self.pre_route_callback = Arc::new(Mutex::new(Box::new(callback)));
+    self.pre_route_callback = Arc::new(Box::new(callback));
 
     self
   }
@@ -789,7 +792,7 @@ impl Router {
     &mut self,
     callback: impl PostRouteHook + 'static,
   ) -> &mut Self {
-    self.post_route_callback = Arc::new(Mutex::new(Box::new(callback)));
+    self.post_route_callback = Arc::new(Box::new(callback));
 
     self
   }
@@ -1126,12 +1129,10 @@ impl Default for Router {
       default_logger: false,
       #[cfg(feature = "logger")]
       log_filter: String::new(),
-      pre_route_callback: Arc::new(Mutex::new(Box::new(
-        (|_| {}) as fn(&HookContext),
-      ))),
-      post_route_callback: Arc::new(Mutex::new(Box::new(
+      pre_route_callback: Arc::new(Box::new((|_| {}) as fn(&HookContext))),
+      post_route_callback: Arc::new(Box::new(
         (|_, _: &mut Response| {}) as fn(&HookContext, &mut Response),
-      ))),
+      )),
       character_set: "utf-8".to_string(),
       languages: vec!["en".to_string()],
       port: 1965,
