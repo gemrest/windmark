@@ -190,10 +190,9 @@ impl RequestHandler {
     }
 
     let peer_certificate = stream.ssl().peer_certificate();
-    let url_clone = url.clone();
     let hook_context = HookContext::new(
       stream.get_ref().peer_addr(),
-      url_clone.clone(),
+      url.clone(),
       route.as_ref().ok().map(|route| route.params.clone()),
       peer_certificate.clone(),
     );
@@ -212,7 +211,7 @@ impl RequestHandler {
     let mut content = if let Ok(ref route) = route {
       let route_context = RouteContext::new(
         stream.get_ref().peer_addr(),
-        url_clone,
+        url,
         &route.params,
         peer_certificate,
       );
@@ -245,7 +244,7 @@ impl RequestHandler {
         .error_handler
         .call(ErrorContext::new(
           stream.get_ref().peer_addr(),
-          url_clone,
+          url,
           peer_certificate,
         ))
         .await
