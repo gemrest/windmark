@@ -73,8 +73,8 @@ type Stream = async_std_openssl::SslStream<async_std::net::TcpStream>;
 /// response generation, panics, logging, and more.
 #[derive(Clone)]
 pub struct Router {
-  routes: matchit::Router<Arc<AsyncMutex<Box<dyn RouteResponse>>>>,
-  error_handler:         Arc<AsyncMutex<Box<dyn ErrorResponse>>>,
+  routes:                matchit::Router<Arc<Box<dyn RouteResponse>>>,
+  error_handler:         Arc<Box<dyn ErrorResponse>>,
   private_key_file_name: String,
   private_key_content:   Option<String>,
   certificate_file_name: String,
@@ -98,8 +98,8 @@ pub struct Router {
 }
 
 struct RequestHandler {
-  routes:              matchit::Router<Arc<AsyncMutex<Box<dyn RouteResponse>>>>,
-  error_handler:       Arc<AsyncMutex<Box<dyn ErrorResponse>>>,
+  routes:              matchit::Router<Arc<Box<dyn RouteResponse>>>,
+  error_handler:       Arc<Box<dyn ErrorResponse>>,
   headers:             Arc<Mutex<Vec<Box<dyn Partial>>>>,
   footers:             Arc<Mutex<Vec<Box<dyn Partial>>>>,
   pre_route_callback:  Arc<Mutex<Box<dyn PreRouteHook>>>,
@@ -254,14 +254,10 @@ impl RequestHandler {
         }
       }
 
-      let mut lock = (*route.value).lock().await;
-      let handler = lock.call(route_context);
-
-      handler.await
+      route.value.call(route_context).await
     } else {
-      (*self.error_handler)
-        .lock()
-        .await
+      self
+        .error_handler
         .call(ErrorContext::new(
           stream.get_ref().peer_addr(),
           url_clone,
@@ -460,7 +456,7 @@ impl Router {
   pub fn mount<R>(
     &mut self,
     route: impl Into<String> + AsRef<str>,
-    mut handler: impl FnMut(RouteContext) -> R + Send + Sync + 'static,
+    handler: impl Fn(RouteContext) -> R + Send + Sync + 'static,
   ) -> &mut Self
   where
     R: IntoFuture<Output = Response> + Send + 'static,
@@ -470,9 +466,9 @@ impl Router {
       .routes
       .insert(
         route.into(),
-        Arc::new(AsyncMutex::new(Box::new(move |context: RouteContext| {
+        Arc::new(Box::new(move |context: RouteContext| {
           handler(context).into_future()
-        }))),
+        })),
       )
       .expect("failed to mount route");
 
@@ -490,15 +486,14 @@ impl Router {
   /// ```
   pub fn set_error_handler<R>(
     &mut self,
-    mut handler: impl FnMut(ErrorContext) -> R + Send + Sync + 'static,
+    handler: impl Fn(ErrorContext) -> R + Send + Sync + 'static,
   ) -> &mut Self
   where
     R: IntoFuture<Output = Response> + Send + 'static,
     <R as IntoFuture>::IntoFuture: Send,
   {
-    self.error_handler = Arc::new(AsyncMutex::new(Box::new(move |context| {
-      handler(context).into_future()
-    })));
+    self.error_handler =
+      Arc::new(Box::new(move |context| handler(context).into_future()));
 
     self
   }
@@ -1123,13 +1118,13 @@ impl Default for Router {
   fn default() -> Self {
     Self {
       routes: matchit::Router::new(),
-      error_handler: Arc::new(AsyncMutex::new(Box::new(|_| {
+      error_handler: Arc::new(Box::new(|_| {
         async {
           Response::not_found(
             "This capsule has not implemented an error handler...",
           )
         }
-      }))),
+      })),
       private_key_file_name: String::new(),
       certificate_file_name: String::new(),
       headers: Arc::new(Mutex::new(vec![])),

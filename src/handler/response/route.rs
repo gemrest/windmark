@@ -5,16 +5,16 @@ use crate::{context::RouteContext, response::Response};
 #[allow(clippy::module_name_repetitions)]
 #[async_trait]
 pub trait RouteResponse: Send + Sync {
-  async fn call(&mut self, context: RouteContext) -> Response;
+  async fn call(&self, context: RouteContext) -> Response;
 }
 
 #[async_trait]
 impl<T, F> RouteResponse for T
 where
-  T: FnMut(RouteContext) -> F + Send + Sync,
+  T: Fn(RouteContext) -> F + Send + Sync,
   F: std::future::Future<Output = Response> + Send + 'static,
 {
-  async fn call(&mut self, context: RouteContext) -> Response {
+  async fn call(&self, context: RouteContext) -> Response {
     (*self)(context).await
   }
 }
