@@ -223,12 +223,8 @@ impl RequestHandler {
         let mut headers = self.headers.lock().expect("headers lock poisoned");
 
         for partial_header in &mut *headers {
-          writeln!(
-            &mut header,
-            "{}",
-            partial_header.call(route_context.clone()),
-          )
-          .expect("failed to write header");
+          writeln!(&mut header, "{}", partial_header.call(&route_context),)
+            .expect("failed to write header");
         }
       }
 
@@ -240,7 +236,7 @@ impl RequestHandler {
           let _ = write!(
             &mut footer,
             "{}{}",
-            partial_footer.call(route_context.clone()),
+            partial_footer.call(&route_context),
             if length > 1 && i != length - 1 {
               "\n"
             } else {
