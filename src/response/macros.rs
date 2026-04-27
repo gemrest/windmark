@@ -58,6 +58,7 @@ response!(
   proxy_refused,
   bad_request,
   client_certificate_required,
+  certificate_not_authorised,
   certificate_not_valid,
 );
 
