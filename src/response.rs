@@ -15,11 +15,14 @@ macro_rules! response {
 /// The content and response type a handler should reply with.
 #[derive(Clone)]
 pub struct Response {
-  pub status:        i32,
-  pub mime:          Option<String>,
-  pub content:       String,
-  pub character_set: Option<String>,
-  pub languages:     Option<Vec<String>>,
+  pub status:         i32,
+  pub mime:           Option<String>,
+  pub content:        String,
+  /// Raw body for status `21`/`22`; the router emits these bytes verbatim
+  /// instead of `content`.
+  pub binary_content: Option<Vec<u8>>,
+  pub character_set:  Option<String>,
+  pub languages:      Option<Vec<String>>,
 }
 
 impl Response {
@@ -74,7 +77,9 @@ impl Response {
     content: impl AsRef<[u8]>,
     mime: impl Into<String> + AsRef<str>,
   ) -> Self {
-    let mut response = Self::new(21, String::from_utf8_lossy(content.as_ref()));
+    let mut response = Self::new(21, String::new());
+
+    response.binary_content = Some(content.as_ref().to_vec());
 
     response.with_mime(mime);
 
@@ -84,9 +89,11 @@ impl Response {
   #[cfg(feature = "auto-deduce-mime")]
   #[must_use]
   pub fn binary_success_auto(content: &[u8]) -> Self {
-    let mut response = Self::new(22, String::from_utf8_lossy(content));
+    let mut response = Self::new(22, String::new());
 
     response.with_mime(tree_magic_mini::from_u8(content));
+
+    response.binary_content = Some(content.to_vec());
 
     response
   }
@@ -97,8 +104,30 @@ impl Response {
       status,
       mime: None,
       content: content.into(),
+      binary_content: None,
       character_set: None,
       languages: None,
+    }
+  }
+
+  #[doc(hidden)]
+  #[must_use]
+  pub fn serialize_body(self, header: &str, footer: &str) -> Vec<u8> {
+    match self.status {
+      20 => {
+        let mut body = Vec::with_capacity(
+          header.len() + self.content.len() + footer.len() + 1,
+        );
+
+        body.extend_from_slice(header.as_bytes());
+        body.extend_from_slice(self.content.as_bytes());
+        body.push(b'\n');
+        body.extend_from_slice(footer.as_bytes());
+
+        body
+      }
+      21 | 22 => self.binary_content.unwrap_or_default(),
+      _ => Vec::new(),
     }
   }
 

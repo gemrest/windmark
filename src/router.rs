@@ -301,29 +301,13 @@ impl RequestHandler {
         format!("{} {}", status_code, content.content)
       }
     };
-    let body = match content.status {
-      20 => {
-        let mut body = String::with_capacity(
-          header.len() + content.content.len() + footer.len() + 1,
-        );
+    let body = content.serialize_body(&header, &footer);
+    let mut response = Vec::with_capacity(status_line.len() + body.len() + 2);
 
-        body.push_str(&header);
-        body.push_str(&content.content);
-        body.push('\n');
-        body.push_str(&footer);
-
-        body
-      }
-      21 | 22 => content.content,
-      _ => String::new(),
-    };
-    let mut response =
-      String::with_capacity(status_line.len() + body.len() + 2);
-
-    response.push_str(&status_line);
-    response.push_str("\r\n");
-    response.push_str(&body);
-    stream.write_all(response.as_bytes()).await?;
+    response.extend_from_slice(status_line.as_bytes());
+    response.extend_from_slice(b"\r\n");
+    response.extend_from_slice(&body);
+    stream.write_all(&response).await?;
     #[cfg(feature = "tokio")]
     stream.shutdown().await?;
     #[cfg(feature = "async-std")]
