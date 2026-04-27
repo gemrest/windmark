@@ -14,6 +14,7 @@ macro_rules! response {
 
 /// The content and response type a handler should reply with.
 #[derive(Clone)]
+#[non_exhaustive]
 pub struct Response {
   pub status:         i32,
   pub mime:           Option<String>,
