@@ -33,3 +33,10 @@ jobs:
         with:
           command: check
           args: --verbose
+
+      - name: Test 🧪
+        uses: actions-rs/cargo@v1
+        continue-on-error: false
+        with:
+          command: test
+          args: --verbose --features auto-deduce-mime
