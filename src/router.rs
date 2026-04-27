@@ -660,7 +660,7 @@ impl Router {
   ///
   /// # Examples
   ///
-  /// ```rust
+  /// ```rust,no_run
   /// use openssl::ssl;
   ///
   /// windmark::router::Router::new().set_ssl_acceptor({
