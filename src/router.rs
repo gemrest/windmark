@@ -470,7 +470,7 @@ impl Router {
   ///
   /// ```rust
   /// windmark::router::Router::new().add_header(
-  ///   |context: windmark::context::RouteContext| {
+  ///   |context: &windmark::context::RouteContext| {
   ///     format!("This is displayed at the top of {}!", context.url.path())
   ///   },
   /// );
@@ -492,7 +492,7 @@ impl Router {
   ///
   /// ```rust
   /// windmark::router::Router::new().add_footer(
-  ///   |context: windmark::context::RouteContext| {
+  ///   |context: &windmark::context::RouteContext| {
   ///     format!("This is displayed at the bottom of {}!", context.url.path())
   ///   },
   /// );
@@ -737,7 +737,7 @@ impl Router {
   /// use log::info;
   ///
   /// windmark::router::Router::new().set_pre_route_callback(
-  ///   |context: windmark::context::HookContext| {
+  ///   |context: &windmark::context::HookContext| {
   ///     info!(
   ///       "accepted connection from {}",
   ///       context.peer_address.unwrap().ip(),
@@ -762,7 +762,7 @@ impl Router {
   /// use log::info;
   ///
   /// windmark::router::Router::new().set_post_route_callback(
-  ///   |context: windmark::context::HookContext,
+  ///   |context: &windmark::context::HookContext,
   ///    _content: &mut windmark::response::Response| {
   ///     info!(
   ///       "closed connection from {}",
@@ -859,7 +859,7 @@ impl Router {
   ///     info!("clicker has been attached!");
   ///   }
   ///
-  ///   async fn on_pre_route(&mut self, context: HookContext) {
+  ///   async fn on_pre_route(&mut self, context: &HookContext) {
   ///     self.clicks += 1;
   ///
   ///     info!(
@@ -869,7 +869,7 @@ impl Router {
   ///     );
   ///   }
   ///
-  ///   async fn on_post_route(&mut self, context: HookContext) {
+  ///   async fn on_post_route(&mut self, context: &HookContext) {
   ///     info!(
   ///       "clicker has been called post-route on {} with {} clicks!",
   ///       context.url.path(),
@@ -921,7 +921,7 @@ impl Router {
   ///     info!("clicker has been attached!");
   ///   }
   ///
-  ///   fn on_pre_route(&mut self, context: HookContext) {
+  ///   fn on_pre_route(&mut self, context: &HookContext) {
   ///     self.clicks += 1;
   ///
   ///     info!(
@@ -931,7 +931,7 @@ impl Router {
   ///     );
   ///   }
   ///
-  ///   fn on_post_route(&mut self, context: HookContext) {
+  ///   fn on_post_route(&mut self, context: &HookContext) {
   ///     info!(
   ///       "clicker has been called post-route on {} with {} clicks!",
   ///       context.url.path(),

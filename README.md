@@ -50,7 +50,7 @@ tokio = { version = "1.26.0", features = ["full"] }
 
 ### Implementing a Windmark Server
 
-```rust
+```rust,no_run
 // src/main.rs
 
 use windmark::response::Response;
