@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "*"
+      - "**"
   pull_request:
     paths:
-      - "*"
+      - "**"
 
 env:
   CARGO_TERM_COLOR: always
