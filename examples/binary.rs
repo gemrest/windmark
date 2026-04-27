@@ -11,10 +11,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   router.set_certificate_file("windmark_public.pem");
   #[cfg(feature = "auto-deduce-mime")]
   router.mount("/automatic", {
-    windmark::binary_success!(include_bytes!("../LICENSE"))
+    windmark::binary_success!(include_bytes!("../LICENSE-MIT"))
   });
   router.mount("/specific", {
-    windmark::binary_success!(include_bytes!("../LICENSE"), "text/plain")
+    windmark::binary_success!(include_bytes!("../LICENSE-MIT"), "text/plain")
   });
   router.mount("/direct", {
     windmark::binary_success!("This is a string.", "text/plain")
