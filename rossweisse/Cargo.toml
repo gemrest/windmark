@@ -9,7 +9,7 @@ description = "`struct`-based Router Framework for Windmark"
 documentation = "https://docs.rs/rossweisse"
 readme = "README.md"
 repository = "https://github.com/gemrest/windmark"
-license = "GPL-3.0-only"
+license = "MIT OR Apache-2.0"
 keywords = ["gemini", "windmark"]
 categories = ["network-programming"]
 
