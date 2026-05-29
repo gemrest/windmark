@@ -12,10 +12,20 @@
 #![allow(clippy::module_name_repetitions)]
 #![doc = include_str!("../README.md")]
 
+#[cfg(all(feature = "tokio", feature = "async-std"))]
+compile_error!(
+  "the `tokio` and `async-std` features are mutually exclusive; enable \
+   exactly one (windmark enables `tokio` by default, so set `default-features \
+   = false` to use `async-std`)"
+);
+#[cfg(not(any(feature = "tokio", feature = "async-std")))]
+compile_error!(
+  "a runtime feature must be enabled: `tokio` (the default) or `async-std`"
+);
+
 pub mod context;
 pub mod handler;
 pub mod module;
-#[cfg(feature = "prelude")]
 pub mod prelude;
 pub mod response;
 pub mod router;

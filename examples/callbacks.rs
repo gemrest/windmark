@@ -1,4 +1,4 @@
-//! `cargo run --example callbacks`
+//! `cargo run --example callbacks --features response-macros`
 
 use windmark::context::HookContext;
 

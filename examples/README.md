@@ -27,7 +27,7 @@ and automatic mime resolution (`--features auto-deduce-mime`).
 
 ## [Callbacks](./callbacks.rs)
 
-`cargo run --example callbacks`
+`cargo run --example callbacks --features response-macros`
 
 Demonstrates use of the pre and post-route callback handlers.
 
@@ -85,7 +85,7 @@ Demonstrate the use of route parameters (not URL queries).
 
 ## [Partial](./partial.rs)
 
-`cargo run --example partial`
+`cargo run --example partial --features response-macros`
 
 Demonstrates use of appending headers and footers to routes, globally.
 
@@ -93,7 +93,7 @@ If you would like to conditionally append headers and footers based on route, pl
 
 ## [Query](./query.rs)
 
-`cargo run --example input --features response-macros`
+`cargo run --example query --features response-macros`
 
 Demonstrates the inspection of URL queries parameters.
 
@@ -105,7 +105,7 @@ Demonstrates the use of a wide variety of responses, additionally exposing the f
 
 ## [Simple `async-std`](./simple_async_std.rs)
 
-`cargo run --example simple_async_std --features async-std`
+`cargo run --example simple_async_std --no-default-features --features async-std`
 
 Demonstrates how to explicitly specify Windmark to use the [`async-std`](https://github.com/async-rs/async-std) runtime.
 
@@ -113,7 +113,7 @@ If the `async-std` feature is NOT enabled, Windmark will default to using Tokio 
 
 ## [Simple Tokio](./simple_tokio.rs)
 
-`cargo run --example simple_async_std --features async-std`
+`cargo run --example simple_tokio`
 
 Demonstrates how to explicitly specify Windmark to use the [Tokio](https://github.com/tokio-rs/tokio) runtime.
 

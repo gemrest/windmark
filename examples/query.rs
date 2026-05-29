@@ -1,4 +1,4 @@
-//! `cargo run --example input --features response-macros`
+//! `cargo run --example query --features response-macros`
 
 #[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

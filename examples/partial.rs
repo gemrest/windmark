@@ -1,4 +1,4 @@
-//! `cargo run --example partial`
+//! `cargo run --example partial --features response-macros`
 
 #[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

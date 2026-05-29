@@ -1,4 +1,5 @@
-//! `cargo run --example simple_async_std --features async-std`
+//! `cargo run --example simple_async_std --no-default-features --features
+//! async-std`
 
 #[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
