@@ -617,6 +617,8 @@ impl Router {
               Ok(mut stream) => {
                 if let Err(e) = std::pin::Pin::new(&mut stream).accept().await {
                   warn!("stream accept error: {e:?}");
+
+                  return;
                 }
 
                 if let Err(e) = handler.handle(&mut stream).await {
