@@ -11,17 +11,15 @@ pub fn methods(
       let syn::ImplItem::Fn(method) = item else {
         return None;
       };
-      let route_attrribute = method
+      let route_attribute = method
         .attrs
         .iter()
         .find(|attribute| attribute.path().is_ident("route"))?;
-      let arguments = quote::ToTokens::into_token_stream(route_attrribute)
-        .to_string()
-        .trim_end_matches(")]")
-        .trim_start_matches("#[route(")
-        .to_string();
+      let is_index = route_attribute
+        .parse_args::<syn::Ident>()
+        .is_ok_and(|argument| argument == "index");
 
-      if arguments == "index" {
+      if is_index {
         method.sig.ident =
           syn::Ident::new("__router_index", method.sig.ident.span());
       }
