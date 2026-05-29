@@ -119,30 +119,41 @@ impl RequestHandler {
   )]
   async fn handle(&self, stream: &mut Stream) -> Result<(), Box<dyn Error>> {
     let mut buffer = [0u8; 1024];
-    let mut url = Url::parse("gemini://fuwn.me/")?;
     let mut footer = String::new();
     let mut header = String::new();
+    let mut request = String::new();
 
-    while let Ok(size) = stream.read(&mut buffer).await {
-      let request = or_error!(
+    let mut url = loop {
+      let size = match stream.read(&mut buffer).await {
+        Ok(0) | Err(_) => return Ok(()),
+        Ok(size) => size,
+      };
+
+      request.push_str(or_error!(
         stream,
-        std::str::from_utf8(&buffer[0..size]).map(ToString::to_string),
+        std::str::from_utf8(&buffer[0..size]),
         "59 The server (Windmark) received a bad request: {}"
-      );
-      let request_trimmed = request
-        .find("\r\n")
-        .map_or(&request[..], |pos| &request[..pos]);
+      ));
 
-      url = or_error!(
-        stream,
-        Url::parse(request_trimmed),
-        "59 The server (Windmark) received a bad request: {}"
-      );
+      if request.len() > 1024 {
+        stream
+          .write_all(
+            b"59 The server (Windmark) received a request exceeding 1024 \
+              bytes\r\n",
+          )
+          .await?;
 
-      if request.contains("\r\n") {
-        break;
+        return Ok(());
       }
-    }
+
+      if let Some(position) = request.find("\r\n") {
+        break or_error!(
+          stream,
+          Url::parse(&request[..position]),
+          "59 The server (Windmark) received a bad request: {}"
+        );
+      }
+    };
 
     if url.path().is_empty() {
       url.set_path("/");
