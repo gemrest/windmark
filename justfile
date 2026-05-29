@@ -10,12 +10,14 @@ default:
 fetch:
   curl https://raw.githubusercontent.com/Fuwn/justfiles/refs/heads/main/cargo.just > cargo.just
 
+# `cargo fmt` resolves `rustfmt` via PATH, so prepend the nightly toolchain's
+# bin to reach nightly rustfmt (the unstable rustfmt.toml options need it).
 fmt:
-  cargo +nightly fmt
+  PATH="$(dirname "$(rustup which --toolchain nightly rustfmt)"):$PATH" cargo fmt
 
 [private]
 generic-task task async-feature:
-  cargo +nightly {{ task }} --no-default-features \
+  rustup run nightly cargo {{ task }} --no-default-features \
     {{ default-features }}{{ async-feature }}
 
 check async-feature:
@@ -38,7 +40,7 @@ checkfc:
   @just clippy async-std
 
 docs:
-  cargo +nightly doc --open --no-deps
+  rustup run nightly cargo doc --open --no-deps
 
 example example async-feature="tokio":
   cargo run --example {{ example }} --no-default-features \
