@@ -710,7 +710,10 @@ impl Router {
   #[cfg(feature = "logger")]
   pub fn enable_default_logger(&mut self, enable: bool) -> &mut Self {
     self.default_logger = enable;
-    self.log_filter = "windmark=trace".to_string();
+
+    if self.log_filter.is_empty() {
+      self.log_filter = "windmark=trace".to_string();
+    }
 
     self
   }
