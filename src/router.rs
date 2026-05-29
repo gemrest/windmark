@@ -274,12 +274,11 @@ impl RequestHandler {
 
     self.post_route_callback.call(&hook_context, &mut content);
 
-    let status_code =
-      if content.status == 21 || content.status == 22 || content.status == 23 {
-        20
-      } else {
-        content.status
-      };
+    let status_code = if content.status == 21 || content.status == 22 {
+      20
+    } else {
+      content.status
+    };
     let status_line = match content.status {
       20 => {
         let mime = content.mime.as_deref().unwrap_or("text/gemini");
