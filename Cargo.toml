@@ -48,7 +48,7 @@ log = "0.4.30"
 
 # URL
 url = "2.2.2"
-matchit = "0.6.0"
+matchit = "0.7.3"
 
 tree_magic_mini = { version = "3.2.2", optional = true } # MIME
 
