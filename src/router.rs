@@ -310,7 +310,11 @@ impl RequestHandler {
         )
       }
       _ => {
-        format!("{} {}", status_code, content.content)
+        format!(
+          "{} {}",
+          status_code,
+          content.content.lines().next().unwrap_or_default()
+        )
       }
     };
     let body = content.serialize_body(&header, &footer);
