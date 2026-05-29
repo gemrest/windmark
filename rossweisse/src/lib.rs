@@ -9,7 +9,6 @@
   unused,
   warnings
 )]
-#![recursion_limit = "128"]
 
 mod implementations;
 

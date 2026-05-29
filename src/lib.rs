@@ -11,7 +11,6 @@
 )]
 #![allow(clippy::module_name_repetitions)]
 #![doc = include_str!("../README.md")]
-#![recursion_limit = "128"]
 
 pub mod context;
 pub mod handler;

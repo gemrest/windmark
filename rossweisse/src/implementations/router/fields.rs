@@ -23,25 +23,15 @@ pub fn fields(arguments: TokenStream, item: syn::ItemStruct) -> TokenStream {
          fields or unit structs"
       ),
   };
-  let mut default_expressions = vec![];
   let new_method_fields = named_fields.named.iter().map(|field| {
     let name = &field.ident;
-    let initialiser = field_initializers
+    let initialiser: syn::Expr = field_initializers
       .0
       .iter()
-      .find(|initialiser| initialiser.ident == name.clone().unwrap())
+      .find(|initialiser| name.as_ref() == Some(&initialiser.ident))
       .map_or_else(
-        || {
-          default_expressions.push({
-            let default_expression: syn::Expr =
-              syn::parse_quote! { ::std::default::Default::default() };
-
-            default_expression
-          });
-
-          default_expressions.last().unwrap()
-        },
-        |initialiser| &initialiser.expr,
+        || syn::parse_quote! { ::std::default::Default::default() },
+        |initialiser| initialiser.expr.clone(),
       );
 
     quote! {

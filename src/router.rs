@@ -56,8 +56,6 @@ macro_rules! or_error {
           .write_all(format!($error_format, e).as_bytes())
           .await?;
 
-        // $stream.shutdown().await?;
-
         return Ok(());
       }
     }
@@ -233,22 +231,12 @@ impl RequestHandler {
           .expect("failed to write header");
       }
 
-      {
-        let length = self.footers.len();
-
-        for (i, partial_footer) in self.footers.iter().enumerate() {
-          let _ = write!(
-            &mut footer,
-            "{}{}",
-            partial_footer.call(&route_context),
-            if length > 1 && i != length - 1 {
-              "\n"
-            } else {
-              ""
-            },
-          );
-        }
-      }
+      footer = self
+        .footers
+        .iter()
+        .map(|partial_footer| partial_footer.call(&route_context))
+        .collect::<Vec<_>>()
+        .join("\n");
 
       route.value.call(route_context).await
     } else {
