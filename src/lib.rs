@@ -9,6 +9,7 @@
   unused,
   warnings
 )]
+#![allow(clippy::module_name_repetitions)]
 #![doc = include_str!("../README.md")]
 #![recursion_limit = "128"]
 
