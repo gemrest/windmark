@@ -63,14 +63,7 @@ impl Response {
 
   #[allow(clippy::needless_pass_by_value)]
   pub fn success(content: impl ToString) -> Self {
-    let mut response = Self::new(20, content.to_string());
-
-    response
-      .with_mime("text/gemini")
-      .with_languages(["en"])
-      .with_character_set("utf-8");
-
-    response
+    Self::new(20, content.to_string())
   }
 
   #[must_use]
