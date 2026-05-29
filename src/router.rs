@@ -82,6 +82,7 @@ pub struct Router {
   headers:               Arc<Mutex<Vec<Box<dyn Partial>>>>,
   footers:               Arc<Mutex<Vec<Box<dyn Partial>>>>,
   ssl_acceptor:          Arc<SslAcceptor>,
+  manual_acceptor_set:   bool,
   #[cfg(feature = "logger")]
   default_logger:        bool,
   #[cfg(feature = "logger")]
@@ -531,7 +532,9 @@ impl Router {
   ///
   /// if the `TcpListener` could not be bound.
   pub async fn run(&mut self) -> Result<(), Box<dyn Error>> {
-    self.create_acceptor()?;
+    if !self.manual_acceptor_set {
+      self.create_acceptor()?;
+    }
 
     #[cfg(feature = "logger")]
     if self.default_logger {
@@ -691,6 +694,7 @@ impl Router {
   /// ```
   pub fn set_ssl_acceptor(&mut self, ssl_acceptor: SslAcceptor) -> &mut Self {
     self.ssl_acceptor = Arc::new(ssl_acceptor);
+    self.manual_acceptor_set = true;
 
     self
   }
@@ -1119,6 +1123,7 @@ impl Default for Router {
           .expect("failed to create default SSL acceptor")
           .build(),
       ),
+      manual_acceptor_set: false,
       #[cfg(feature = "logger")]
       default_logger: false,
       #[cfg(feature = "logger")]
