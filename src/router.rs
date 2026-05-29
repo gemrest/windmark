@@ -91,7 +91,7 @@ pub struct Router {
   post_route_callback:   Arc<Box<dyn PostRouteHook>>,
   character_set:         String,
   languages:             Vec<String>,
-  port:                  i32,
+  port:                  u16,
   async_modules:         Arc<AsyncMutex<Vec<Box<dyn AsyncModule + Send>>>>,
   modules:               Arc<Mutex<Vec<Box<dyn Module + Send>>>>,
   options:               HashSet<RouterOption>,
@@ -1023,7 +1023,7 @@ impl Router {
   /// ```rust
   /// windmark::router::Router::new().set_port(1965); 
   /// ```
-  pub const fn set_port(&mut self, port: i32) -> &mut Self {
+  pub const fn set_port(&mut self, port: u16) -> &mut Self {
     self.port = port;
 
     self
