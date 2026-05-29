@@ -73,8 +73,8 @@ type Stream = async_std_openssl::SslStream<async_std::net::TcpStream>;
 /// response generation, panics, logging, and more.
 #[derive(Clone)]
 pub struct Router {
-  routes:                matchit::Router<Arc<Box<dyn RouteResponse>>>,
-  error_handler:         Arc<Box<dyn ErrorResponse>>,
+  routes:                matchit::Router<Arc<dyn RouteResponse>>,
+  error_handler:         Arc<dyn ErrorResponse>,
   private_key_file_name: String,
   private_key_content:   Option<String>,
   certificate_file_name: String,
@@ -87,8 +87,8 @@ pub struct Router {
   default_logger:        bool,
   #[cfg(feature = "logger")]
   log_filter:            String,
-  pre_route_callback:    Arc<Box<dyn PreRouteHook>>,
-  post_route_callback:   Arc<Box<dyn PostRouteHook>>,
+  pre_route_callback:    Arc<dyn PreRouteHook>,
+  post_route_callback:   Arc<dyn PostRouteHook>,
   character_set:         String,
   languages:             Vec<String>,
   port:                  u16,
@@ -99,12 +99,12 @@ pub struct Router {
 }
 
 struct RequestHandler {
-  routes:              matchit::Router<Arc<Box<dyn RouteResponse>>>,
-  error_handler:       Arc<Box<dyn ErrorResponse>>,
+  routes:              matchit::Router<Arc<dyn RouteResponse>>,
+  error_handler:       Arc<dyn ErrorResponse>,
   headers:             Arc<[Box<dyn Partial>]>,
   footers:             Arc<[Box<dyn Partial>]>,
-  pre_route_callback:  Arc<Box<dyn PreRouteHook>>,
-  post_route_callback: Arc<Box<dyn PostRouteHook>>,
+  pre_route_callback:  Arc<dyn PreRouteHook>,
+  post_route_callback: Arc<dyn PostRouteHook>,
   character_set:       String,
   languages_joined:    String,
   async_modules:       Arc<AsyncMutex<Vec<Box<dyn AsyncModule + Send>>>>,
@@ -443,9 +443,7 @@ impl Router {
       .routes
       .insert(
         route.into(),
-        Arc::new(Box::new(move |context: RouteContext| {
-          handler(context).into_future()
-        })),
+        Arc::new(move |context: RouteContext| handler(context).into_future()),
       )
       .expect("failed to mount route");
 
@@ -470,7 +468,7 @@ impl Router {
     <R as IntoFuture>::IntoFuture: Send,
   {
     self.error_handler =
-      Arc::new(Box::new(move |context| handler(context).into_future()));
+      Arc::new(move |context| handler(context).into_future());
 
     self
   }
@@ -772,7 +770,7 @@ impl Router {
     &mut self,
     callback: impl PreRouteHook + 'static,
   ) -> &mut Self {
-    self.pre_route_callback = Arc::new(Box::new(callback));
+    self.pre_route_callback = Arc::new(callback);
 
     self
   }
@@ -798,7 +796,7 @@ impl Router {
     &mut self,
     callback: impl PostRouteHook + 'static,
   ) -> &mut Self {
-    self.post_route_callback = Arc::new(Box::new(callback));
+    self.post_route_callback = Arc::new(callback);
 
     self
   }
@@ -1115,13 +1113,13 @@ impl Default for Router {
   fn default() -> Self {
     Self {
       routes: matchit::Router::new(),
-      error_handler: Arc::new(Box::new(|_| {
+      error_handler: Arc::new(|_| {
         async {
           Response::not_found(
             "This capsule has not implemented an error handler...",
           )
         }
-      })),
+      }),
       private_key_file_name: String::new(),
       certificate_file_name: String::new(),
       headers: Arc::new(Mutex::new(vec![])),
@@ -1136,10 +1134,10 @@ impl Default for Router {
       default_logger: false,
       #[cfg(feature = "logger")]
       log_filter: String::new(),
-      pre_route_callback: Arc::new(Box::new((|_| {}) as fn(&HookContext))),
-      post_route_callback: Arc::new(Box::new(
+      pre_route_callback: Arc::new((|_| {}) as fn(&HookContext)),
+      post_route_callback: Arc::new(
         (|_, _: &mut Response| {}) as fn(&HookContext, &mut Response),
-      )),
+      ),
       character_set: "utf-8".to_string(),
       languages: vec!["en".to_string()],
       port: 1965,
