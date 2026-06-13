@@ -63,9 +63,14 @@ macro_rules! or_error {
 }
 
 #[cfg(feature = "tokio")]
-type Stream = tokio_openssl::SslStream<tokio::net::TcpStream>;
+type TcpStream = tokio::net::TcpStream;
 #[cfg(feature = "async-std")]
-type Stream = async_std_openssl::SslStream<async_std::net::TcpStream>;
+type TcpStream = async_std::net::TcpStream;
+
+#[cfg(feature = "tokio")]
+type Stream = tokio_openssl::SslStream<TcpStream>;
+#[cfg(feature = "async-std")]
+type Stream = async_std_openssl::SslStream<TcpStream>;
 
 /// A router which takes care of all tasks a Windmark server should handle:
 /// response generation, panics, logging, and more.
@@ -158,9 +163,10 @@ impl RequestHandler {
       url.set_path("/");
     }
 
-    let route_path = resolve_lookup_path(&self.options, url.path(), |candidate| {
-      self.routes.at(candidate).is_ok()
-    });
+    let route_path =
+      resolve_lookup_path(&self.options, url.path(), |candidate| {
+        self.routes.at(candidate).is_ok()
+      });
     let route = self.routes.at(&route_path);
 
     let peer_certificate = stream.ssl().peer_certificate();
@@ -282,6 +288,50 @@ impl RequestHandler {
 
     Ok(())
   }
+}
+
+/// Spawn a task to complete the TLS handshake on an accepted connection and
+/// dispatch it through `handler`.
+fn spawn_connection(
+  handler: Arc<RequestHandler>,
+  acceptor: Arc<SslAcceptor>,
+  stream: TcpStream,
+) {
+  #[cfg(feature = "tokio")]
+  let spawner = tokio::spawn;
+  #[cfg(feature = "async-std")]
+  let spawner = async_std::task::spawn;
+
+  spawner(async move {
+    let ssl = match ssl::Ssl::new(acceptor.context()) {
+      Ok(ssl) => ssl,
+      Err(e) => {
+        error!("ssl context error: {e:?}");
+
+        return;
+      }
+    };
+
+    #[cfg(feature = "tokio")]
+    let quick_stream = tokio_openssl::SslStream::new(ssl, stream);
+    #[cfg(feature = "async-std")]
+    let quick_stream = async_std_openssl::SslStream::new(ssl, stream);
+
+    match quick_stream {
+      Ok(mut stream) => {
+        if let Err(e) = std::pin::Pin::new(&mut stream).accept().await {
+          warn!("stream accept error: {e:?}");
+
+          return;
+        }
+
+        if let Err(e) = handler.handle(&mut stream).await {
+          error!("handle error: {e}");
+        }
+      }
+      Err(e) => error!("ssl stream error: {e:?}"),
+    }
+  });
 }
 
 /// Resolve which path an incoming request should be matched against, applying
@@ -514,6 +564,11 @@ impl Router {
 
   /// Run the `Router` and wait for requests
   ///
+  /// Under the default Tokio runtime, the server runs until it receives an
+  /// interrupt (Ctrl+C / SIGINT), at which point it stops accepting new
+  /// connections and returns. The `async-std` runtime runs until the process
+  /// is terminated.
+  ///
   /// # Examples
   ///
   /// ```rust
@@ -581,47 +636,37 @@ impl Router {
       options:             self.options.clone(),
     });
 
+    let acceptor = self.ssl_acceptor.clone();
+
+    // Under Tokio, accept connections until interrupted (Ctrl+C / SIGINT) so
+    // the server can shut down gracefully; `async-std` has no built-in signal
+    // handling, so it keeps the original unconditional accept loop.
+    #[cfg(feature = "tokio")]
+    {
+      loop {
+        tokio::select! {
+          connection = listener.accept() => match connection {
+            Ok((stream, _)) =>
+              spawn_connection(handler.clone(), acceptor.clone(), stream),
+            Err(e) => error!("tcp stream error: {e:?}"),
+          },
+          _ = tokio::signal::ctrl_c() => {
+            #[cfg(feature = "logger")]
+            info!("windmark received an interrupt; shutting down");
+
+            break;
+          }
+        }
+      }
+
+      Ok(())
+    }
+
+    #[cfg(feature = "async-std")]
     loop {
       match listener.accept().await {
-        Ok((stream, _)) => {
-          let handler = Arc::clone(&handler);
-          let acceptor = self.ssl_acceptor.clone();
-          #[cfg(feature = "tokio")]
-          let spawner = tokio::spawn;
-          #[cfg(feature = "async-std")]
-          let spawner = async_std::task::spawn;
-
-          spawner(async move {
-            let ssl = match ssl::Ssl::new(acceptor.context()) {
-              Ok(ssl) => ssl,
-              Err(e) => {
-                error!("ssl context error: {e:?}");
-
-                return;
-              }
-            };
-
-            #[cfg(feature = "tokio")]
-            let quick_stream = tokio_openssl::SslStream::new(ssl, stream);
-            #[cfg(feature = "async-std")]
-            let quick_stream = async_std_openssl::SslStream::new(ssl, stream);
-
-            match quick_stream {
-              Ok(mut stream) => {
-                if let Err(e) = std::pin::Pin::new(&mut stream).accept().await {
-                  warn!("stream accept error: {e:?}");
-
-                  return;
-                }
-
-                if let Err(e) = handler.handle(&mut stream).await {
-                  error!("handle error: {e}");
-                }
-              }
-              Err(e) => error!("ssl stream error: {e:?}"),
-            }
-          });
-        }
+        Ok((stream, _)) =>
+          spawn_connection(handler.clone(), acceptor.clone(), stream),
         Err(e) => error!("tcp stream error: {e:?}"),
       }
     }
@@ -1192,7 +1237,11 @@ mod tests {
   #[test]
   fn case_insensitive_lookup_lowercases_the_path() {
     assert_eq!(
-      resolve(&[RouterOption::AllowCaseInsensitiveLookup], "/FoO", &["/foo"]),
+      resolve(
+        &[RouterOption::AllowCaseInsensitiveLookup],
+        "/FoO",
+        &["/foo"]
+      ),
       "/foo",
     );
   }
@@ -1200,7 +1249,11 @@ mod tests {
   #[test]
   fn extra_trailing_slash_is_removed_when_unslashed_route_exists() {
     assert_eq!(
-      resolve(&[RouterOption::RemoveExtraTrailingSlash], "/foo/", &["/foo"]),
+      resolve(
+        &[RouterOption::RemoveExtraTrailingSlash],
+        "/foo/",
+        &["/foo"]
+      ),
       "/foo",
     );
   }
@@ -1224,7 +1277,11 @@ mod tests {
   #[test]
   fn trailing_slash_fix_is_skipped_when_the_target_route_is_absent() {
     assert_eq!(
-      resolve(&[RouterOption::RemoveExtraTrailingSlash], "/foo/", &["/bar"]),
+      resolve(
+        &[RouterOption::RemoveExtraTrailingSlash],
+        "/foo/",
+        &["/bar"]
+      ),
       "/foo/",
     );
   }
