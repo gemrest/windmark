@@ -3,11 +3,7 @@ name: Check ✅
 on:
   workflow_dispatch:
   push:
-    paths:
-      - "**"
   pull_request:
-    paths:
-      - "**"
 
 env:
   CARGO_TERM_COLOR: always
@@ -17,26 +13,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout 🛒
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Toolchain 🧰
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@nightly
         with:
-          profile: minimal
-          toolchain: stable
           components: rustfmt, clippy
-          override: true
 
-      - name: Check ✅
-        uses: actions-rs/cargo@v1
-        continue-on-error: false
-        with:
-          command: check
-          args: --verbose
+      - name: Just 📋
+        uses: extractions/setup-just@v2
+
+      - name: Format, check, and lint ✅
+        run: just checkfc
+
+      - name: Verify formatting 🎨
+        run: git diff --exit-code
 
       - name: Test 🧪
-        uses: actions-rs/cargo@v1
-        continue-on-error: false
-        with:
-          command: test
-          args: --verbose --features auto-deduce-mime,response-macros
+        run: |
+          just test tokio
+          just test async-std
