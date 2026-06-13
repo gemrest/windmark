@@ -26,7 +26,6 @@ Now supporting both [Tokio](https://tokio.rs/) and [`async-std`](https://async.r
 | `response-macros`  | Simple macros for all `Response`s                                                                       |
 | `tokio`            | Marks [Tokio](https://tokio.rs/) as the asynchronous runtime                                            |
 | `async-std`        | Marks [`async-std`](https://async.rs/) as the asynchronous runtime                                      |
-| `prelude`          | Exposes the `prelude` module containing the most used Windmark features                                 |
 
 ### Add Windmark and Tokio as Dependencies
 
