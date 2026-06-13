@@ -158,46 +158,10 @@ impl RequestHandler {
       url.set_path("/");
     }
 
-    let mut path = url.path().to_string();
-
-    if self
-      .options
-      .contains(&RouterOption::AllowCaseInsensitiveLookup)
-    {
-      path = path.to_lowercase();
-    }
-
-    let mut route = self.routes.at(&path);
-
-    if route.is_err() {
-      if self
-        .options
-        .contains(&RouterOption::RemoveExtraTrailingSlash)
-        && path.ends_with('/')
-        && path != "/"
-      {
-        let trimmed = path.trim_end_matches('/');
-
-        if trimmed != path {
-          path = trimmed.to_string();
-          route = self.routes.at(&path);
-        }
-      } else if self
-        .options
-        .contains(&RouterOption::AddMissingTrailingSlash)
-        && !path.ends_with('/')
-      {
-        let mut path_with_slash = String::with_capacity(path.len() + 1);
-
-        path_with_slash.push_str(&path);
-        path_with_slash.push('/');
-
-        if self.routes.at(&path_with_slash).is_ok() {
-          path = path_with_slash;
-          route = self.routes.at(&path);
-        }
-      }
-    }
+    let route_path = resolve_lookup_path(&self.options, url.path(), |candidate| {
+      self.routes.at(candidate).is_ok()
+    });
+    let route = self.routes.at(&route_path);
 
     let peer_certificate = stream.ssl().peer_certificate();
     let hook_context = HookContext::new(
@@ -318,6 +282,49 @@ impl RequestHandler {
 
     Ok(())
   }
+}
+
+/// Resolve which path an incoming request should be matched against, applying
+/// the configured path-fixing `options`.
+///
+/// `route_exists` probes whether a candidate path resolves to a mounted route,
+/// letting the trailing-slash fixes fall back gracefully when their target
+/// route is absent. An exact match always takes precedence over any fix.
+fn resolve_lookup_path(
+  options: &HashSet<RouterOption>,
+  request_path: &str,
+  route_exists: impl Fn(&str) -> bool,
+) -> String {
+  let mut path = request_path.to_string();
+
+  if options.contains(&RouterOption::AllowCaseInsensitiveLookup) {
+    path = path.to_lowercase();
+  }
+
+  if route_exists(&path) {
+    return path;
+  }
+
+  if options.contains(&RouterOption::RemoveExtraTrailingSlash)
+    && path.ends_with('/')
+    && path != "/"
+  {
+    let trimmed = path.trim_end_matches('/');
+
+    if route_exists(trimmed) {
+      return trimmed.to_string();
+    }
+  } else if options.contains(&RouterOption::AddMissingTrailingSlash)
+    && !path.ends_with('/')
+  {
+    let path_with_slash = format!("{path}/");
+
+    if route_exists(&path_with_slash) {
+      return path_with_slash;
+    }
+  }
+
+  path
 }
 
 impl Router {
@@ -1136,5 +1143,116 @@ impl Default for Router {
       certificate_content: None,
       listener_address: "0.0.0.0".to_string(),
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use std::collections::HashSet;
+
+  use matchit::Router as MatchRouter;
+
+  use super::resolve_lookup_path;
+  use crate::router_option::RouterOption;
+
+  /// Resolve `request_path` against a router holding `routes`, under `options`.
+  fn resolve(
+    options: &[RouterOption],
+    request_path: &str,
+    routes: &[&str],
+  ) -> String {
+    let mut router = MatchRouter::new();
+
+    for route in routes {
+      router.insert(*route, ()).unwrap();
+    }
+
+    let option_set = options.iter().copied().collect::<HashSet<_>>();
+
+    resolve_lookup_path(&option_set, request_path, |candidate| {
+      router.at(candidate).is_ok()
+    })
+  }
+
+  #[test]
+  fn exact_match_is_returned_unchanged() {
+    assert_eq!(resolve(&[], "/foo", &["/foo"]), "/foo");
+  }
+
+  #[test]
+  fn unmatched_path_without_options_is_returned_unchanged() {
+    assert_eq!(resolve(&[], "/missing", &["/foo"]), "/missing");
+  }
+
+  #[test]
+  fn dynamic_route_is_matched_without_modification() {
+    assert_eq!(resolve(&[], "/posts/42", &["/posts/:id"]), "/posts/42");
+  }
+
+  #[test]
+  fn case_insensitive_lookup_lowercases_the_path() {
+    assert_eq!(
+      resolve(&[RouterOption::AllowCaseInsensitiveLookup], "/FoO", &["/foo"]),
+      "/foo",
+    );
+  }
+
+  #[test]
+  fn extra_trailing_slash_is_removed_when_unslashed_route_exists() {
+    assert_eq!(
+      resolve(&[RouterOption::RemoveExtraTrailingSlash], "/foo/", &["/foo"]),
+      "/foo",
+    );
+  }
+
+  #[test]
+  fn root_path_is_left_untouched_by_trailing_slash_removal() {
+    assert_eq!(
+      resolve(&[RouterOption::RemoveExtraTrailingSlash], "/", &["/"]),
+      "/",
+    );
+  }
+
+  #[test]
+  fn missing_trailing_slash_is_added_when_slashed_route_exists() {
+    assert_eq!(
+      resolve(&[RouterOption::AddMissingTrailingSlash], "/foo", &["/foo/"]),
+      "/foo/",
+    );
+  }
+
+  #[test]
+  fn trailing_slash_fix_is_skipped_when_the_target_route_is_absent() {
+    assert_eq!(
+      resolve(&[RouterOption::RemoveExtraTrailingSlash], "/foo/", &["/bar"]),
+      "/foo/",
+    );
+  }
+
+  #[test]
+  fn exact_match_takes_precedence_over_trailing_slash_fix() {
+    assert_eq!(
+      resolve(
+        &[RouterOption::RemoveExtraTrailingSlash],
+        "/foo/",
+        &["/foo", "/foo/"],
+      ),
+      "/foo/",
+    );
+  }
+
+  #[test]
+  fn case_insensitive_lookup_combines_with_trailing_slash_removal() {
+    assert_eq!(
+      resolve(
+        &[
+          RouterOption::AllowCaseInsensitiveLookup,
+          RouterOption::RemoveExtraTrailingSlash,
+        ],
+        "/Foo/",
+        &["/foo"],
+      ),
+      "/foo",
+    );
   }
 }
