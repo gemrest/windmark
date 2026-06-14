@@ -232,48 +232,8 @@ impl RequestHandler {
 
     self.post_route_callback.call(&hook_context, &mut content);
 
-    let status_code = if content.status == 21 || content.status == 22 {
-      20
-    } else {
-      content.status
-    };
-    let status_line = match content.status {
-      20 => {
-        let mime = content.mime.as_deref().unwrap_or("text/gemini");
-        let charset = content
-          .character_set
-          .as_deref()
-          .unwrap_or(&self.character_set);
-        let lang = content.languages.as_ref().map_or_else(
-          || std::borrow::Cow::Borrowed(self.languages_joined.as_str()),
-          |l| std::borrow::Cow::Owned(l.join(",")),
-        );
-
-        format!("{status_code} {mime}; charset={charset}; lang={lang}")
-      }
-      21 => {
-        format!(
-          "{} {}",
-          status_code,
-          content.mime.as_deref().unwrap_or_default()
-        )
-      }
-      #[cfg(feature = "auto-deduce-mime")]
-      22 => {
-        format!(
-          "{} {}",
-          status_code,
-          content.mime.as_deref().unwrap_or_default()
-        )
-      }
-      _ => {
-        format!(
-          "{} {}",
-          status_code,
-          content.content.lines().next().unwrap_or_default()
-        )
-      }
-    };
+    let status_line =
+      status_line(&content, &self.character_set, &self.languages_joined);
     let body = content.serialize_body(&header, &footer);
     let mut response = Vec::with_capacity(status_line.len() + body.len() + 2);
 
@@ -332,6 +292,40 @@ fn spawn_connection(
       Err(e) => error!("ssl stream error: {e:?}"),
     }
   });
+}
+
+/// Build the Gemini response status line for `content`, falling back to the
+/// router's `default_character_set` and `default_languages` for `20` responses.
+///
+/// Statuses `21`/`22` (binary success) are sent to clients as a plain `20` with
+/// the response's MIME as the meta; every other status uses the first line of
+/// its `content` as the meta.
+fn status_line(
+  content: &Response,
+  default_character_set: &str,
+  default_languages: &str,
+) -> String {
+  match content.status {
+    20 => {
+      let mime = content.mime.as_deref().unwrap_or("text/gemini");
+      let character_set = content
+        .character_set
+        .as_deref()
+        .unwrap_or(default_character_set);
+      let languages = content.languages.as_ref().map_or_else(
+        || std::borrow::Cow::Borrowed(default_languages),
+        |languages| std::borrow::Cow::Owned(languages.join(",")),
+      );
+
+      format!("20 {mime}; charset={character_set}; lang={languages}")
+    }
+    21 | 22 => format!("20 {}", content.mime.as_deref().unwrap_or_default()),
+    status =>
+      format!(
+        "{status} {}",
+        content.content.lines().next().unwrap_or_default()
+      ),
+  }
 }
 
 /// Resolve which path an incoming request should be matched against, applying
@@ -1197,8 +1191,8 @@ mod tests {
 
   use matchit::Router as MatchRouter;
 
-  use super::resolve_lookup_path;
-  use crate::router_option::RouterOption;
+  use super::{resolve_lookup_path, status_line};
+  use crate::{response::Response, router_option::RouterOption};
 
   /// Resolve `request_path` against a router holding `routes`, under `options`.
   fn resolve(
@@ -1311,5 +1305,80 @@ mod tests {
       ),
       "/foo",
     );
+  }
+
+  /// Format `response`'s status line with the router's default charset and
+  /// language (matching `Router::default`).
+  fn line(response: &Response) -> String {
+    status_line(response, "utf-8", "en")
+  }
+
+  #[test]
+  fn success_status_line_falls_back_to_router_defaults() {
+    assert_eq!(
+      line(&Response::success("hi")),
+      "20 text/gemini; charset=utf-8; lang=en",
+    );
+  }
+
+  #[test]
+  fn success_status_line_uses_the_response_mime() {
+    let mut response = Response::success("hi");
+
+    response.with_mime("text/plain");
+
+    assert_eq!(line(&response), "20 text/plain; charset=utf-8; lang=en");
+  }
+
+  #[test]
+  fn success_status_line_uses_the_response_character_set() {
+    let mut response = Response::success("hi");
+
+    response.with_character_set("iso-8859-1");
+
+    assert_eq!(
+      line(&response),
+      "20 text/gemini; charset=iso-8859-1; lang=en"
+    );
+  }
+
+  #[test]
+  fn success_status_line_joins_the_response_languages() {
+    let mut response = Response::success("hi");
+
+    response.with_languages(["en", "fr"]);
+
+    assert_eq!(line(&response), "20 text/gemini; charset=utf-8; lang=en,fr");
+  }
+
+  #[test]
+  fn binary_success_is_sent_as_a_plain_success_with_its_mime() {
+    assert_eq!(
+      line(&Response::binary_success([0xFFu8], "image/png")),
+      "20 image/png"
+    );
+  }
+
+  #[test]
+  fn status_21_without_a_mime_emits_an_empty_meta() {
+    assert_eq!(line(&Response::new(21, "")), "20 ");
+  }
+
+  #[test]
+  fn redirect_status_line_uses_its_content_as_the_meta() {
+    assert_eq!(
+      line(&Response::temporary_redirect("/elsewhere")),
+      "30 /elsewhere"
+    );
+  }
+
+  #[test]
+  fn failure_status_line_uses_only_the_first_line_of_content() {
+    assert_eq!(line(&Response::new(40, "down\nfor maintenance")), "40 down");
+  }
+
+  #[test]
+  fn input_status_line_uses_its_prompt_as_the_meta() {
+    assert_eq!(line(&Response::input("Your name?")), "10 Your name?");
   }
 }
