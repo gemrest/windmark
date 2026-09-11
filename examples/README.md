@@ -14,9 +14,9 @@ tracked for clicks.
 
 `cargo run --example async --features response-macros`
 
-Demonstrates use of async routes through an async response macro and
-implementing a click tracker using a shared variable through an thread-safe,
-async mutex.
+This example shows how to define async routes with an async response macro
+and implement a click tracker using a shared variable protected by an async
+mutex.
 
 ## [Binary](./binary.rs)
 
@@ -29,7 +29,7 @@ and automatic mime resolution (`--features auto-deduce-mime`).
 
 `cargo run --example callbacks --features response-macros`
 
-Demonstrates use of the pre and post-route callback handlers.
+This example shows how to register pre-route and post-route callbacks.
 
 ## [Certificate](./certificate.rs)
 
@@ -42,7 +42,7 @@ reading the client certificate to give conditional access.
 
 `cargo run --example default_logger --features logger,response-macros`
 
-A simple example showing the use of the default default logger implementation.
+A simple example showing the use of the default logger implementation.
 
 ## [Empty](./empty.rs)
 
@@ -54,7 +54,9 @@ An empty example which starts up a server but has no mounted routes.
 
 `cargo run --example error_handler`
 
-Creates an intentional error within a route, invoking the error handler.
+This example shows how to handle requests that do not match a route. It also
+includes an `/error` route that deliberately panics; this panic does not invoke
+the error handler.
 
 ## [Fix Path](./fix_path.rs)
 
@@ -109,7 +111,8 @@ Demonstrates the use of a wide variety of responses, additionally exposing the f
 
 Demonstrates how to explicitly specify Windmark to use the [`async-std`](https://github.com/async-rs/async-std) runtime.
 
-If the `async-std` feature is NOT enabled, Windmark will default to using Tokio as the async runtime.
+Windmark uses Tokio when its default features are enabled. If you disable
+default features, you must explicitly enable either `tokio` or `async-std`.
 
 ## [Simple Tokio](./simple_tokio.rs)
 

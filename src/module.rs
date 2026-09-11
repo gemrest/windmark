@@ -1,24 +1,30 @@
 use crate::context::HookContext;
 
 pub trait Module {
-  /// Called right after the module is attached.
+  /// The router calls this hook during attachment, before registering
+  /// request hooks.
   fn on_attach(&mut self, _: &mut crate::router::Router) {}
 
-  /// Called before a route is mounted.
+  /// The router calls this hook before dispatching a request, even if the
+  /// request does not match a route.
   fn on_pre_route(&mut self, _: &HookContext) {}
 
-  /// Called after a route is mounted.
+  /// The router calls this hook after the handler completes, before
+  /// response serialisation.
   fn on_post_route(&mut self, _: &HookContext) {}
 }
 
 #[async_trait::async_trait]
 pub trait AsyncModule: Send + Sync {
-  /// Called right after the module is attached.
+  /// The router calls this hook during attachment, before registering
+  /// request hooks.
   async fn on_attach(&mut self, _: &mut crate::router::Router) {}
 
-  /// Called before a route is mounted.
+  /// The router calls this hook before dispatching a request, even if the
+  /// request does not match a route.
   async fn on_pre_route(&mut self, _: &HookContext) {}
 
-  /// Called after a route is mounted.
+  /// The router calls this hook after the handler completes, before
+  /// response serialisation.
   async fn on_post_route(&mut self, _: &HookContext) {}
 }

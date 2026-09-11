@@ -20,7 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         content.content = content.content.replace("Hello", "Hi");
 
         println!(
-          "closed connection from {}",
+          "prepared response for {}",
           context.peer_address.unwrap().ip()
         )
       },

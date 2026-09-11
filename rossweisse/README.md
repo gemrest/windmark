@@ -4,9 +4,10 @@
 
 ## Usage
 
-Rossweisse is in it's infancy, and a much comprehensive interface is planned.
+Rossweisse provides a struct wrapper around Windmark. Routes are associated
+functions and do not receive `self`.
 
-For now, a simple Rosswiesse router can be implemented like this:
+For now, a simple Rossweisse router can be implemented like this:
 
 ```rust
 use rossweisse::route;

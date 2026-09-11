@@ -15,8 +15,7 @@ mod implementations;
 use proc_macro::TokenStream;
 use syn::Item;
 
-/// Marks a `struct` as a router or marks an `impl` block as a router
-/// implementation
+/// Mark a `struct` as a router or an `impl` block as a router implementation.
 ///
 /// # Panics
 ///
@@ -50,7 +49,7 @@ pub fn router(arguments: TokenStream, item: TokenStream) -> TokenStream {
   }
 }
 
-/// Marks a method of a router implementation as a route to mount
+/// Mark a method of a router implementation as a route to mount.
 ///
 /// # Panics
 ///

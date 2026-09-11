@@ -1,4 +1,4 @@
-//! Content and response handlers
+//! This module provides the response type returned by handlers.
 
 #[cfg(feature = "response-macros")]
 mod macros;
@@ -12,15 +12,16 @@ macro_rules! response {
   };
 }
 
-/// The content and response type a handler should reply with.
+/// A response holds the status and content returned by a handler.
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct Response {
-  pub status:         i32,
-  pub mime:           Option<String>,
-  pub content:        String,
-  /// Raw body for status `21`/`22`; the router emits these bytes verbatim
-  /// instead of `content`.
+  pub status:  i32,
+  pub mime:    Option<String>,
+  pub content: String,
+
+  /// The router emits these bytes verbatim instead of `content` for status
+  /// `21`/`22`.
   pub binary_content: Option<Vec<u8>>,
   pub character_set:  Option<String>,
   pub languages:      Option<Vec<String>>,

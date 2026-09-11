@@ -1,8 +1,9 @@
-//! Utilities to make cumbersome tasks simpler
+//! This module provides URL query helpers.
 
 use std::collections::HashMap;
 
-/// Extract the queries from a URL into a `HashMap`.
+/// Extract decoded query pairs into a map. The last value wins for repeated
+/// keys; use `Url::query_pairs` directly to retain repeated keys.
 #[must_use]
 pub fn queries_from_url(url: &url::Url) -> HashMap<String, String> {
   let mut queries = HashMap::new();

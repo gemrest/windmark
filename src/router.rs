@@ -70,8 +70,7 @@ type Stream = tokio_openssl::SslStream<TcpStream>;
 #[cfg(feature = "async-std")]
 type Stream = async_std_openssl::SslStream<TcpStream>;
 
-/// A router which takes care of all tasks a Windmark server should handle:
-/// response generation, panics, logging, and more.
+/// A router dispatches requests through its handlers, partials, and modules.
 #[derive(Clone)]
 pub struct Router {
   routes:                matchit::Router<Arc<dyn RouteResponse>>,
@@ -393,7 +392,7 @@ fn resolve_lookup_path(
 }
 
 impl Router {
-  /// Create a new `Router`
+  /// Create a new `Router`.
   ///
   /// # Examples
   ///
@@ -423,7 +422,7 @@ impl Router {
     self
   }
 
-  /// Set the content of the private key
+  /// Set the content of the private key.
   ///
   /// # Examples
   ///
@@ -471,9 +470,9 @@ impl Router {
     self
   }
 
-  /// Map routes to URL paths
+  /// Map routes to URL paths.
   ///
-  /// Supports both synchronous and asynchronous handlers
+  /// This method supports both synchronous and asynchronous handlers.
   ///
   /// # Examples
   ///
@@ -510,7 +509,8 @@ impl Router {
     self
   }
 
-  /// Create an error handler which will be displayed on any error.
+  /// Set the handler for unmatched routes. Transport errors and route panics
+  /// do not invoke this handler.
   ///
   /// # Examples
   ///
@@ -559,7 +559,7 @@ impl Router {
   ///
   /// # Panics
   ///
-  /// May panic if the header cannot be added.
+  /// This method panics if the footer registry lock has been poisoned.
   ///
   /// # Examples
   ///
@@ -577,7 +577,7 @@ impl Router {
     self
   }
 
-  /// Run the `Router` and wait for requests
+  /// Run the `Router` and wait for requests.
   ///
   /// Under the default Tokio runtime, the server runs until it receives an
   /// interrupt (Ctrl+C / SIGINT), at which point it stops accepting new
@@ -652,9 +652,9 @@ impl Router {
     });
     let acceptor = self.ssl_acceptor.clone();
 
-    // Under Tokio, accept connections until interrupted (Ctrl+C / SIGINT) so
-    // the server can shut down gracefully; `async-std` has no built-in signal
-    // handling, so it keeps the original unconditional accept loop.
+    // Under Tokio, Ctrl+C stops the server from accepting new connections
+    // without waiting for active connection tasks to finish. The async-std
+    // runtime continues accepting connections until the process exits.
     #[cfg(feature = "tokio")]
     {
       loop {
@@ -727,7 +727,7 @@ impl Router {
     Ok(())
   }
 
-  /// Use a self-made `SslAcceptor`
+  /// Use a custom `SslAcceptor`.
   ///
   /// # Examples
   ///
@@ -756,7 +756,7 @@ impl Router {
     self
   }
 
-  /// Enabled the default logger (the
+  /// Enable the default logger (the
   /// [`pretty_env_logger`](https://crates.io/crates/pretty_env_logger) and
   /// [`log`](https://crates.io/crates/log) crates).
   #[cfg(feature = "logger")]
@@ -773,7 +773,7 @@ impl Router {
   /// Set the default logger's log level.
   ///
   /// If you enable Windmark's default logger with `enable_default_logger`,
-  /// Windmark will only log, logs from itself. By setting a log level with
+  /// Windmark will only emit its own logs. By setting a log level with
   /// this method, you are overriding the default log level, so you must choose
   /// to enable logs from Windmark with the `log_windmark` parameter.
   ///
@@ -786,7 +786,7 @@ impl Router {
   /// windmark::router::Router::new()
   ///   .enable_default_logger(true)
   ///   .set_log_level("your_crate_name=trace", true);
-  /// // If you would only like to log, logs from your crate:
+  /// // Use this setting to emit only logs from your crate.
   /// // .set_log_level("your_crate_name=trace", false);
   /// ```
   #[cfg(feature = "logger")]
@@ -804,7 +804,8 @@ impl Router {
     self
   }
 
-  /// Set a callback to run before a client response is delivered
+  /// Set a callback to run before a request is dispatched, even if the request
+  /// does not match a route.
   ///
   /// # Examples
   ///
@@ -829,7 +830,8 @@ impl Router {
     self
   }
 
-  /// Set a callback to run after a client response is delivered
+  /// Set a callback to modify the response after the handler, before
+  /// serialisation and delivery.
   ///
   /// # Examples
   ///
@@ -905,13 +907,13 @@ impl Router {
     self
   }
 
-  /// Attach a stateful module to a `Router`; with async support
+  /// Attach a stateful module, completing its asynchronous initialisation
+  /// before returning. Tokio requires an active multi-threaded runtime.
   ///
-  /// Like a stateless module is an extension or middleware to a `Router`.
-  /// Modules get full access to the `Router` and can be extended by a third
-  /// party, but also, can create hooks will be executed through various parts
-  /// of a routes' lifecycle. Stateful modules also have state, so variables can
-  /// be stored for further access.
+  /// Like a stateless module, a stateful module extends a `Router` and gets
+  /// full access to it during attachment. Third parties can provide modules
+  /// with hooks that run during a request's lifecycle. Stateful modules retain
+  /// state between hook calls.
   ///
   /// # Panics
   ///
@@ -953,7 +955,10 @@ impl Router {
   ///   }
   /// }
   ///
-  /// // Router::new().attach_async(Clicker::default());
+  /// # #[windmark::main]
+  /// # async fn main() {
+  /// Router::new().attach_async(Clicker::default());
+  /// # }
   /// ```
   pub fn attach_async(
     &mut self,
@@ -970,11 +975,10 @@ impl Router {
 
   /// Attach a stateful module to a `Router`.
   ///
-  /// Like a stateless module is an extension or middleware to a `Router`.
-  /// Modules get full access to the `Router` and can be extended by a third
-  /// party, but also, can create hooks will be executed through various parts
-  /// of a routes' lifecycle. Stateful modules also have state, so variables can
-  /// be stored for further access.
+  /// Like a stateless module, a stateful module extends a `Router` and gets
+  /// full access to it during attachment. Third parties can provide modules
+  /// with hooks that run during a request's lifecycle. Stateful modules retain
+  /// state between hook calls.
   ///
   /// # Panics
   ///
@@ -1030,9 +1034,9 @@ impl Router {
 
   /// Specify a custom character set.
   ///
-  /// Will be over-ridden if a character set is specified in a [`Response`].
+  /// A character set specified in a [`Response`] overrides this setting.
   ///
-  /// Defaults to `"utf-8"`.
+  /// The default character set is `"utf-8"`.
   ///
   /// # Examples
   ///
@@ -1050,9 +1054,9 @@ impl Router {
 
   /// Specify a custom language.
   ///
-  /// Will be over-ridden if a language is specified in a [`Response`].
+  /// Languages specified in a [`Response`] override this setting.
   ///
-  /// Defaults to `"en"`.
+  /// The default language is `"en"`.
   ///
   /// # Examples
   ///
@@ -1072,7 +1076,7 @@ impl Router {
 
   /// Specify a custom port.
   ///
-  /// Defaults to `1965`.
+  /// The default port is `1965`.
   ///
   /// # Examples
   ///
@@ -1085,7 +1089,7 @@ impl Router {
     self
   }
 
-  /// Add optional features to the router
+  /// Add optional features to the router.
   ///
   /// # Examples
   ///
@@ -1103,7 +1107,7 @@ impl Router {
     self
   }
 
-  /// Toggle optional features for the router
+  /// Toggle optional features for the router.
   ///
   /// # Examples
   ///
@@ -1125,7 +1129,7 @@ impl Router {
     self
   }
 
-  /// Remove optional features from the router
+  /// Remove optional features from the router.
   ///
   /// # Examples
   ///
@@ -1145,7 +1149,7 @@ impl Router {
 
   /// Specify a custom listener address.
   ///
-  /// Defaults to `"0.0.0.0"`.
+  /// The default listener address is `"0.0.0.0"`.
   ///
   /// # Examples
   ///

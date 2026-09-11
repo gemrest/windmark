@@ -12,9 +12,8 @@ Now supporting both [Tokio](https://tokio.rs/) and [`async-std`](https://async.r
 ## Usage
 
 > [!NOTE]
-> A macro-based "`struct`-router" is in active development as a simplified
-> alternative to the standard server creation approach. Check out
-> [Rossweisse](./rossweisse/) for more information!
+> Rossweisse lets you define a Windmark router using a struct and route
+> attributes. See the [Rossweisse guide](./rossweisse/) for an example.
 
 ### Features
 
@@ -73,6 +72,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```rust
 // src/main.rs
 
+use rossweisse::route;
 use windmark::response::Response;
 
 #[rossweisse::router]
@@ -80,7 +80,7 @@ struct Router;
 
 #[rossweisse::router]
 impl Router {
-  #[rossweisse::route(index)]
+  #[route(index)]
   pub fn index(
     _context: windmark::context::RouteContext,
   ) -> Response {
@@ -97,7 +97,9 @@ Examples can be found within the
 [`examples/`](https://github.com/gemrest/windmark/tree/main/examples) directory
 along with a rundown of each of their purposes and useful facts.
 
-Run an example by cloning this repository and running `cargo run --example example_name`.
+Each entry in [the examples guide](./examples/README.md) lists the required
+features. Generate local credentials with `just gen-key`, then use the listed
+command or `just example example_name` (optionally followed by `async-std`).
 
 ## Modules
 

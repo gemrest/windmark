@@ -1,4 +1,4 @@
-/// Options that can be set for the `Router`
+/// These options configure the `Router`.
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum RouterOption {
   /// If enabled, removes a trailing slash from the request URL path if a route
