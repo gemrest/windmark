@@ -1184,4 +1184,5 @@ impl Default for Router {
 }
 
 #[cfg(test)]
+#[path = "../tests/router.rs"]
 mod tests;

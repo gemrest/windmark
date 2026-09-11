@@ -62,6 +62,9 @@ pub fn router(arguments: TokenStream, item: TokenStream) -> TokenStream {
 /// use rossweisse::route;
 /// use windmark::response::Response;
 ///
+/// # #[rossweisse::router]
+/// # struct Router;
+/// #
 /// #[rossweisse::router]
 /// impl Router {
 ///   #[route]

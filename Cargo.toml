@@ -4,6 +4,7 @@
 members = ["rossweisse"]
 
 [package]
+autotests = false
 name = "windmark"
 version = "0.7.0"
 authors = ["Fuwn <contact@fuwn.me>"]
@@ -115,3 +116,13 @@ required-features = ["response-macros"]
 [[example]]
 name = "simple_async_std"
 required-features = ["async-std"]
+
+# Private unit-test modules also live in tests, so integration targets are explicit.
+[[test]]
+name = "binary_response"
+
+[[test]]
+name = "consumer"
+
+[[test]]
+name = "router_runtime"

@@ -9,16 +9,16 @@ fn resolve(
   request_path: &str,
   routes: &[&str],
 ) -> String {
-  let mut router = MatchRouter::new();
+  let mut matcher = MatchRouter::new();
 
   for route in routes {
-    router.insert(*route, ()).unwrap();
+    matcher.insert(*route, ()).unwrap();
   }
 
   let option_set = options.iter().copied().collect::<HashSet<_>>();
 
   resolve_lookup_path(&option_set, request_path, |candidate| {
-    router.at(candidate).is_ok()
+    matcher.at(candidate).is_ok()
   })
 }
 
@@ -133,7 +133,6 @@ fn success_status_line_uses_the_response_mime() {
   let mut response = Response::success("hi");
 
   response.with_mime("text/plain");
-
   assert_eq!(line(&response), "20 text/plain; charset=utf-8; lang=en");
 }
 
@@ -142,7 +141,6 @@ fn success_status_line_uses_the_response_character_set() {
   let mut response = Response::success("hi");
 
   response.with_character_set("iso-8859-1");
-
   assert_eq!(
     line(&response),
     "20 text/gemini; charset=iso-8859-1; lang=en"
@@ -154,7 +152,6 @@ fn success_status_line_joins_the_response_languages() {
   let mut response = Response::success("hi");
 
   response.with_languages(["en", "fr"]);
-
   assert_eq!(line(&response), "20 text/gemini; charset=utf-8; lang=en,fr");
 }
 
