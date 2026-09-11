@@ -18,7 +18,14 @@ fn resolve(
   let option_set = options.iter().copied().collect::<HashSet<_>>();
 
   resolve_lookup_path(&option_set, request_path, |candidate| {
-    matcher.at(candidate).is_ok()
+    let lookup = if options.contains(&RouterOption::AllowCaseInsensitiveLookup)
+    {
+      candidate.to_ascii_lowercase()
+    } else {
+      candidate.to_owned()
+    };
+
+    matcher.at(&lookup).is_ok()
   })
 }
 
@@ -38,14 +45,14 @@ fn dynamic_route_is_matched_without_modification() {
 }
 
 #[test]
-fn case_insensitive_lookup_lowercases_the_path() {
+fn case_insensitive_lookup_preserves_the_path() {
   assert_eq!(
     resolve(
       &[RouterOption::AllowCaseInsensitiveLookup],
       "/FoO",
       &["/foo"]
     ),
-    "/foo",
+    "/FoO",
   );
 }
 
@@ -112,7 +119,7 @@ fn case_insensitive_lookup_combines_with_trailing_slash_removal() {
       "/Foo/",
       &["/foo"],
     ),
-    "/foo",
+    "/Foo",
   );
 }
 
@@ -221,7 +228,7 @@ fn footer_rendering_preserves_empty_values_and_callback_order() {
 }
 
 #[test]
-fn case_folding_preserves_existing_unicode_and_probe_order() {
+fn path_resolution_preserves_unicode_and_probe_order() {
   let options = [
     RouterOption::AllowCaseInsensitiveLookup,
     RouterOption::AddMissingTrailingSlash,
@@ -232,11 +239,11 @@ fn case_folding_preserves_existing_unicode_and_probe_order() {
   let path = resolve_lookup_path(&options, "/Users/ÄLICE", |candidate| {
     probes.borrow_mut().push(candidate.to_owned());
 
-    candidate == "/users/älice/"
+    candidate == "/Users/ÄLICE/"
   });
 
-  assert_eq!(path, "/users/älice/");
-  assert_eq!(*probes.borrow(), ["/users/älice", "/users/älice/"]);
+  assert_eq!(path, "/Users/ÄLICE/");
+  assert_eq!(*probes.borrow(), ["/Users/ÄLICE", "/Users/ÄLICE/"]);
 }
 
 #[test]
@@ -284,4 +291,134 @@ fn response_assembly_preserves_publicly_constructible_states() {
       b"20 \r\n"
     );
   }
+}
+
+#[test]
+fn case_insensitive_routes_preserve_parameter_names_and_values() {
+  let mut router = super::Router::new();
+
+  router.mount("/Users/:Name/Files/*FilePath", |_| {
+    Response::success("file")
+  });
+  router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+
+  let matched = router
+    .routes
+    .at("/uSeRs/ÄLICE/fIlEs/Photo%2FOne.PNG")
+    .unwrap();
+
+  assert_eq!(matched.parameters.get("Name"), Some("ÄLICE"));
+  assert_eq!(matched.parameters.get("FilePath"), Some("Photo%2FOne.PNG"));
+  assert_eq!(matched.parameters.get("name"), None);
+}
+
+#[test]
+fn case_insensitive_routes_preserve_static_priority_and_inline_parameters() {
+  let mut router = super::Router::new();
+
+  router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+  router.mount("/Users/:Name", |_| Response::success("user"));
+  router.mount("/Users/Me", |_| Response::success("profile"));
+  router.mount("/Files/Prefix:Name", |_| Response::success("file"));
+
+  let profile = router.routes.at("/users/ME").unwrap();
+  let file = router.routes.at("/FILES/prefixREPORT.PDF").unwrap();
+
+  assert!(profile.parameters.is_empty());
+  assert_eq!(file.parameters.get("Name"), Some("REPORT.PDF"));
+}
+
+#[test]
+fn case_insensitive_routes_restore_repeated_values_from_their_own_positions() {
+  let mut router = super::Router::new();
+
+  router.mount("/Same/:First/:Second", |_| Response::success("pair"));
+  router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+
+  let matched = router.routes.at("/same/SAME/SaMe").unwrap();
+
+  assert_eq!(matched.parameters.get("First"), Some("SAME"));
+  assert_eq!(matched.parameters.get("Second"), Some("SaMe"));
+}
+
+#[test]
+fn case_insensitive_matching_can_be_disabled_reenabled_and_cloned() {
+  let mut router = super::Router::new();
+
+  router.mount("/Mixed/:Name", |_| Response::success("mixed"));
+  assert!(!router.routes.contains("/mixed/Alice"));
+  router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+  assert!(router.routes.contains("/mixed/Alice"));
+
+  let cloned = router.clone();
+
+  router.toggle_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+  assert!(!router.routes.contains("/mixed/Alice"));
+  assert!(cloned.routes.contains("/mixed/Alice"));
+  router.toggle_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+  assert!(router.routes.contains("/mixed/Alice"));
+  router.remove_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+  assert!(!router.routes.contains("/mixed/Alice"));
+  assert!(router.routes.contains("/Mixed/Alice"));
+}
+
+#[test]
+fn enabling_case_insensitive_matching_rejects_existing_conflicts() {
+  let mut router = super::Router::new();
+
+  router.mount("/Foo", |_| Response::success("upper"));
+  router.mount("/foo", |_| Response::success("lower"));
+
+  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+    router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+  }));
+
+  assert!(result.is_err());
+  assert!(!router
+    .options
+    .contains(&RouterOption::AllowCaseInsensitiveLookup));
+  assert!(router.routes.contains("/Foo"));
+  assert!(router.routes.contains("/foo"));
+  assert!(!router.routes.contains("/FOO"));
+}
+
+#[test]
+fn mounting_case_conflicts_preserves_existing_routes() {
+  let mut router = super::Router::new();
+
+  router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+  router.mount("/Users/:Name", |_| Response::success("user"));
+
+  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+    router.mount("/users/:Other", |_| Response::success("conflict"));
+  }));
+
+  assert!(result.is_err());
+
+  let matched = router.routes.at("/USERS/Alice").unwrap();
+
+  assert_eq!(matched.parameters.get("Name"), Some("Alice"));
+  assert_eq!(matched.parameters.get("Other"), None);
+  router.mount("/Other", |_| Response::success("other"));
+  assert!(router.routes.contains("/OTHER"));
+}
+
+#[test]
+fn trailing_slash_fixes_preserve_case_insensitive_parameters() {
+  let mut router = super::Router::new();
+
+  router.mount("/Users/:Name/", |_| Response::success("user"));
+  router.add_options(&[
+    RouterOption::AllowCaseInsensitiveLookup,
+    RouterOption::AddMissingTrailingSlash,
+  ]);
+
+  let path =
+    resolve_lookup_path(&router.options, "/uSeRs/Alice", |candidate| {
+      router.routes.contains(candidate)
+    });
+  let matched = router.routes.at(&path).unwrap();
+
+  assert_eq!(path, "/uSeRs/Alice/");
+  assert_eq!(matched.parameters.get("Name"), Some("Alice"));
 }

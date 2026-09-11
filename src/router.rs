@@ -2,13 +2,7 @@
 
 use crate::{
   context::{ErrorContext, HookContext, RouteContext},
-  handler::{
-    ErrorResponse,
-    Partial,
-    PostRouteHook,
-    PreRouteHook,
-    RouteResponse,
-  },
+  handler::{ErrorResponse, Partial, PostRouteHook, PreRouteHook},
   module::{AsyncModule, Module},
   response::Response,
   router_option::RouterOption,
@@ -33,6 +27,10 @@ use tokio::{
   sync::Mutex as AsyncMutex,
 };
 use url::Url;
+
+mod routes;
+
+use routes::Routes;
 
 macro_rules! or_error {
   ($stream:ident, $operation:expr, $error_format:literal) => {
@@ -62,7 +60,7 @@ type Stream = async_std_openssl::SslStream<TcpStream>;
 /// A router dispatches requests through its handlers, partials, and modules.
 #[derive(Clone)]
 pub struct Router {
-  routes:                matchit::Router<Arc<dyn RouteResponse>>,
+  routes:                Routes,
   error_handler:         Arc<dyn ErrorResponse>,
   private_key_file_name: String,
   private_key_content:   Option<String>,
@@ -88,7 +86,7 @@ pub struct Router {
 }
 
 struct RequestHandler {
-  routes:              matchit::Router<Arc<dyn RouteResponse>>,
+  routes:              Routes,
   error_handler:       Arc<dyn ErrorResponse>,
   headers:             Arc<[Box<dyn Partial>]>,
   footers:             Arc<[Box<dyn Partial>]>,
@@ -154,16 +152,16 @@ impl RequestHandler {
 
     let route_path =
       resolve_lookup_path(&self.options, url.path(), |candidate| {
-        self.routes.at(candidate).is_ok()
+        self.routes.contains(candidate)
       });
     let route = self.routes.at(&route_path);
     let peer_certificate = stream.ssl().peer_certificate();
-    let hook_context = HookContext::new(
-      stream.get_ref().peer_addr(),
-      url.clone(),
-      route.as_ref().ok().map(|route| route.params.clone()),
-      peer_certificate.clone(),
-    );
+    let hook_context = HookContext {
+      peer_address: stream.get_ref().peer_addr().ok(),
+      url:          url.clone(),
+      parameters:   route.as_ref().ok().map(|route| route.parameters.clone()),
+      certificate:  peer_certificate.clone(),
+    };
 
     for module in &mut *self.async_modules.lock().await {
       module.on_pre_route(&hook_context).await;
@@ -178,12 +176,12 @@ impl RequestHandler {
     self.pre_route_callback.call(&hook_context);
 
     let mut content = if let Ok(ref route) = route {
-      let route_context = RouteContext::new(
-        stream.get_ref().peer_addr(),
+      let route_context = RouteContext {
+        peer_address: stream.get_ref().peer_addr().ok(),
         url,
-        &route.params,
-        peer_certificate,
-      );
+        parameters: route.parameters.clone(),
+        certificate: peer_certificate,
+      };
 
       for partial_header in self.headers.iter() {
         writeln!(&mut header, "{}", partial_header.call(&route_context))
@@ -352,11 +350,7 @@ fn resolve_lookup_path(
   request_path: &str,
   route_exists: impl Fn(&str) -> bool,
 ) -> String {
-  let path = if options.contains(&RouterOption::AllowCaseInsensitiveLookup) {
-    request_path.to_lowercase()
-  } else {
-    request_path.to_owned()
-  };
+  let path = request_path.to_owned();
 
   if route_exists(&path) {
     return path;
@@ -481,7 +475,8 @@ impl Router {
   ///
   /// # Panics
   ///
-  /// May panic if the route cannot be mounted.
+  /// This method panics if the route is invalid or conflicts with a mounted
+  /// route, including conflicts under case-insensitive matching when enabled.
   pub fn mount<R>(
     &mut self,
     route: impl Into<String> + AsRef<str>,
@@ -1081,6 +1076,12 @@ impl Router {
 
   /// Add optional features to the router.
   ///
+  /// # Panics
+  ///
+  /// This method panics if enabling case-insensitive matching would make
+  /// existing routes conflict. Case-insensitive matching remains disabled
+  /// when validation fails.
+  ///
   /// # Examples
   ///
   /// ```rust
@@ -1091,6 +1092,13 @@ impl Router {
   /// ```
   pub fn add_options(&mut self, options: &[RouterOption]) -> &mut Self {
     for option in options {
+      if *option == RouterOption::AllowCaseInsensitiveLookup {
+        self
+          .routes
+          .enable_case_insensitive()
+          .expect("routes conflict under case-insensitive matching");
+      }
+
       self.options.insert(*option);
     }
 
@@ -1098,6 +1106,12 @@ impl Router {
   }
 
   /// Toggle optional features for the router.
+  ///
+  /// # Panics
+  ///
+  /// This method panics if enabling case-insensitive matching would make
+  /// existing routes conflict. Case-insensitive matching remains disabled
+  /// when validation fails.
   ///
   /// # Examples
   ///
@@ -1110,9 +1124,9 @@ impl Router {
   pub fn toggle_options(&mut self, options: &[RouterOption]) -> &mut Self {
     for option in options {
       if self.options.contains(option) {
-        self.options.remove(option);
+        self.remove_options(std::slice::from_ref(option));
       } else {
-        self.options.insert(*option);
+        self.add_options(std::slice::from_ref(option));
       }
     }
 
@@ -1131,6 +1145,10 @@ impl Router {
   /// ```
   pub fn remove_options(&mut self, options: &[RouterOption]) -> &mut Self {
     for option in options {
+      if *option == RouterOption::AllowCaseInsensitiveLookup {
+        self.routes.disable_case_insensitive();
+      }
+
       self.options.remove(option);
     }
 
@@ -1159,7 +1177,7 @@ impl Router {
 impl Default for Router {
   fn default() -> Self {
     Self {
-      routes: matchit::Router::new(),
+      routes: Routes::default(),
       error_handler: Arc::new(|_| {
         async {
           Response::not_found(

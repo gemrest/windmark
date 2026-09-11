@@ -30,11 +30,25 @@ impl Module for Observer {
     self.0.lock().unwrap().push("attach");
   }
 
-  fn on_pre_route(&mut self, _: &HookContext) {
+  fn on_pre_route(&mut self, context: &HookContext) {
+    if context.url.path() == "/Users/Alice" {
+      assert_eq!(
+        context.parameters.as_ref().unwrap().get("Name"),
+        Some("Alice")
+      );
+    }
+
     self.0.lock().unwrap().push("module-pre");
   }
 
-  fn on_post_route(&mut self, _: &HookContext) {
+  fn on_post_route(&mut self, context: &HookContext) {
+    if context.url.path() == "/Users/Alice" {
+      assert_eq!(
+        context.parameters.as_ref().unwrap().get("Name"),
+        Some("Alice")
+      );
+    }
+
     self.0.lock().unwrap().push("module-post");
   }
 }
@@ -211,9 +225,9 @@ async fn callbacks_partials_and_case_folding_keep_their_existing_order() {
 
   let recorded = events.clone();
 
-  router.mount("/users/:name", move |context: RouteContext| {
+  router.mount("/Users/:Name", move |context: RouteContext| {
     recorded.lock().unwrap().push("route");
-    Response::success(context.parameters.get("name").unwrap())
+    Response::success(context.parameters.get("Name").unwrap())
   });
 
   let recorded = events.clone();
@@ -235,7 +249,7 @@ async fn callbacks_partials_and_case_folding_keep_their_existing_order() {
     request(
       address,
       "/Users/Alice",
-      b"20 text/gemini; charset=utf-8; lang=en\r\nHEADER\nalice!\nFOOTER",
+      b"20 text/gemini; charset=utf-8; lang=en\r\nHEADER\nAlice!\nFOOTER",
     );
     request(
       address,

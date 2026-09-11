@@ -11,6 +11,26 @@ impl Parameters {
     )
   }
 
+  pub(crate) fn from_lookup(
+    parameters: &matchit::Params<'_, '_>,
+    lookup: &str,
+    original: &str,
+  ) -> Self {
+    Self(
+      parameters
+        .iter()
+        .map(|(name, value)| {
+          // Matchit borrows each value from the lookup path. ASCII case folding
+          // preserves byte offsets, so the original path has the same spans.
+          let start = value.as_ptr().addr() - lookup.as_ptr().addr();
+          let end = start + value.len();
+
+          (name.to_owned(), original[start..end].to_owned())
+        })
+        .collect(),
+    )
+  }
+
   #[must_use]
   pub fn get(&self, key: &str) -> Option<&str> {
     self
