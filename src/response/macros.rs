@@ -4,10 +4,10 @@ macro_rules! sync_response {
       /// Trailing commas are not supported at the moment!
       #[macro_export]
       macro_rules! $name {
-        ($body:expr /* $(,)? */) => {
+        ($body:expr) => {
           |_: $crate::context::RouteContext| $crate::response::Response::$name($body)
         };
-        ($context:ident, $body:expr /* $(,)? */) => {
+        ($context:ident, $body:expr) => {
           |$context: $crate::context::RouteContext| $crate::response::Response::$name($body)
         };
       }
@@ -21,10 +21,10 @@ macro_rules! async_response {
       /// Trailing commas are not supported at the moment!
       #[macro_export]
       macro_rules! [< $name _async >] {
-        ($body:expr /* $(,)? */) => {
+        ($body:expr) => {
           |_: $crate::context::RouteContext| async { $crate::response::Response::$name($body) }
         };
-        ($context:ident, $body:expr /* $(,)? */) => {
+        ($context:ident, $body:expr) => {
           |$context: $crate::context::RouteContext| async { $crate::response::Response::$name($body) }
         };
       }
@@ -84,7 +84,6 @@ macro_rules! binary_success {
       #[cfg(feature = "auto-deduce-mime")]
       return $crate::response::Response::binary_success_auto($body);
 
-      // Suppress item not found warning
       #[cfg(not(feature = "auto-deduce-mime"))]
       $crate::response::Response::binary_success(
         $body,
@@ -108,7 +107,6 @@ macro_rules! binary_success {
       #[cfg(feature = "auto-deduce-mime")]
       return $crate::response::Response::binary_success_auto($body);
 
-      // Suppress item not found warning
       #[cfg(not(feature = "auto-deduce-mime"))]
       $crate::response::Response::binary_success(
         $body,
