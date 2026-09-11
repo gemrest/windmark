@@ -45,7 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     router.enable_default_logger(true);
   }
 
-  router.attach_async(Clicker::default());
+  router.attach_async(Clicker::default()).await;
   router.mount("/", windmark::success!("Hello!"));
   router.run().await
 }

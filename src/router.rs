@@ -34,17 +34,6 @@ use tokio::{
 };
 use url::Url;
 
-macro_rules! block {
-  ($body:expr) => {
-    #[cfg(feature = "tokio")]
-    ::tokio::task::block_in_place(|| {
-      ::tokio::runtime::Handle::current().block_on(async { $body });
-    });
-    #[cfg(feature = "async-std")]
-    ::async_std::task::block_on(async { $body });
-  };
-}
-
 macro_rules! or_error {
   ($stream:ident, $operation:expr, $error_format:literal) => {
     match $operation {
@@ -911,8 +900,8 @@ impl Router {
     self
   }
 
-  /// Attach a stateful module, completing its asynchronous initialisation
-  /// before returning. Tokio requires an active multi-threaded runtime.
+  /// Attach a stateful module and await its initialisation before registering
+  /// its request hooks.
   ///
   /// Like a stateless module, a stateful module extends a `Router` and gets
   /// full access to it during attachment. Third parties can provide modules
@@ -961,18 +950,15 @@ impl Router {
   ///
   /// # #[windmark::main]
   /// # async fn main() {
-  /// Router::new().attach_async(Clicker::default());
+  /// Router::new().attach_async(Clicker::default()).await;
   /// # }
   /// ```
-  pub fn attach_async(
+  pub async fn attach_async(
     &mut self,
     mut module: impl AsyncModule + 'static,
   ) -> &mut Self {
-    block!({
-      module.on_attach(self).await;
-
-      (*self.async_modules.lock().await).push(Box::new(module));
-    });
+    module.on_attach(self).await;
+    (*self.async_modules.lock().await).push(Box::new(module));
 
     self
   }

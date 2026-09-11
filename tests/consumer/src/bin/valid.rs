@@ -106,12 +106,15 @@ fn context() -> RouteContext {
   }
 }
 
+async fn attach_module(router: &mut Router) {
+  router.attach_async(AwaitableModule).await;
+}
+
 fn main() {
   let mut router = Router::new();
   let capsule = Capsule::new();
   let _empty = Empty::new();
-  let _attachment: fn(&mut Router, AwaitableModule) -> &mut Router =
-    Router::attach_async;
+  let _attachment = attach_module;
   let _route: &dyn RouteResponse = &Replies;
   let _error: &dyn ErrorResponse = &Replies;
 

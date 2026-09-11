@@ -15,7 +15,7 @@ use std::{
 };
 use windmark::{
   context::{HookContext, RouteContext},
-  module::Module,
+  module::{AsyncModule, Module},
   response::Response,
   router::Router,
   router_option::RouterOption,
@@ -36,6 +36,29 @@ impl Module for Observer {
 
   fn on_post_route(&mut self, _: &HookContext) {
     self.0.lock().unwrap().push("module-post");
+  }
+}
+
+struct AsyncObserver {
+  events:      Events,
+  initialized: bool,
+}
+
+#[async_trait::async_trait]
+impl AsyncModule for AsyncObserver {
+  async fn on_attach(&mut self, _: &mut Router) {
+    self.initialized = true;
+
+    self.events.lock().unwrap().push("async-attach");
+  }
+
+  async fn on_pre_route(&mut self, _: &HookContext) {
+    assert!(self.initialized);
+    self.events.lock().unwrap().push("async-pre");
+  }
+
+  async fn on_post_route(&mut self, _: &HookContext) {
+    self.events.lock().unwrap().push("async-post");
   }
 }
 
@@ -159,6 +182,12 @@ async fn callbacks_partials_and_case_folding_keep_their_existing_order() {
 
   router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
   router.attach(Observer(events.clone()));
+  router
+    .attach_async(AsyncObserver {
+      events:      events.clone(),
+      initialized: false,
+    })
+    .await;
 
   let recorded = events.clone();
 
@@ -219,18 +248,23 @@ async fn callbacks_partials_and_case_folding_keep_their_existing_order() {
     *events.lock().unwrap(),
     [
       "attach",
+      "async-attach",
+      "async-pre",
       "module-pre",
       "callback-pre",
       "header",
       "footer",
       "route",
+      "async-post",
       "module-post",
       "callback-post",
+      "async-pre",
       "module-pre",
       "callback-pre",
       "header",
       "footer",
       "route",
+      "async-post",
       "module-post",
       "callback-post",
     ]

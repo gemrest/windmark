@@ -1,7 +1,7 @@
 use std::{path::PathBuf, process::Command};
 
 #[test]
-fn public_api_and_existing_macro_behavior_are_preserved() {
+fn consumer_api_and_macro_forms_match_expected_behavior() {
   let manifest =
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/consumer/Cargo.toml");
   let target = std::env::var_os("CARGO_TARGET_DIR")

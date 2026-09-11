@@ -126,3 +126,6 @@ name = "consumer"
 
 [[test]]
 name = "router_runtime"
+
+[[test]]
+name = "module"
