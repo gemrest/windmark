@@ -1,9 +1,8 @@
-use async_trait::async_trait;
-
 use crate::{
   context::{ErrorContext, HookContext, RouteContext},
   response::Response,
 };
+use async_trait::async_trait;
 
 #[async_trait]
 pub trait RouteResponse: Send + Sync {

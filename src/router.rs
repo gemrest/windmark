@@ -1,27 +1,5 @@
 #![allow(clippy::significant_drop_tightening)]
 
-use std::{
-  collections::HashSet,
-  error::Error,
-  fmt::Write,
-  future::IntoFuture,
-  sync::{Arc, Mutex},
-  time,
-};
-
-#[cfg(feature = "async-std")]
-use async_std::{
-  io::{ReadExt, WriteExt},
-  sync::Mutex as AsyncMutex,
-};
-use openssl::ssl::{self, SslAcceptor, SslMethod};
-#[cfg(feature = "tokio")]
-use tokio::{
-  io::{AsyncReadExt, AsyncWriteExt},
-  sync::Mutex as AsyncMutex,
-};
-use url::Url;
-
 use crate::{
   context::{ErrorContext, HookContext, RouteContext},
   handler::{
@@ -35,6 +13,26 @@ use crate::{
   response::Response,
   router_option::RouterOption,
 };
+#[cfg(feature = "async-std")]
+use async_std::{
+  io::{ReadExt, WriteExt},
+  sync::Mutex as AsyncMutex,
+};
+use openssl::ssl::{self, SslAcceptor, SslMethod};
+use std::{
+  collections::HashSet,
+  error::Error,
+  fmt::Write,
+  future::IntoFuture,
+  sync::{Arc, Mutex},
+  time,
+};
+#[cfg(feature = "tokio")]
+use tokio::{
+  io::{AsyncReadExt, AsyncWriteExt},
+  sync::Mutex as AsyncMutex,
+};
+use url::Url;
 
 macro_rules! block {
   ($body:expr) => {

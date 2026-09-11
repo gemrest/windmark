@@ -4,7 +4,6 @@ use std::sync::{
   atomic::{AtomicUsize, Ordering},
   Arc,
 };
-
 use windmark::response::Response;
 
 #[windmark::main]

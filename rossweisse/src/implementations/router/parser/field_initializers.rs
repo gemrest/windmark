@@ -1,6 +1,5 @@
-use syn::parse::{self, Parse};
-
 use super::field_initializer::FieldInitializer;
+use syn::parse::{self, Parse};
 
 pub struct FieldInitializers<T: Parse>(pub Vec<FieldInitializer<T>>);
 

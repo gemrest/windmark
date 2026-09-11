@@ -1,9 +1,7 @@
-use std::collections::HashSet;
-
-use matchit::Router as MatchRouter;
-
 use super::{resolve_lookup_path, status_line};
 use crate::{response::Response, router_option::RouterOption};
+use matchit::Router as MatchRouter;
+use std::collections::HashSet;
 
 /// Resolve `request_path` against a router holding `routes`, under `options`.
 fn resolve(
