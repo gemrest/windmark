@@ -9,27 +9,37 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  check:
+  format:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout 🛒
-        uses: actions/checkout@v4
-
-      - name: Toolchain 🧰
-        uses: dtolnay/rust-toolchain@nightly
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly-2026-05-25
         with:
-          components: rustfmt, clippy
-
-      - name: Just 📋
-        uses: extractions/setup-just@v2
-
-      - name: Format, check, and lint ✅
-        run: just checkfc
-
-      - name: Verify formatting 🎨
-        run: git diff --exit-code
-
-      - name: Test 🧪
+          components: rustfmt
+      - name: Check Formatting
         run: |
-          just test tokio
-          just test async-std
+          cargo +nightly-2026-05-25 fmt --all -- --check
+          cargo +nightly-2026-05-25 fmt --manifest-path tests/consumer/Cargo.toml -- --check
+
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Default
+            flags: --features windmark/tokio
+          - name: Tokio
+            flags: --no-default-features --features windmark/tokio,windmark/logger,windmark/auto-deduce-mime,windmark/response-macros
+          - name: Async-Std
+            flags: --no-default-features --features windmark/async-std,windmark/logger,windmark/auto-deduce-mime,windmark/response-macros
+    name: Check ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: clippy
+      - name: Test the Workspace and Consumers
+        run: cargo +1.95.0 test --workspace ${{ matrix.flags }}
+      - name: Lint All Targets
+        run: cargo +1.95.0 clippy --workspace --all-targets ${{ matrix.flags }} -- -D warnings
