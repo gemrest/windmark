@@ -124,7 +124,6 @@ impl RequestHandler {
     let mut footer = String::new();
     let mut header = String::new();
     let mut request = String::new();
-
     let mut url = loop {
       let size = match stream.read(&mut buffer).await {
         Ok(0) | Err(_) => return Ok(()),
@@ -166,7 +165,6 @@ impl RequestHandler {
         self.routes.at(candidate).is_ok()
       });
     let route = self.routes.at(&route_path);
-
     let peer_certificate = stream.ssl().peer_certificate();
     let hook_context = HookContext::new(
       stream.get_ref().peer_addr(),
@@ -174,6 +172,7 @@ impl RequestHandler {
       route.as_ref().ok().map(|route| route.params.clone()),
       peer_certificate.clone(),
     );
+
     for module in &mut *self.async_modules.lock().await {
       module.on_pre_route(&hook_context).await;
     }
@@ -234,7 +233,6 @@ impl RequestHandler {
     stream.shutdown().await?;
     #[cfg(feature = "async-std")]
     stream.get_mut().shutdown(std::net::Shutdown::Both)?;
-
     Ok(())
   }
 }
@@ -295,7 +293,6 @@ fn spawn_connection(
         return;
       }
     };
-
     #[cfg(feature = "tokio")]
     let quick_stream = tokio_openssl::SslStream::new(ssl, stream);
     #[cfg(feature = "async-std")]
@@ -653,7 +650,6 @@ impl Router {
       modules:             self.modules.clone(),
       options:             self.options.clone(),
     });
-
     let acceptor = self.ssl_acceptor.clone();
 
     // Under Tokio, accept connections until interrupted (Ctrl+C / SIGINT) so
@@ -1026,7 +1022,6 @@ impl Router {
     mut module: impl Module + 'static + Send,
   ) -> &mut Self {
     module.on_attach(self);
-
     (*self.modules.lock().expect("modules lock poisoned"))
       .push(Box::new(module));
 
