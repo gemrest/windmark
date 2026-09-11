@@ -227,12 +227,8 @@ impl RequestHandler {
 
     let status_line =
       status_line(&content, &self.character_set, &self.languages_joined);
-    let body = content.serialize_body(&header, &footer);
-    let mut response = Vec::with_capacity(status_line.len() + body.len() + 2);
+    let response = serialize_response(content, &status_line, &header, &footer);
 
-    response.extend_from_slice(status_line.as_bytes());
-    response.extend_from_slice(b"\r\n");
-    response.extend_from_slice(&body);
     stream.write_all(&response).await?;
     #[cfg(feature = "tokio")]
     stream.shutdown().await?;
@@ -241,6 +237,24 @@ impl RequestHandler {
 
     Ok(())
   }
+}
+
+fn serialize_response(
+  content: Response,
+  status_line: &str,
+  header: &str,
+  footer: &str,
+) -> Vec<u8> {
+  let mut response = Vec::with_capacity(
+    status_line.len() + content.body_length(header, footer) + 2,
+  );
+
+  response.extend_from_slice(status_line.as_bytes());
+  response.extend_from_slice(b"\r\n");
+  content.append_body(&mut response, header, footer);
+  drop(content);
+
+  response
 }
 
 fn render_footer(

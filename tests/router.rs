@@ -238,3 +238,50 @@ fn case_folding_preserves_existing_unicode_and_probe_order() {
   assert_eq!(path, "/users/älice/");
   assert_eq!(*probes.borrow(), ["/users/älice", "/users/älice/"]);
 }
+
+#[test]
+fn response_assembly_preserves_publicly_constructible_states() {
+  for (status, expected_line, expected_body) in [
+    (
+      20,
+      "20 text/gemini; charset=utf-8; lang=en",
+      b"HEADERbody\nFOOTER".as_slice(),
+    ),
+    (21, "20 ", b"\x00\xff".as_slice()),
+    (22, "20 ", b"\x00\xff".as_slice()),
+    (23, "23 body", b"".as_slice()),
+    (40, "40 body", b"".as_slice()),
+    (79, "79 body", b"".as_slice()),
+    (-1, "-1 body", b"".as_slice()),
+  ] {
+    let mut response = Response::new(status, "body");
+
+    response.binary_content = Some(vec![0, 0xff]);
+
+    let status_line = line(&response);
+    let expected = [expected_line.as_bytes(), b"\r\n", expected_body].concat();
+
+    assert_eq!(status_line, expected_line);
+    assert_eq!(
+      response.clone().serialize_body("HEADER", "FOOTER"),
+      expected_body
+    );
+    assert_eq!(
+      super::serialize_response(response, &status_line, "HEADER", "FOOTER"),
+      expected
+    );
+  }
+
+  for status in [21, 22] {
+    let response = Response::new(status, "ignored");
+
+    assert!(response
+      .clone()
+      .serialize_body("HEADER", "FOOTER")
+      .is_empty());
+    assert_eq!(
+      super::serialize_response(response, "20 ", "HEADER", "FOOTER"),
+      b"20 \r\n"
+    );
+  }
+}

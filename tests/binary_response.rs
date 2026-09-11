@@ -44,3 +44,24 @@ fn serialize_body_text_success_wraps_with_header_and_footer() {
 
   assert_eq!(body, b"HEADER\nbody\nFOOTER");
 }
+
+#[test]
+fn public_binary_serialization_returns_the_existing_allocation() {
+  for status in [21, 22] {
+    let mut response = Response::new(status, "ignored");
+    let mut bytes = Vec::with_capacity(1024);
+
+    bytes.extend_from_slice(NON_UTF8);
+
+    let pointer = bytes.as_ptr();
+    let capacity = bytes.capacity();
+
+    response.binary_content = Some(bytes);
+
+    let body = response.serialize_body("ignored-header", "ignored-footer");
+
+    assert_eq!(body.as_ptr(), pointer);
+    assert_eq!(body.capacity(), capacity);
+    assert_eq!(body, NON_UTF8);
+  }
+}

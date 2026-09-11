@@ -107,21 +107,45 @@ impl Response {
   #[doc(hidden)]
   #[must_use]
   pub fn serialize_body(self, header: &str, footer: &str) -> Vec<u8> {
+    if matches!(self.status, 21 | 22) {
+      return self.binary_content.unwrap_or_default();
+    }
+
+    let mut body = Vec::with_capacity(self.body_length(header, footer));
+
+    self.append_body(&mut body, header, footer);
+
+    body
+  }
+
+  pub(crate) fn body_length(&self, header: &str, footer: &str) -> usize {
+    match self.status {
+      20 => header.len() + self.content.len() + footer.len() + 1,
+      21 | 22 => self.binary_content.as_ref().map_or(0, Vec::len),
+      _ => 0,
+    }
+  }
+
+  pub(crate) fn append_body(
+    &self,
+    body: &mut Vec<u8>,
+    header: &str,
+    footer: &str,
+  ) {
     match self.status {
       20 => {
-        let mut body = Vec::with_capacity(
-          header.len() + self.content.len() + footer.len() + 1,
-        );
-
         body.extend_from_slice(header.as_bytes());
         body.extend_from_slice(self.content.as_bytes());
         body.push(b'\n');
         body.extend_from_slice(footer.as_bytes());
-
-        body
       }
-      21 | 22 => self.binary_content.unwrap_or_default(),
-      _ => Vec::new(),
+
+      21 | 22 =>
+        if let Some(bytes) = &self.binary_content {
+          body.extend_from_slice(bytes);
+        },
+
+      _ => {}
     }
   }
 
