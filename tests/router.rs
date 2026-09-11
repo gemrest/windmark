@@ -185,3 +185,56 @@ fn failure_status_line_uses_only_the_first_line_of_content() {
 fn input_status_line_uses_its_prompt_as_the_meta() {
   assert_eq!(line(&Response::input("Your name?")), "10 Your name?");
 }
+
+#[test]
+fn footer_rendering_preserves_empty_values_and_callback_order() {
+  let context = crate::context::RouteContext {
+    peer_address: None,
+    url:          "gemini://localhost/footer".parse().unwrap(),
+    parameters:   crate::context::Parameters::default(),
+    certificate:  None,
+  };
+
+  for values in [vec![], vec![""], vec!["", ""], vec!["a", "", "b\n"]] {
+    let calls = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let partials: Vec<Box<dyn crate::handler::Partial>> = values
+      .iter()
+      .enumerate()
+      .map(|(index, value)| {
+        let calls = calls.clone();
+        let value = (*value).to_owned();
+
+        Box::new(move |context: &crate::context::RouteContext| {
+          assert_eq!(context.url.path(), "/footer");
+          calls.lock().unwrap().push(index);
+          value.clone()
+        }) as Box<dyn crate::handler::Partial>
+      })
+      .collect();
+
+    assert_eq!(super::render_footer(&partials, &context), values.join("\n"));
+    assert_eq!(
+      *calls.lock().unwrap(),
+      (0..values.len()).collect::<Vec<_>>()
+    );
+  }
+}
+
+#[test]
+fn case_folding_preserves_existing_unicode_and_probe_order() {
+  let options = [
+    RouterOption::AllowCaseInsensitiveLookup,
+    RouterOption::AddMissingTrailingSlash,
+  ]
+  .into_iter()
+  .collect();
+  let probes = std::cell::RefCell::new(Vec::new());
+  let path = resolve_lookup_path(&options, "/Users/ÄLICE", |candidate| {
+    probes.borrow_mut().push(candidate.to_owned());
+
+    candidate == "/users/älice/"
+  });
+
+  assert_eq!(path, "/users/älice/");
+  assert_eq!(*probes.borrow(), ["/users/älice", "/users/älice/"]);
+}

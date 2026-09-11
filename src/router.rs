@@ -199,12 +199,7 @@ impl RequestHandler {
           .expect("failed to write header");
       }
 
-      footer = self
-        .footers
-        .iter()
-        .map(|partial_footer| partial_footer.call(&route_context))
-        .collect::<Vec<_>>()
-        .join("\n");
+      footer = render_footer(&self.footers, &route_context);
 
       route.value.call(route_context).await
     } else {
@@ -246,6 +241,23 @@ impl RequestHandler {
 
     Ok(())
   }
+}
+
+fn render_footer(
+  partials: &[Box<dyn Partial>],
+  context: &RouteContext,
+) -> String {
+  let mut footer = String::new();
+
+  for (index, partial) in partials.iter().enumerate() {
+    if index != 0 {
+      footer.push('\n');
+    }
+
+    footer.push_str(&partial.call(context));
+  }
+
+  footer
 }
 
 /// Spawn a task to complete the TLS handshake on an accepted connection and
@@ -337,11 +349,11 @@ fn resolve_lookup_path(
   request_path: &str,
   route_exists: impl Fn(&str) -> bool,
 ) -> String {
-  let mut path = request_path.to_string();
-
-  if options.contains(&RouterOption::AllowCaseInsensitiveLookup) {
-    path = path.to_lowercase();
-  }
+  let path = if options.contains(&RouterOption::AllowCaseInsensitiveLookup) {
+    request_path.to_lowercase()
+  } else {
+    request_path.to_owned()
+  };
 
   if route_exists(&path) {
     return path;
