@@ -70,6 +70,14 @@ fn acceptor() -> SslAcceptor {
 }
 
 fn request(address: SocketAddr, path: &str, expected: &[u8]) {
+  request_chunks(
+    address,
+    &[format!("gemini://localhost{path}\r\n").as_bytes()],
+    expected,
+  );
+}
+
+fn request_chunks(address: SocketAddr, chunks: &[&[u8]], expected: &[u8]) {
   let started = Instant::now();
   let stream = loop {
     match TcpStream::connect_timeout(&address, Duration::from_millis(100)) {
@@ -96,11 +104,48 @@ fn request(address: SocketAddr, path: &str, expected: &[u8]) {
   let mut stream = connector.build().connect("localhost", stream).unwrap();
   let mut output = vec![0; expected.len()];
 
-  stream
-    .write_all(format!("gemini://localhost{path}\r\n").as_bytes())
-    .unwrap();
+  for chunk in chunks {
+    stream.write_all(chunk).unwrap();
+  }
+
   stream.read_exact(&mut output).unwrap();
   assert_eq!(output, expected);
+}
+
+async fn serve_requests(
+  mut router: Router,
+  client: impl FnOnce(SocketAddr) + Send + 'static,
+) {
+  let reservation = TcpListener::bind("127.0.0.1:0").unwrap();
+  let address = reservation.local_addr().unwrap();
+
+  router.set_listener_address("127.0.0.1");
+  router.set_port(address.port());
+  router.set_ssl_acceptor(acceptor());
+  drop(reservation);
+
+  #[cfg(feature = "tokio")]
+  let server = tokio::spawn(async move { router.run().await.unwrap() });
+  #[cfg(feature = "async-std")]
+  let server =
+    async_std::task::spawn(async move { router.run().await.unwrap() });
+  #[cfg(feature = "tokio")]
+  let run_client = tokio::task::spawn_blocking;
+  #[cfg(feature = "async-std")]
+  let run_client = async_std::task::spawn_blocking;
+  let client = run_client(move || client(address));
+  #[cfg(feature = "tokio")]
+  let result = client.await;
+
+  #[cfg(feature = "async-std")]
+  client.await;
+
+  #[cfg(feature = "tokio")]
+  server.abort();
+  #[cfg(feature = "async-std")]
+  server.cancel().await;
+  #[cfg(feature = "tokio")]
+  result.unwrap();
 }
 
 #[cfg_attr(
@@ -109,14 +154,9 @@ fn request(address: SocketAddr, path: &str, expected: &[u8]) {
 )]
 #[cfg_attr(feature = "async-std", async_std::test)]
 async fn callbacks_partials_and_case_folding_keep_their_existing_order() {
-  let reservation = TcpListener::bind("127.0.0.1:0").unwrap();
-  let address = reservation.local_addr().unwrap();
   let events: Events = Arc::default();
   let mut router = Router::new();
 
-  router.set_listener_address("127.0.0.1");
-  router.set_port(address.port());
-  router.set_ssl_acceptor(acceptor());
   router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
   router.attach(Observer(events.clone()));
 
@@ -162,18 +202,7 @@ async fn callbacks_partials_and_case_folding_keep_their_existing_order() {
       response.content.push('!');
     },
   );
-  drop(reservation);
-
-  #[cfg(feature = "tokio")]
-  let server = tokio::spawn(async move { router.run().await.unwrap() });
-  #[cfg(feature = "async-std")]
-  let server =
-    async_std::task::spawn(async move { router.run().await.unwrap() });
-  #[cfg(feature = "tokio")]
-  let run_client = tokio::task::spawn_blocking;
-  #[cfg(feature = "async-std")]
-  let run_client = async_std::task::spawn_blocking;
-  let client = run_client(move || {
+  serve_requests(router, move |address| {
     request(
       address,
       "/Users/Alice",
@@ -184,18 +213,8 @@ async fn callbacks_partials_and_case_folding_keep_their_existing_order() {
       "/binary",
       b"20 application/octet-stream\r\n\x00\xff",
     );
-  });
-
-  #[cfg(feature = "tokio")]
-  client.await.unwrap();
-
-  #[cfg(feature = "async-std")]
-  client.await;
-
-  #[cfg(feature = "tokio")]
-  server.abort();
-  #[cfg(feature = "async-std")]
-  server.cancel().await;
+  })
+  .await;
   assert_eq!(
     *events.lock().unwrap(),
     [
@@ -216,4 +235,51 @@ async fn callbacks_partials_and_case_folding_keep_their_existing_order() {
       "callback-post",
     ]
   );
+}
+
+#[cfg_attr(
+  feature = "tokio",
+  tokio::test(flavor = "multi_thread", worker_threads = 2)
+)]
+#[cfg_attr(feature = "async-std", async_std::test)]
+async fn request_framing_handles_split_characters_and_terminates_errors() {
+  let mut router = Router::new();
+
+  router.mount("/caf%C3%A9", |_| Response::success("accepted"));
+  router.set_error_handler(|_| Response::success("accepted"));
+  serve_requests(router, |address| {
+    let success = b"20 text/gemini; charset=utf-8; lang=en\r\naccepted\n";
+    let invalid_utf8 = b"gemini://localhost/\xff";
+    let invalid_url = "not a url";
+    let utf8_error = format!(
+      "59 The server (Windmark) received a bad request: {}\r\n",
+      std::str::from_utf8(invalid_utf8.as_slice()).unwrap_err()
+    );
+    let url_error = format!(
+      "59 The server (Windmark) received a bad request: {}\r\n",
+      url::Url::parse(invalid_url).unwrap_err()
+    );
+    let prefix = "gemini://localhost/";
+    let maximum_url = format!("{prefix}{}", "a".repeat(1022 - prefix.len()));
+
+    assert_eq!(maximum_url.len(), 1022);
+    request_chunks(
+      address,
+      &[b"gemini://localhost/caf\xc3", b"\xa9\r", b"\n"],
+      success,
+    );
+    request_chunks(address, &[invalid_utf8, b"\r\n"], utf8_error.as_bytes());
+    request_chunks(
+      address,
+      &[invalid_url.as_bytes(), b"\r\n"],
+      url_error.as_bytes(),
+    );
+    request_chunks(address, &[maximum_url.as_bytes(), b"\r\n"], success);
+    request_chunks(
+      address,
+      &[maximum_url.as_bytes(), b"a\r\n"],
+      b"59 The server (Windmark) received a request exceeding 1024 bytes\r\n",
+    );
+  })
+  .await;
 }

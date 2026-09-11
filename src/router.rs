@@ -122,18 +122,14 @@ impl RequestHandler {
     let mut buffer = [0u8; 1024];
     let mut footer = String::new();
     let mut header = String::new();
-    let mut request = String::new();
+    let mut request = Vec::new();
     let mut url = loop {
       let size = match stream.read(&mut buffer).await {
         Ok(0) | Err(_) => return Ok(()),
         Ok(size) => size,
       };
 
-      request.push_str(or_error!(
-        stream,
-        std::str::from_utf8(&buffer[0..size]),
-        "59 The server (Windmark) received a bad request: {}"
-      ));
+      request.extend_from_slice(&buffer[..size]);
 
       if request.len() > 1024 {
         stream
@@ -146,11 +142,19 @@ impl RequestHandler {
         return Ok(());
       }
 
-      if let Some(position) = request.find("\r\n") {
+      if let Some(position) =
+        request.windows(2).position(|pair| pair == b"\r\n")
+      {
+        let request = or_error!(
+          stream,
+          std::str::from_utf8(&request[..position]),
+          "59 The server (Windmark) received a bad request: {}\r\n"
+        );
+
         break or_error!(
           stream,
-          Url::parse(&request[..position]),
-          "59 The server (Windmark) received a bad request: {}"
+          Url::parse(request),
+          "59 The server (Windmark) received a bad request: {}\r\n"
         );
       }
     };
