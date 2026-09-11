@@ -3,20 +3,18 @@ use quote::quote;
 use syn::punctuated::Punctuated;
 
 pub fn fields(arguments: TokenStream, item: syn::ItemStruct) -> TokenStream {
-  let field_initializers = syn::parse_macro_input!(
-    arguments as super::parser::FieldInitializers<syn::Expr>
-  );
+  let field_initializers =
+    syn::parse_macro_input!(arguments as super::parser::FieldInitializers);
   let router_identifier = item.ident;
-  let (named_fields, has_fields) = match item.fields {
-    syn::Fields::Named(fields) => (fields, true),
+  let named_fields = match item.fields {
+    syn::Fields::Named(fields) => fields,
+
     syn::Fields::Unit =>
-      (
-        syn::FieldsNamed {
-          brace_token: syn::token::Brace::default(),
-          named:       Punctuated::default(),
-        },
-        false,
-      ),
+      syn::FieldsNamed {
+        brace_token: syn::token::Brace::default(),
+        named:       Punctuated::default(),
+      },
+
     syn::Fields::Unnamed(_) =>
       panic!(
         "`#[rossweisse::router]` can only be used on `struct`s with named \
@@ -25,34 +23,24 @@ pub fn fields(arguments: TokenStream, item: syn::ItemStruct) -> TokenStream {
   };
   let new_method_fields = named_fields.named.iter().map(|field| {
     let name = &field.ident;
-    let initialiser: syn::Expr = field_initializers
+    let initializer: syn::Expr = field_initializers
       .0
       .iter()
-      .find(|initialiser| name.as_ref() == Some(&initialiser.ident))
+      .find(|initializer| name.as_ref() == Some(&initializer.identifier))
       .map_or_else(
         || syn::parse_quote! { ::std::default::Default::default() },
-        |initialiser| initialiser.expr.clone(),
+        |initializer| initializer.expression.clone(),
       );
 
     quote! {
-        #name: #initialiser,
+      #name: #initializer,
     }
   });
-  let new_methods = if has_fields {
-    quote! {
-      fn _new() -> Self {
-        Self {
-          #(#new_method_fields)*
-          router: ::windmark::router::Router::new(),
-        }
-      }
-    }
-  } else {
-    quote! {
-      fn _new() -> Self {
-        Self {
-          router: ::windmark::router::Router::new(),
-        }
+  let new_methods = quote! {
+    fn _new() -> Self {
+      Self {
+        #(#new_method_fields)*
+        router: ::windmark::router::Router::new(),
       }
     }
   };
