@@ -12,7 +12,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       println!(
         "accepted connection from {} to {}",
         context.peer_address.unwrap().ip(),
-        context.url.to_string()
+        context.url
       )
     })
     .set_post_route_callback(

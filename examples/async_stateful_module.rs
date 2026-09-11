@@ -4,7 +4,7 @@ use windmark::{context::HookContext, router::Router};
 
 #[derive(Default)]
 struct Clicker {
-  clicks: std::sync::Arc<std::sync::Mutex<usize>>,
+  clicks: usize,
 }
 
 #[async_trait::async_trait]
@@ -14,12 +14,12 @@ impl windmark::module::AsyncModule for Clicker {
   }
 
   async fn on_pre_route(&mut self, context: &HookContext) {
-    *self.clicks.lock().unwrap() += 1;
+    self.clicks += 1;
 
     println!(
       "module 'clicker' has been called before the route '{}' with {} clicks!",
       context.url.path(),
-      self.clicks.lock().unwrap()
+      self.clicks
     );
   }
 
@@ -28,7 +28,7 @@ impl windmark::module::AsyncModule for Clicker {
       "module 'clicker' clicker has been called after the route '{}' with {} \
        clicks!",
       context.url.path(),
-      self.clicks.lock().unwrap()
+      self.clicks
     );
   }
 }
@@ -39,12 +39,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
   router.set_private_key_file("windmark_private.pem");
   router.set_certificate_file("windmark_public.pem");
+
   #[cfg(feature = "logger")]
   {
     router.enable_default_logger(true);
   }
+
   router.attach_async(Clicker::default());
   router.mount("/", windmark::success!("Hello!"));
-
   router.run().await
 }
