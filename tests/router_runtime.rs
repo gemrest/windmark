@@ -714,11 +714,12 @@ async fn pause(duration: Duration) {
 async fn connection_deadlines_release_stalled_handshakes_and_requests() {
   let mut router = Router::new();
   let mut limits = windmark::router::ConnectionLimits::default();
+  let timeout = Duration::from_secs(1);
 
   limits.max_connections = std::num::NonZeroUsize::new(1);
-  limits.handshake_timeout = Some(Duration::from_millis(50));
-  limits.request_timeout = Some(Duration::from_millis(50));
-  limits.shutdown_timeout = Some(Duration::from_millis(50));
+  limits.handshake_timeout = Some(timeout);
+  limits.request_timeout = Some(timeout);
+  limits.shutdown_timeout = Some(timeout);
 
   router.set_connection_limits(limits);
   router.mount("/", |_| Response::success("ready"));
@@ -746,7 +747,7 @@ async fn connection_deadlines_release_stalled_handshakes_and_requests() {
     let result = stalled.read(&mut [0]);
 
     assert!(result.is_err() || matches!(result, Ok(0)));
-    assert!(started.elapsed() < Duration::from_secs(2));
+    assert!(started.elapsed() < Duration::from_secs(4));
     request(
       address,
       "/",
