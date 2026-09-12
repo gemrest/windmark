@@ -43,11 +43,7 @@ fn consumer_api_and_macro_forms_match_expected_behavior() {
       "struct `Capsule` is private",
       false,
     ),
-    (
-      "index_name",
-      "no function or associated item named `index`",
-      false,
-    ),
+    ("index_name", "", false),
   ];
 
   for (name, diagnostic, automatic_mime) in cases {

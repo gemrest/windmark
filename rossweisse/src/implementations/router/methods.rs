@@ -1,12 +1,9 @@
 use proc_macro::TokenStream;
 
-pub fn methods(
-  _arguments: TokenStream,
-  mut item: syn::ItemImpl,
-) -> TokenStream {
-  let routes = item
+pub fn methods(_arguments: TokenStream, item: &syn::ItemImpl) -> TokenStream {
+  let (routes, route_paths): (Vec<_>, Vec<_>) = item
     .items
-    .iter_mut()
+    .iter()
     .filter_map(|item| {
       let syn::ImplItem::Fn(method) = item else {
         return None;
@@ -18,31 +15,18 @@ pub fn methods(
       let is_index = route_attribute
         .parse_args::<syn::Ident>()
         .is_ok_and(|argument| argument == "index");
+      let path = if is_index {
+        "/".to_owned()
+      } else {
+        format!("/{}", method.sig.ident)
+      };
 
-      if is_index {
-        method.sig.ident =
-          syn::Ident::new("__router_index", method.sig.ident.span());
-      }
-
-      Some(method.sig.ident.clone())
+      Some((&method.sig.ident, path))
     })
-    .collect::<Vec<_>>();
+    .unzip();
   let (implementation_generics, type_generics, where_clause) =
     item.generics.split_for_impl();
   let name = &item.self_ty;
-  let route_paths = routes
-    .iter()
-    .map(|route| {
-      format!(
-        "/{}",
-        if route == "__router_index" {
-          String::new()
-        } else {
-          route.to_string()
-        }
-      )
-    })
-    .collect::<Vec<_>>();
 
   quote::quote! {
     #item

@@ -127,7 +127,7 @@ fn main() {
   router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
   assert_eq!(capsule.count, 7);
   assert!(capsule.label.is_empty());
-  assert_eq!(Capsule::__router_index(context()).content, "index");
+  assert_eq!(Capsule::index(context()).content, "index");
 
   let mut response = Response::input::<String>("prompt".to_owned());
 

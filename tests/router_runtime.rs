@@ -627,3 +627,50 @@ async fn poisoned_modules_do_not_disable_other_modules() {
     .await;
   }
 }
+
+mod named_routes {
+  use rossweisse::route;
+  use windmark::{context::RouteContext, response::Response};
+
+  #[rossweisse::router]
+  pub struct Capsule;
+
+  #[rossweisse::router]
+  impl Capsule {
+    #[route(index)]
+    pub fn index(_: RouteContext) -> Response { Response::success("INDEX") }
+
+    #[route]
+    pub fn about(_: RouteContext) -> Response { Response::success("ABOUT") }
+
+    #[route]
+    pub fn __router_index(_: RouteContext) -> Response {
+      Response::success("ORDINARY")
+    }
+  }
+}
+
+#[cfg_attr(
+  feature = "tokio",
+  tokio::test(flavor = "multi_thread", worker_threads = 2)
+)]
+#[cfg_attr(feature = "async-std", async_std::test)]
+async fn index_route_attributes_preserve_names_and_select_the_root_path() {
+  let mut capsule = named_routes::Capsule::new();
+
+  serve_requests(capsule.router().clone(), |address| {
+    for (path, body) in [
+      ("/", "INDEX"),
+      ("/about", "ABOUT"),
+      ("/__router_index", "ORDINARY"),
+    ] {
+      request(
+        address,
+        path,
+        format!("20 text/gemini; charset=utf-8; lang=en\r\n{body}\n")
+          .as_bytes(),
+      );
+    }
+  })
+  .await;
+}

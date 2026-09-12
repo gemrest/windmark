@@ -40,7 +40,7 @@ use syn::Item;
 pub fn router(arguments: TokenStream, item: TokenStream) -> TokenStream {
   match syn::parse::<Item>(item) {
     Ok(Item::Struct(item)) => implementations::fields(arguments, item),
-    Ok(Item::Impl(item)) => implementations::methods(arguments, item),
+    Ok(Item::Impl(ref item)) => implementations::methods(arguments, item),
     Ok(item) =>
       syn::Error::new_spanned(
         item,
@@ -53,6 +53,9 @@ pub fn router(arguments: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 /// Mark a method of a router implementation as a route to mount.
+///
+/// Within a router implementation, `#[route(index)]` mounts the method at `/`
+/// without changing its name.
 ///
 /// # Examples
 ///
