@@ -678,9 +678,9 @@ impl Router {
 
     #[cfg(feature = "logger")]
     if self.default_logger {
-      pretty_env_logger::formatted_builder()
+      let _ = pretty_env_logger::formatted_builder()
         .parse_filters(&self.log_filter)
-        .init();
+        .try_init();
     }
 
     #[cfg(feature = "tokio")]

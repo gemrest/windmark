@@ -674,3 +674,40 @@ async fn index_route_attributes_preserve_names_and_select_the_root_path() {
   })
   .await;
 }
+
+#[cfg(feature = "logger")]
+#[cfg_attr(
+  feature = "tokio",
+  tokio::test(flavor = "multi_thread", worker_threads = 2)
+)]
+#[cfg_attr(feature = "async-std", async_std::test)]
+async fn startup_preserves_an_existing_logger() {
+  struct Logger;
+
+  impl log::Log for Logger {
+    fn enabled(&self, _: &log::Metadata<'_>) -> bool { false }
+
+    fn log(&self, _: &log::Record<'_>) {}
+
+    fn flush(&self) {}
+  }
+
+  static LOGGER: Logger = Logger;
+
+  log::set_logger(&LOGGER).unwrap();
+
+  for _ in 0..2 {
+    let mut router = Router::new();
+
+    router.enable_default_logger(true);
+    router.mount("/", |_| Response::success("ready"));
+    serve_requests(router, |address| {
+      request(
+        address,
+        "/",
+        b"20 text/gemini; charset=utf-8; lang=en\r\nready\n",
+      );
+    })
+    .await;
+  }
+}
