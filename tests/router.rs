@@ -422,3 +422,84 @@ fn trailing_slash_fixes_preserve_case_insensitive_parameters() {
   assert_eq!(path, "/uSeRs/Alice/");
   assert_eq!(matched.parameters.get("Name"), Some("Alice"));
 }
+
+#[test]
+fn synchronous_module_locks_allow_other_modules_to_progress() {
+  struct SignalingModule(std::sync::mpsc::Sender<()>);
+
+  impl crate::module::Module for SignalingModule {
+    fn on_pre_route(&mut self, _: &crate::context::HookContext) {
+      self.0.send(()).unwrap();
+    }
+  }
+
+  struct BlockingModule {
+    entered: std::sync::mpsc::Sender<()>,
+    release: std::sync::mpsc::Receiver<()>,
+    blocked: bool,
+  }
+
+  impl crate::module::Module for BlockingModule {
+    fn on_pre_route(&mut self, _: &crate::context::HookContext) {
+      if !self.blocked {
+        self.blocked = true;
+
+        self.entered.send(()).unwrap();
+        self
+          .release
+          .recv_timeout(std::time::Duration::from_secs(5))
+          .unwrap();
+      }
+    }
+  }
+
+  let (signal, progress) = std::sync::mpsc::channel();
+  let (entered, entry) = std::sync::mpsc::channel();
+  let (release, resume) = std::sync::mpsc::channel();
+  let modules: std::sync::Arc<std::sync::Mutex<Vec<super::SharedModule>>> =
+    std::sync::Arc::new(std::sync::Mutex::new(vec![
+      std::sync::Arc::new(std::sync::Mutex::new(Box::new(SignalingModule(
+        signal,
+      )))),
+      std::sync::Arc::new(std::sync::Mutex::new(Box::new(BlockingModule {
+        entered,
+        release: resume,
+        blocked: false,
+      }))),
+    ]));
+  let first_modules = modules.clone();
+  let first = std::thread::spawn(move || {
+    super::call_modules(&first_modules, |module| {
+      module.on_pre_route(&crate::context::HookContext {
+        peer_address: None,
+        url:          url::Url::parse("gemini://localhost/").unwrap(),
+        parameters:   None,
+        certificate:  None,
+      });
+    });
+  });
+
+  progress
+    .recv_timeout(std::time::Duration::from_secs(5))
+    .unwrap();
+  entry
+    .recv_timeout(std::time::Duration::from_secs(5))
+    .unwrap();
+
+  let second = std::thread::spawn(move || {
+    super::call_modules(&modules, |module| {
+      module.on_pre_route(&crate::context::HookContext {
+        peer_address: None,
+        url:          url::Url::parse("gemini://localhost/").unwrap(),
+        parameters:   None,
+        certificate:  None,
+      });
+    });
+  });
+  let advanced = progress.recv_timeout(std::time::Duration::from_secs(5));
+
+  release.send(()).unwrap();
+  first.join().unwrap();
+  second.join().unwrap();
+  advanced.expect("the first module was blocked by the second module");
+}

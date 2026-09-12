@@ -56,6 +56,8 @@ type TcpStream = async_std::net::TcpStream;
 type Stream = tokio_openssl::SslStream<TcpStream>;
 #[cfg(feature = "async-std")]
 type Stream = async_std_openssl::SslStream<TcpStream>;
+type SharedModule = Arc<Mutex<Box<dyn Module + Send>>>;
+type SharedAsyncModule = Arc<AsyncMutex<Box<dyn AsyncModule + Send>>>;
 
 /// A router dispatches requests through its handlers, partials, and modules.
 #[derive(Clone)]
@@ -79,8 +81,8 @@ pub struct Router {
   character_set:         String,
   languages:             Vec<String>,
   port:                  u16,
-  async_modules:         Arc<AsyncMutex<Vec<Box<dyn AsyncModule + Send>>>>,
-  modules:               Arc<Mutex<Vec<Box<dyn Module + Send>>>>,
+  async_modules:         Arc<AsyncMutex<Vec<SharedAsyncModule>>>,
+  modules:               Arc<Mutex<Vec<SharedModule>>>,
   options:               HashSet<RouterOption>,
   listener_address:      String,
 }
@@ -94,8 +96,8 @@ struct RequestHandler {
   post_route_callback: Arc<dyn PostRouteHook>,
   character_set:       String,
   languages_joined:    String,
-  async_modules:       Arc<AsyncMutex<Vec<Box<dyn AsyncModule + Send>>>>,
-  modules:             Arc<Mutex<Vec<Box<dyn Module + Send>>>>,
+  async_modules:       Arc<AsyncMutex<Vec<SharedAsyncModule>>>,
+  modules:             Arc<Mutex<Vec<SharedModule>>>,
   options:             HashSet<RouterOption>,
 }
 
@@ -162,17 +164,15 @@ impl RequestHandler {
       parameters:   route.as_ref().ok().map(|route| route.parameters.clone()),
       certificate:  peer_certificate.clone(),
     };
+    let async_modules = self.async_modules.lock().await.clone();
 
-    for module in &mut *self.async_modules.lock().await {
-      module.on_pre_route(&hook_context).await;
+    for module in async_modules {
+      module.lock().await.on_pre_route(&hook_context).await;
     }
 
-    if let Ok(mut modules) = self.modules.lock() {
-      for module in &mut *modules {
-        module.on_pre_route(&hook_context);
-      }
-    }
-
+    call_modules(&self.modules, |module| {
+      module.on_pre_route(&hook_context);
+    });
     self.pre_route_callback.call(&hook_context);
 
     let mut content = if let Ok(ref route) = route {
@@ -201,17 +201,15 @@ impl RequestHandler {
         ))
         .await
     };
+    let async_modules = self.async_modules.lock().await.clone();
 
-    for module in &mut *self.async_modules.lock().await {
-      module.on_post_route(&hook_context).await;
+    for module in async_modules {
+      module.lock().await.on_post_route(&hook_context).await;
     }
 
-    if let Ok(mut modules) = self.modules.lock() {
-      for module in &mut *modules {
-        module.on_post_route(&hook_context);
-      }
-    }
-
+    call_modules(&self.modules, |module| {
+      module.on_post_route(&hook_context);
+    });
     self.post_route_callback.call(&hook_context, &mut content);
 
     let status_line =
@@ -224,6 +222,21 @@ impl RequestHandler {
     #[cfg(feature = "async-std")]
     stream.get_mut().shutdown(std::net::Shutdown::Both)?;
     Ok(())
+  }
+}
+
+fn call_modules(
+  modules: &Mutex<Vec<SharedModule>>,
+  hook: impl Fn(&mut dyn Module),
+) {
+  let modules = modules.lock().ok().map(|modules| modules.clone());
+
+  if let Some(modules) = modules {
+    for module in modules {
+      if let Ok(mut module) = module.lock() {
+        hook(module.as_mut());
+      }
+    }
   }
 }
 
@@ -951,7 +964,8 @@ impl Router {
     mut module: impl AsyncModule + 'static,
   ) -> &mut Self {
     module.on_attach(self).await;
-    (*self.async_modules.lock().await).push(Box::new(module));
+    (*self.async_modules.lock().await)
+      .push(Arc::new(AsyncMutex::new(Box::new(module))));
 
     self
   }
@@ -1010,7 +1024,7 @@ impl Router {
   ) -> &mut Self {
     module.on_attach(self);
     (*self.modules.lock().expect("modules lock poisoned"))
-      .push(Box::new(module));
+      .push(Arc::new(Mutex::new(Box::new(module))));
 
     self
   }
