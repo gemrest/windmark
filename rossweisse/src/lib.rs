@@ -17,10 +17,6 @@ use syn::Item;
 
 /// Mark a `struct` as a router or an `impl` block as a router implementation.
 ///
-/// # Panics
-///
-/// Panics if used on an item that is not a `struct` or `impl` block.
-///
 /// # Examples
 ///
 /// ```rust
@@ -45,15 +41,18 @@ pub fn router(arguments: TokenStream, item: TokenStream) -> TokenStream {
   match syn::parse::<Item>(item) {
     Ok(Item::Struct(item)) => implementations::fields(arguments, item),
     Ok(Item::Impl(item)) => implementations::methods(arguments, item),
-    _ => panic!("`#[rossweisse::router]` can only be used on `struct`s"),
+    Ok(item) =>
+      syn::Error::new_spanned(
+        item,
+        "`#[rossweisse::router]` requires a struct or impl block",
+      )
+      .to_compile_error()
+      .into(),
+    Err(error) => error.to_compile_error().into(),
   }
 }
 
 /// Mark a method of a router implementation as a route to mount.
-///
-/// # Panics
-///
-/// Panics if used on an item that is not a function.
 ///
 /// # Examples
 ///
@@ -76,6 +75,13 @@ pub fn router(arguments: TokenStream, item: TokenStream) -> TokenStream {
 pub fn route(arguments: TokenStream, item: TokenStream) -> TokenStream {
   match syn::parse::<Item>(item) {
     Ok(Item::Fn(ref item)) => implementations::route(arguments, item),
-    _ => panic!("`#[rossweisse::route]` can only be used on `fn`s"),
+    Ok(item) =>
+      syn::Error::new_spanned(
+        item,
+        "`#[rossweisse::route]` requires a function",
+      )
+      .to_compile_error()
+      .into(),
+    Err(error) => error.to_compile_error().into(),
   }
 }

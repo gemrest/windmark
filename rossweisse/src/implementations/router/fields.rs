@@ -16,11 +16,15 @@ pub fn fields(arguments: TokenStream, item: syn::ItemStruct) -> TokenStream {
         named:       Punctuated::default(),
       },
 
-    syn::Fields::Unnamed(_) =>
-      panic!(
-        "`#[rossweisse::router]` can only be used on `struct`s with named \
-         fields or unit structs"
-      ),
+    syn::Fields::Unnamed(fields) => {
+      return syn::Error::new_spanned(
+        fields,
+        "`#[rossweisse::router]` requires a struct with named fields or a \
+         unit struct",
+      )
+      .to_compile_error()
+      .into();
+    }
   };
   let new_method_fields = named_fields.named.iter().map(|field| {
     let name = &field.ident;

@@ -23,6 +23,19 @@ fn consumer_api_and_macro_forms_match_expected_behavior() {
       "cannot return reference to function parameter",
       false,
     ),
+    (
+      "invalid_router_item",
+      "requires a struct or impl block",
+      false,
+    ),
+    ("invalid_route_item", "requires a function", false),
+    (
+      "invalid_router_fields",
+      "requires a struct with named fields or a unit struct",
+      false,
+    ),
+    ("invalid_router_syntax", "expected", false),
+    ("invalid_route_syntax", "expected", false),
     ("visibility", "", false),
     ("visibility_private", "struct `Capsule` is private", false),
     (
@@ -57,6 +70,14 @@ fn consumer_api_and_macro_forms_match_expected_behavior() {
       .output()
       .unwrap();
     let errors = String::from_utf8_lossy(&output.stderr);
+
+    if name.starts_with("invalid_") {
+      assert!(
+        !errors.contains("custom attribute panicked"),
+        "{name}: {errors}"
+      );
+      assert!(errors.contains(&format!("{name}.rs")), "{name}: {errors}");
+    }
 
     if diagnostic.is_empty() {
       assert!(output.status.success(), "{name}: {errors}");
