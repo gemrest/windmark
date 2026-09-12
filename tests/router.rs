@@ -125,7 +125,9 @@ fn case_insensitive_lookup_combines_with_trailing_slash_removal() {
 
 /// Format `response`'s status line with the router's default charset and
 /// language (matching `Router::default`).
-fn line(response: &Response) -> String { status_line(response, "utf-8", "en") }
+fn line(response: &Response) -> String {
+  status_line(response, "utf-8", "en").unwrap()
+}
 
 #[test]
 fn success_status_line_falls_back_to_router_defaults() {
@@ -159,7 +161,10 @@ fn success_status_line_joins_the_response_languages() {
   let mut response = Response::success("hi");
 
   response.with_languages(["en", "fr"]);
-  assert_eq!(line(&response), "20 text/gemini; charset=utf-8; lang=en,fr");
+  assert_eq!(
+    line(&response),
+    "20 text/gemini; charset=utf-8; lang=\"en,fr\""
+  );
 }
 
 #[test]
@@ -171,8 +176,8 @@ fn binary_success_is_sent_as_a_plain_success_with_its_mime() {
 }
 
 #[test]
-fn status_21_without_a_mime_emits_an_empty_meta() {
-  assert_eq!(line(&Response::new(21, "")), "20 ");
+fn status_21_without_a_mime_uses_binary_media_type() {
+  assert_eq!(line(&Response::new(21, "")), "20 application/octet-stream");
 }
 
 #[test]
@@ -254,12 +259,9 @@ fn response_assembly_preserves_publicly_constructible_states() {
       "20 text/gemini; charset=utf-8; lang=en",
       b"HEADERbody\nFOOTER\n".as_slice(),
     ),
-    (21, "20 ", b"\x00\xff".as_slice()),
-    (22, "20 ", b"\x00\xff".as_slice()),
-    (23, "23 body", b"".as_slice()),
+    (21, "20 application/octet-stream", b"\x00\xff".as_slice()),
+    (22, "20 application/octet-stream", b"\x00\xff".as_slice()),
     (40, "40 body", b"".as_slice()),
-    (79, "79 body", b"".as_slice()),
-    (-1, "-1 body", b"".as_slice()),
   ] {
     let mut response = Response::new(status, "body");
 
@@ -287,8 +289,13 @@ fn response_assembly_preserves_publicly_constructible_states() {
       .serialize_body("HEADER", "FOOTER")
       .is_empty());
     assert_eq!(
-      super::serialize_response(response, "20 ", "HEADER", "FOOTER"),
-      b"20 \r\n"
+      super::serialize_response(
+        response,
+        "20 application/octet-stream",
+        "HEADER",
+        "FOOTER"
+      ),
+      b"20 application/octet-stream\r\n"
     );
   }
 }
@@ -637,6 +644,87 @@ async fn exclusive_async_phases_wait_for_existing_concurrent_phases() {
   drop(shared);
 
   exclusive.await;
+}
+
+#[test]
+fn request_uris_reject_forbidden_syntax_before_normalization() {
+  for request in [
+    "gemini://user@localhost/",
+    "gemini://@localhost/",
+    "gemini://localhost/#",
+    "gemini://localhost/#fragment",
+    "gemini://localhost/\t",
+    "gemini://localhost/?hello world",
+    "gemini://localhost/?%ZZ",
+    "gemini://localhost/?%0",
+    "gemini://localhost/?%",
+    "gemini://localhost/[path]",
+    "gemini://localhost/café",
+    "gemini:///",
+    "/relative",
+  ] {
+    assert!(super::request::parse_uri(request).is_err(), "{request}");
+  }
+
+  for request in [
+    "gemini://localhost/",
+    "gemini://localhost",
+    "gemini://[::1]/",
+    "gemini://localhost/?hello%20world",
+    "gemini://localhost/caf%C3%A9",
+    "gemini://localhost/%23%40%5B",
+    "gopher://localhost/1/example",
+    "https://localhost/",
+    "mailto:user@example.com",
+  ] {
+    assert!(super::request::parse_uri(request).is_ok(), "{request}");
+  }
+}
+
+#[test]
+fn response_headers_reject_invalid_statuses_and_metadata() {
+  for response in [
+    Response::new(-1, "message"),
+    Response::new(23, "message"),
+    Response::new(99, "message"),
+    Response::input(""),
+    Response::temporary_redirect(""),
+    Response::temporary_redirect("/hello world"),
+    Response::temporary_redirect("/%XX"),
+    Response::temporary_redirect("/[path]"),
+    Response::temporary_redirect("/#one#two"),
+    Response::bad_request("one\rtwo"),
+    Response::bad_request("one\u{0085}two"),
+    Response::binary_success([], "text/plain\r\ninjected"),
+    Response::binary_success([], "invalid media type"),
+  ] {
+    assert!(status_line(&response, "utf-8", "en").is_err());
+  }
+
+  assert_eq!(line(&Response::temporary_failure("")), "40");
+  assert_eq!(
+    line(&Response::temporary_redirect("../page#part")),
+    "30 ../page#part"
+  );
+  assert_eq!(
+    line(&Response::temporary_redirect("https://example.com/")),
+    "30 https://example.com/"
+  );
+}
+
+#[test]
+fn response_languages_support_private_tags_and_omission() {
+  let mut response = Response::success("hello");
+
+  response.with_languages(["x-private", "zh-Hans-CN"]);
+  assert_eq!(
+    line(&response),
+    "20 text/gemini; charset=utf-8; lang=\"x-private,zh-Hans-CN\""
+  );
+  response.with_languages(Vec::<String>::new());
+  assert_eq!(line(&response), "20 text/gemini; charset=utf-8");
+  response.with_languages(["en;injected=value"]);
+  assert!(status_line(&response, "utf-8", "en").is_err());
 }
 
 #[test]

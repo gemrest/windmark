@@ -114,7 +114,7 @@ fn request(address: SocketAddr, path: &str, expected: &[u8]) {
   );
 }
 
-fn connect(address: SocketAddr) -> openssl::ssl::SslStream<TcpStream> {
+fn connect_tcp(address: SocketAddr) -> TcpStream {
   let started = Instant::now();
   let stream = loop {
     match TcpStream::connect_timeout(&address, Duration::from_millis(100)) {
@@ -134,6 +134,11 @@ fn connect(address: SocketAddr) -> openssl::ssl::SslStream<TcpStream> {
     .set_write_timeout(Some(Duration::from_secs(5)))
     .unwrap();
 
+  stream
+}
+
+fn connect(address: SocketAddr) -> openssl::ssl::SslStream<TcpStream> {
+  let stream = connect_tcp(address);
   let mut connector = SslConnector::builder(SslMethod::tls()).unwrap();
 
   connector.set_verify(SslVerifyMode::NONE);
@@ -157,6 +162,10 @@ fn exchange(
 
   stream.read_exact(&mut output).unwrap();
   assert_eq!(output, expected);
+  assert_eq!(stream.read(&mut [0]).unwrap(), 0);
+  assert!(stream
+    .get_shutdown()
+    .contains(openssl::ssl::ShutdownState::RECEIVED));
 }
 
 async fn serve_requests(
@@ -308,7 +317,7 @@ async fn request_framing_handles_split_characters_and_terminates_errors() {
   serve_requests(router, |address| {
     let success = b"20 text/gemini; charset=utf-8; lang=en\r\naccepted\n";
     let invalid_utf8 = b"gemini://localhost/\xff";
-    let invalid_url = "not a url";
+    let invalid_url = "relative";
     let utf8_error = format!(
       "59 The server (Windmark) received a bad request: {}\r\n",
       std::str::from_utf8(invalid_utf8.as_slice()).unwrap_err()
@@ -318,12 +327,12 @@ async fn request_framing_handles_split_characters_and_terminates_errors() {
       url::Url::parse(invalid_url).unwrap_err()
     );
     let prefix = "gemini://localhost/";
-    let maximum_url = format!("{prefix}{}", "a".repeat(1022 - prefix.len()));
+    let maximum_url = format!("{prefix}{}", "a".repeat(1024 - prefix.len()));
 
-    assert_eq!(maximum_url.len(), 1022);
+    assert_eq!(maximum_url.len(), 1024);
     request_chunks(
       address,
-      &[b"gemini://localhost/caf\xc3", b"\xa9\r", b"\n"],
+      &[b"gemini://localhost/caf%C", b"3%A9\r", b"\n"],
       success,
     );
     request_chunks(address, &[invalid_utf8, b"\r\n"], utf8_error.as_bytes());
@@ -332,11 +341,16 @@ async fn request_framing_handles_split_characters_and_terminates_errors() {
       &[invalid_url.as_bytes(), b"\r\n"],
       url_error.as_bytes(),
     );
-    request_chunks(address, &[maximum_url.as_bytes(), b"\r\n"], success);
+    request_chunks(address, &[maximum_url.as_bytes(), b"\r", b"\n"], success);
+
+    let mut followed_by_extra_bytes = b"gemini://localhost/\r\n".to_vec();
+
+    followed_by_extra_bytes.extend_from_slice(&[b'x'; 1024]);
+    request_chunks(address, &[&followed_by_extra_bytes], success);
     request_chunks(
       address,
       &[maximum_url.as_bytes(), b"a\r\n"],
-      b"59 The server (Windmark) received a request exceeding 1024 bytes\r\n",
+      b"59 The server (Windmark) received a bad request: request URI exceeds 1024 bytes\r\n",
     );
   })
   .await;
@@ -669,6 +683,34 @@ async fn index_route_attributes_preserve_names_and_select_the_root_path() {
         path,
         format!("20 text/gemini; charset=utf-8; lang=en\r\n{body}\n")
           .as_bytes(),
+      );
+    }
+  })
+  .await;
+}
+
+#[cfg_attr(
+  feature = "tokio",
+  tokio::test(flavor = "multi_thread", worker_threads = 2)
+)]
+#[cfg_attr(feature = "async-std", async_std::test)]
+async fn invalid_response_headers_become_complete_failure_responses() {
+  let mut router = Router::new();
+
+  router.mount("/status", |_| Response::new(99, "invalid"));
+  router.mount("/metadata", |_| {
+    let mut response = Response::success("must not escape");
+
+    response.with_mime("text/gemini\r\nINJECTED");
+
+    response
+  });
+  serve_requests(router, |address| {
+    for path in ["/status", "/metadata"] {
+      request(
+        address,
+        path,
+        b"40 The server could not encode the response\r\n",
       );
     }
   })

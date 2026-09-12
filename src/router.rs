@@ -31,26 +31,13 @@ use tokio::{
   io::{AsyncReadExt, AsyncWriteExt},
   sync::{Mutex as AsyncMutex, RwLock as AsyncRwLock},
 };
-use url::Url;
 
+mod request;
 mod routes;
 
 use routes::Routes;
 
-macro_rules! or_error {
-  ($stream:ident, $operation:expr, $error_format:literal) => {
-    match $operation {
-      Ok(u) => u,
-      Err(e) => {
-        $stream
-          .write_all(format!($error_format, e).as_bytes())
-          .await?;
-
-        return Ok(());
-      }
-    }
-  };
-}
+const MAX_REQUEST_URI_BYTES: usize = 1024;
 
 #[cfg(feature = "tokio")]
 type TcpStream = tokio::net::TcpStream;
@@ -78,6 +65,10 @@ enum HookPhase {
 }
 
 /// A router dispatches requests through its handlers, partials, and modules.
+///
+/// Requests must contain an absolute URI of at most 1024 bytes, excluding
+/// CRLF, without userinfo or a fragment. Non-ASCII characters must be
+/// percent-encoded. Other schemes remain available to proxy handlers.
 #[derive(Clone)]
 pub struct Router {
   routes:                Routes,
@@ -127,44 +118,60 @@ impl RequestHandler {
     clippy::cognitive_complexity
   )]
   async fn handle(&self, stream: &mut Stream) -> Result<(), Box<dyn Error>> {
-    let mut buffer = [0u8; 1024];
+    let mut buffer = [0u8; MAX_REQUEST_URI_BYTES];
     let mut footer = String::new();
     let mut header = String::new();
     let mut request = Vec::new();
-    let mut url = loop {
-      let size = match stream.read(&mut buffer).await {
-        Ok(0) | Err(_) => return Ok(()),
-        Ok(size) => size,
+    let request = async {
+      let url = loop {
+        let size = match stream.read(&mut buffer).await {
+          Ok(0) => return Ok(None),
+          Err(error) => return Err(error),
+          Ok(size) => size,
+        };
+
+        request.extend_from_slice(&buffer[..size]);
+
+        let request_end = request.windows(2).position(|pair| pair == b"\r\n");
+        let uri_length = request_end.unwrap_or_else(|| {
+          request.len() - usize::from(request.last() == Some(&b'\r'))
+        });
+
+        if uri_length > MAX_REQUEST_URI_BYTES {
+          return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "request URI exceeds 1024 bytes",
+          ));
+        }
+
+        if let Some(position) = request_end {
+          let request =
+            std::str::from_utf8(&request[..position]).map_err(|error| {
+              std::io::Error::new(std::io::ErrorKind::InvalidData, error)
+            })?;
+
+          break request::parse_uri(request).map_err(|error| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, error)
+          })?;
+        }
       };
 
-      request.extend_from_slice(&buffer[..size]);
+      Ok(Some(url))
+    }
+    .await;
+    let mut url = match request {
+      Ok(Some(url)) => url,
+      Ok(None) => return Ok(()),
+      Err(error) if error.kind() == std::io::ErrorKind::InvalidData => {
+        let response = format!(
+          "59 The server (Windmark) received a bad request: {error}\r\n"
+        );
 
-      if request.len() > 1024 {
-        stream
-          .write_all(
-            b"59 The server (Windmark) received a request exceeding 1024 \
-              bytes\r\n",
-          )
-          .await?;
+        stream.write_all(response.as_bytes()).await?;
 
         return Ok(());
       }
-
-      if let Some(position) =
-        request.windows(2).position(|pair| pair == b"\r\n")
-      {
-        let request = or_error!(
-          stream,
-          std::str::from_utf8(&request[..position]),
-          "59 The server (Windmark) received a bad request: {}\r\n"
-        );
-
-        break or_error!(
-          stream,
-          Url::parse(request),
-          "59 The server (Windmark) received a bad request: {}\r\n"
-        );
-      }
+      Err(error) => return Err(error.into()),
     };
 
     if url.path().is_empty() {
@@ -235,15 +242,26 @@ impl RequestHandler {
     });
     self.post_route_callback.call(&hook_context, &mut content);
 
-    let status_line =
-      status_line(&content, &self.character_set, &self.languages_joined);
+    let status_line = match status_line(
+      &content,
+      &self.character_set,
+      &self.languages_joined,
+    ) {
+      Ok(line) => line,
+      Err(error) => {
+        error!("response encoding error: {error}");
+
+        content = Response::temporary_failure(
+          "The server could not encode the response",
+        );
+
+        "40 The server could not encode the response".to_owned()
+      }
+    };
     let response = serialize_response(content, &status_line, &header, &footer);
 
     stream.write_all(&response).await?;
-    #[cfg(feature = "tokio")]
-    stream.shutdown().await?;
-    #[cfg(feature = "async-std")]
-    stream.get_mut().shutdown(std::net::Shutdown::Both)?;
+
     Ok(())
   }
 }
@@ -383,6 +401,22 @@ fn spawn_connection(
 
         if let Err(e) = handler.handle(&mut stream).await {
           error!("handle error: {e}");
+
+          return;
+        }
+
+        #[cfg(feature = "tokio")]
+        let shutdown = stream.shutdown();
+        #[cfg(feature = "async-std")]
+        let shutdown = std::future::poll_fn(|context| {
+          async_std::io::Write::poll_close(
+            std::pin::Pin::new(&mut stream),
+            context,
+          )
+        });
+
+        if let Err(error) = shutdown.await {
+          error!("TLS shutdown error: {error}");
         }
       }
       Err(e) => error!("ssl stream error: {e:?}"),
@@ -390,37 +424,92 @@ fn spawn_connection(
   });
 }
 
-/// Build the Gemini response status line for `content`, falling back to the
-/// router's `default_character_set` and `default_languages` for `20` responses.
-///
-/// Statuses `21`/`22` (binary success) are sent to clients as a plain `20` with
-/// the response's MIME as the meta; every other status uses the first line of
-/// its `content` as the meta.
+/// Build a protocol-valid response header from the handler's response.
 fn status_line(
   content: &Response,
   default_character_set: &str,
   default_languages: &str,
-) -> String {
-  match content.status {
-    20 => {
-      let mime = content.mime.as_deref().unwrap_or("text/gemini");
+) -> Result<String, &'static str> {
+  let status = content.status;
+
+  if matches!(status, 20..=22) {
+    let mime = content.mime.as_deref().unwrap_or(if status == 20 {
+      "text/gemini"
+    } else {
+      "application/octet-stream"
+    });
+    let metadata = if status == 20 {
       let character_set = content
         .character_set
         .as_deref()
         .unwrap_or(default_character_set);
       let languages = content.languages.as_ref().map_or_else(
-        || std::borrow::Cow::Borrowed(default_languages),
-        |languages| std::borrow::Cow::Owned(languages.join(",")),
+        || default_languages.to_owned(),
+        |languages| languages.join(","),
       );
+      let mut metadata =
+        format!("{mime}; charset={}", mime_parameter(character_set));
 
-      format!("20 {mime}; charset={character_set}; lang={languages}")
+      if !languages.is_empty() {
+        if languages
+          .split(',')
+          .any(|language| language_tags::LanguageTag::parse(language).is_err())
+        {
+          return Err("invalid response language tag");
+        }
+
+        write!(&mut metadata, "; lang={}", mime_parameter(&languages))
+          .expect("writing to a string cannot fail");
+      }
+
+      metadata
+    } else {
+      mime.to_owned()
+    };
+
+    if metadata.chars().any(char::is_control)
+      || metadata.parse::<mime::Mime>().is_err()
+    {
+      return Err("invalid response media type or parameters");
     }
-    21 | 22 => format!("20 {}", content.mime.as_deref().unwrap_or_default()),
-    status =>
-      format!(
-        "{status} {}",
-        content.content.lines().next().unwrap_or_default()
-      ),
+
+    return Ok(format!("20 {metadata}"));
+  }
+
+  if !matches!(status, 10 | 11 | 30 | 31 | 40..=44 | 50..=53 | 59..=62) {
+    return Err("undefined response status");
+  }
+
+  let metadata = content.content.lines().next().unwrap_or_default();
+
+  if metadata.chars().any(char::is_control) {
+    return Err("response metadata contains a control character");
+  }
+
+  if matches!(status, 10 | 11 | 30 | 31) && metadata.is_empty() {
+    return Err("input prompts and redirect targets must not be empty");
+  }
+
+  if matches!(status, 30 | 31) && !request::valid_uri_reference(metadata) {
+    return Err("invalid redirect URI reference");
+  }
+
+  if metadata.is_empty() {
+    Ok(status.to_string())
+  } else {
+    Ok(format!("{status} {metadata}"))
+  }
+}
+
+fn mime_parameter(value: &str) -> String {
+  if !value.is_empty()
+    && value.bytes().all(|byte| {
+      byte.is_ascii_graphic() && !b"()<>@,;:\\\"/[]?=".contains(&byte)
+    })
+  {
+    value.to_owned()
+  } else {
+    format!("\"{}\"", value.replace('\\', "\\\\").replace('\"', "\\\""))
   }
 }
 

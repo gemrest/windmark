@@ -14,8 +14,9 @@ macro_rules! response {
 
 /// A response holds the status and content returned by a handler.
 ///
-/// Text bodies use LF line endings, including a final newline after a
-/// non-empty footer. Binary bodies are sent unchanged.
+/// The server replaces responses whose status or metadata cannot be encoded
+/// with a temporary failure. Text bodies use LF line endings, including a
+/// final newline after a non-empty footer. Binary bodies are sent unchanged.
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct Response {

@@ -51,6 +51,8 @@ log = "0.4.30"
 # URL
 url = "2.2.2"
 matchit = "0.7.3"
+mime = "0.3.17"
+language-tags = "0.3.2"
 
 tree_magic_mini = { version = "3.2.2", optional = true } # MIME
 
