@@ -17,6 +17,11 @@ use syn::Item;
 
 /// Mark a `struct` as a router or an `impl` block as a router implementation.
 ///
+/// Struct attributes and generics are preserved. Each field initialiser must
+/// name a declared field, and repeated names are rejected. The `router` field
+/// and the `new`, `_new`, `run`, and `router` methods are reserved for
+/// generated code.
+///
 /// # Examples
 ///
 /// ```rust

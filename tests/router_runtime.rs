@@ -637,7 +637,7 @@ mod named_routes {
 
   #[rossweisse::router]
   impl Capsule {
-    #[route(index)]
+    #[rossweisse::route(index)]
     pub fn index(_: RouteContext) -> Response { Response::success("INDEX") }
 
     #[route]

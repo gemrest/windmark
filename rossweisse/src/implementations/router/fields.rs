@@ -1,33 +1,70 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::punctuated::Punctuated;
+use std::collections::HashSet;
 
-pub fn fields(arguments: TokenStream, item: syn::ItemStruct) -> TokenStream {
+pub fn fields(
+  arguments: TokenStream,
+  mut item: syn::ItemStruct,
+) -> TokenStream {
   let field_initializers =
     syn::parse_macro_input!(arguments as super::parser::FieldInitializers);
-  let visibility = item.vis;
-  let router_identifier = item.ident;
-  let named_fields = match item.fields {
-    syn::Fields::Named(fields) => fields,
 
-    syn::Fields::Unit =>
-      syn::FieldsNamed {
-        brace_token: syn::token::Brace::default(),
-        named:       Punctuated::default(),
-      },
+  if matches!(item.fields, syn::Fields::Unit) {
+    item.fields = syn::Fields::Named(syn::parse_quote!({}));
+    item.semi_token = None;
+  }
 
-    syn::Fields::Unnamed(fields) => {
+  let syn::Fields::Named(fields) = &mut item.fields else {
+    return syn::Error::new_spanned(
+      item.fields,
+      "`#[rossweisse::router]` requires a struct with named fields or a unit \
+       struct",
+    )
+    .to_compile_error()
+    .into();
+  };
+  let mut supplied_fields = HashSet::new();
+
+  for initializer in &field_initializers.0 {
+    if !supplied_fields.insert(initializer.identifier.to_string()) {
       return syn::Error::new_spanned(
-        fields,
-        "`#[rossweisse::router]` requires a struct with named fields or a \
-         unit struct",
+        &initializer.identifier,
+        "duplicate field initialiser",
       )
       .to_compile_error()
       .into();
     }
-  };
-  let new_method_fields = named_fields.named.iter().map(|field| {
+
+    if !fields
+      .named
+      .iter()
+      .any(|field| field.ident.as_ref() == Some(&initializer.identifier))
+    {
+      return syn::Error::new_spanned(
+        &initializer.identifier,
+        "unknown field initialiser",
+      )
+      .to_compile_error()
+      .into();
+    }
+  }
+
+  if let Some(field) = fields
+    .named
+    .iter()
+    .find(|field| field.ident.as_ref().is_some_and(|name| name == "router"))
+  {
+    return syn::Error::new_spanned(
+      field,
+      "the field name `router` is reserved by Rossweisse",
+    )
+    .to_compile_error()
+    .into();
+  }
+
+  let initializers = fields.named.iter().map(|field| {
     let name = &field.ident;
+    let conditions = super::conditional_attributes(&field.attrs);
     let initializer: syn::Expr = field_initializers
       .0
       .iter()
@@ -38,26 +75,32 @@ pub fn fields(arguments: TokenStream, item: syn::ItemStruct) -> TokenStream {
       );
 
     quote! {
+      #(#conditions)*
       #name: #initializer,
     }
   });
-  let new_methods = quote! {
-    fn _new() -> Self {
-      Self {
-        #(#new_method_fields)*
-        router: ::windmark::router::Router::new(),
-      }
+  let initialization = quote! {
+    Self {
+      #(#initializers)*
+      router: ::windmark::router::Router::new(),
     }
   };
-  let output_fields = named_fields.named;
-  let output = quote! {
-    #visibility struct #router_identifier {
-      #output_fields
-      router: ::windmark::router::Router,
-    }
 
-    impl #router_identifier {
-      #new_methods
+  fields
+    .named
+    .push(syn::parse_quote!(router: ::windmark::router::Router));
+
+  let name = &item.ident;
+  let conditions = super::conditional_attributes(&item.attrs);
+  let (implementation_generics, type_generics, where_clause) =
+    item.generics.split_for_impl();
+
+  quote! {
+    #item
+
+    #(#conditions)*
+    impl #implementation_generics #name #type_generics #where_clause {
+      fn _new() -> Self { #initialization }
 
       pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.router.run().await
@@ -67,7 +110,6 @@ pub fn fields(arguments: TokenStream, item: syn::ItemStruct) -> TokenStream {
         &mut self.router
       }
     }
-  };
-
-  output.into()
+  }
+  .into()
 }

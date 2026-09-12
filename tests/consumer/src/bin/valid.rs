@@ -21,7 +21,7 @@ struct Empty;
 #[rossweisse::router]
 impl Empty {}
 
-#[rossweisse::router(count = 7, count = 8, ignored = 9)]
+#[rossweisse::router(count = 7)]
 struct Capsule {
   count: usize,
   label: String,

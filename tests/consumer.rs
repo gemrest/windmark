@@ -41,6 +41,23 @@ fn consumer_api_and_macro_forms_match_expected_behavior() {
       "mime",
     ),
     ("index_name", "", "mime"),
+    ("router_declarations", "", "mime"),
+    (
+      "invalid_router_duplicate",
+      "duplicate field initialiser",
+      "mime",
+    ),
+    (
+      "invalid_router_unknown",
+      "unknown field initialiser",
+      "mime",
+    ),
+    ("invalid_router_reserved", "reserved by Rossweisse", "mime"),
+    (
+      "invalid_route_argument",
+      "only supported route argument",
+      "mime",
+    ),
   ];
 
   for (name, diagnostic, extra_features) in cases {
