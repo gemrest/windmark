@@ -35,10 +35,12 @@ use tokio::{
 mod connections;
 mod request;
 mod routes;
+mod server;
 
-use connections::with_timeout;
 pub use connections::ConnectionLimits;
+use connections::{with_timeout, TcpListener};
 use routes::Routes;
+pub use server::Server;
 
 const MAX_REQUEST_URI_BYTES: usize = 1024;
 
@@ -727,14 +729,11 @@ impl Router {
   /// This method returns an error if TLS configuration or listener binding
   /// fails.
   pub async fn run(&mut self) -> Result<(), Box<dyn Error>> {
-    #[cfg(feature = "tokio")]
-    let shutdown = async {
-      let _ = tokio::signal::ctrl_c().await;
-    };
-    #[cfg(feature = "async-std")]
-    let shutdown = std::future::pending();
+    let server = self.bind().await?;
 
-    self.run_until(shutdown).await
+    server.run().await;
+
+    Ok(())
   }
 
   /// Set connection limits for subsequent server starts.
@@ -775,26 +774,40 @@ impl Router {
     &mut self,
     shutdown: impl std::future::Future<Output = ()>,
   ) -> Result<(), Box<dyn Error>> {
+    let server = self.bind().await?;
+
+    server.run_until(shutdown).await;
+
+    Ok(())
+  }
+
+  /// Bind a server using the current configuration.
+  ///
+  /// Routes, callbacks, partials, TLS settings, and connection limits are
+  /// captured at binding. Module registrations and module scheduling remain
+  /// shared with this router and its clones. State owned by handlers and
+  /// partials also retains its existing sharing semantics.
+  ///
+  /// The returned server owns the listener independently of this router.
+  /// Set the port to zero and call `Server::local_addr` to discover an
+  /// operating-system-assigned port before serving requests.
+  ///
+  /// # Errors
+  ///
+  /// This method returns an error if TLS configuration or listener binding
+  /// fails.
+  ///
+  /// # Panics
+  ///
+  /// This method panics if a partial registry lock has been poisoned.
+  pub async fn bind(&self) -> Result<Server, Box<dyn Error>> {
     let acceptor = match &self.ssl_acceptor {
       Some(acceptor) => acceptor.clone(),
       None => Arc::new(self.create_acceptor()?),
     };
-
-    #[cfg(feature = "tokio")]
-    let listener = tokio::net::TcpListener::bind(format!(
-      "{}:{}",
-      self.listener_address, self.port
-    ))
-    .await?;
-    #[cfg(feature = "async-std")]
-    let listener = async_std::net::TcpListener::bind(format!(
-      "{}:{}",
-      self.listener_address, self.port
-    ))
-    .await?;
-
-    info!("windmark is listening for connections");
-
+    let listener =
+      TcpListener::bind(format!("{}:{}", self.listener_address, self.port))
+        .await?;
     let handler = Arc::new(RequestHandler {
       routes:              self.routes.clone(),
       error_handler:       self.error_handler.clone(),
@@ -821,9 +834,11 @@ impl Router {
       connection_limits:   self.connection_limits,
     });
 
-    connections::serve(listener, handler, acceptor, shutdown).await;
-
-    Ok(())
+    Ok(Server {
+      listener,
+      handler,
+      acceptor,
+    })
   }
 
   fn create_acceptor(&self) -> Result<SslAcceptor, Box<dyn Error>> {

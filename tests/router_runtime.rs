@@ -17,7 +17,7 @@ use windmark::{
   context::{HookContext, RouteContext},
   module::{AsyncModule, Module},
   response::Response,
-  router::Router,
+  router::{Router, Server},
   router_option::RouterOption,
 };
 
@@ -180,22 +180,26 @@ async fn serve_requests_until(
   client: impl FnOnce(SocketAddr) + Send + 'static,
   shutdown: impl std::future::Future<Output = ()> + Send + 'static,
 ) {
-  let reservation = TcpListener::bind("127.0.0.1:0").unwrap();
-  let address = reservation.local_addr().unwrap();
-
   router.set_listener_address("127.0.0.1");
-  router.set_port(address.port());
+  router.set_port(0);
   router.set_ssl_acceptor(acceptor());
-  drop(reservation);
 
+  let bound = router.bind().await.unwrap();
+
+  serve_bound_requests(bound, client, shutdown).await;
+}
+
+async fn serve_bound_requests(
+  bound: Server,
+  client: impl FnOnce(SocketAddr) + Send + 'static,
+  shutdown: impl std::future::Future<Output = ()> + Send + 'static,
+) {
+  let address = bound.local_addr().unwrap();
   #[cfg(feature = "tokio")]
-  let server =
-    tokio::spawn(async move { router.run_until(shutdown).await.unwrap() });
+  let server = tokio::spawn(async move { bound.run_until(shutdown).await });
   #[cfg(feature = "async-std")]
   let server =
-    async_std::task::spawn(
-      async move { router.run_until(shutdown).await.unwrap() },
-    );
+    async_std::task::spawn(async move { bound.run_until(shutdown).await });
   #[cfg(feature = "tokio")]
   let run_client = tokio::task::spawn_blocking;
   #[cfg(feature = "async-std")]
@@ -990,4 +994,93 @@ async fn write_deadlines_release_connections_when_clients_stop_reading() {
     drop(stalled);
   })
   .await;
+}
+
+#[cfg_attr(
+  feature = "tokio",
+  tokio::test(flavor = "multi_thread", worker_threads = 2)
+)]
+#[cfg_attr(feature = "async-std", async_std::test)]
+async fn bound_servers_own_their_ports_and_report_binding_errors() {
+  let mut router = Router::new();
+
+  router.set_listener_address("127.0.0.1");
+  router.set_port(0);
+  router.set_ssl_acceptor(acceptor());
+
+  let server = router.bind().await.unwrap();
+  let address = server.local_addr().unwrap();
+
+  assert_ne!(address.port(), 0);
+  router.set_port(address.port());
+  assert!(router.bind().await.is_err());
+  drop(server);
+
+  let rebound = router.bind().await.unwrap();
+
+  assert_eq!(rebound.local_addr().unwrap(), address);
+  rebound.run_until(std::future::ready(())).await;
+
+  let listener = TcpListener::bind(address).unwrap();
+
+  assert_eq!(listener.local_addr().unwrap(), address);
+}
+
+#[cfg_attr(
+  feature = "tokio",
+  tokio::test(flavor = "multi_thread", worker_threads = 2)
+)]
+#[cfg_attr(feature = "async-std", async_std::test)]
+async fn binding_captures_routes_but_preserves_shared_module_registration() {
+  let mut router = Router::new();
+  let events: Events = Arc::default();
+
+  router.set_listener_address("127.0.0.1");
+  router.set_port(0);
+  router.set_ssl_acceptor(acceptor());
+  router.set_error_handler(|_| Response::success("before"));
+
+  let first = router.bind().await.unwrap();
+
+  router.mount("/", |_| Response::success("after"));
+
+  let second = router.bind().await.unwrap();
+
+  assert_ne!(first.local_addr().unwrap(), second.local_addr().unwrap());
+  router.attach(Observer(events.clone()));
+  drop(router);
+  serve_bound_requests(
+    first,
+    |address| {
+      request(
+        address,
+        "/",
+        b"20 text/gemini; charset=utf-8; lang=en\r\nbefore\n",
+      );
+    },
+    std::future::pending(),
+  )
+  .await;
+  serve_bound_requests(
+    second,
+    |address| {
+      request(
+        address,
+        "/",
+        b"20 text/gemini; charset=utf-8; lang=en\r\nafter\n",
+      );
+    },
+    std::future::pending(),
+  )
+  .await;
+  assert_eq!(
+    *events.lock().unwrap(),
+    [
+      "attach",
+      "module-pre",
+      "module-post",
+      "module-pre",
+      "module-post"
+    ]
+  );
 }

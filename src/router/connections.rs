@@ -20,9 +20,9 @@ use std::{
 use tokio::io::AsyncWriteExt;
 
 #[cfg(feature = "tokio")]
-type TcpListener = tokio::net::TcpListener;
+pub(super) type TcpListener = tokio::net::TcpListener;
 #[cfg(feature = "async-std")]
-type TcpListener = async_std::net::TcpListener;
+pub(super) type TcpListener = async_std::net::TcpListener;
 
 /// These limits apply to each server when it starts.
 ///
