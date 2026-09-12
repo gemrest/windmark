@@ -638,3 +638,81 @@ async fn exclusive_async_phases_wait_for_existing_concurrent_phases() {
 
   exclusive.await;
 }
+
+#[test]
+fn credentials_load_complete_chains_and_use_the_last_setter() {
+  use openssl::{
+    asn1::Asn1Time,
+    ec::{EcGroup, EcKey},
+    hash::MessageDigest,
+    nid::Nid,
+    pkey::PKey,
+    x509::{X509NameBuilder, X509},
+  };
+
+  let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
+  let key = PKey::from_ec_key(EcKey::generate(&group).unwrap()).unwrap();
+  let mut name = X509NameBuilder::new().unwrap();
+
+  name.append_entry_by_text("CN", "localhost").unwrap();
+
+  let name = name.build();
+  let mut certificate = X509::builder().unwrap();
+
+  certificate.set_version(2).unwrap();
+  certificate.set_subject_name(&name).unwrap();
+  certificate.set_issuer_name(&name).unwrap();
+  certificate.set_pubkey(&key).unwrap();
+  certificate
+    .set_not_before(&Asn1Time::days_from_now(0).unwrap())
+    .unwrap();
+  certificate
+    .set_not_after(&Asn1Time::days_from_now(1).unwrap())
+    .unwrap();
+  certificate.sign(&key, MessageDigest::sha256()).unwrap();
+
+  let certificate = certificate.build();
+  let certificate_pem =
+    String::from_utf8(certificate.to_pem().unwrap()).unwrap();
+  let key_pem =
+    String::from_utf8(key.private_key_to_pem_pkcs8().unwrap()).unwrap();
+  let chain = certificate_pem.repeat(2);
+  let directory = std::env::temp_dir().join(format!(
+    "windmark-credentials-{}-{}",
+    std::process::id(),
+    std::time::SystemTime::now()
+      .duration_since(std::time::UNIX_EPOCH)
+      .unwrap()
+      .as_nanos(),
+  ));
+
+  std::fs::create_dir(&directory).unwrap();
+  std::fs::write(directory.join("chain.pem"), &chain).unwrap();
+  std::fs::write(directory.join("key.pem"), &key_pem).unwrap();
+
+  let mut router = super::Router::new();
+
+  router.set_certificate("invalid");
+  router.set_private_key("invalid");
+  router.set_certificate_file(directory.join("chain.pem").to_str().unwrap());
+  router.set_private_key_file(directory.join("key.pem").to_str().unwrap());
+
+  let acceptor = router.create_acceptor().unwrap();
+
+  assert_eq!(acceptor.context().extra_chain_certs().len(), 1);
+  router.set_certificate_file("missing-certificate.pem");
+  router.set_private_key_file("missing-key.pem");
+  router.set_certificate(chain);
+  router.set_private_key(key_pem);
+
+  let acceptor = router.create_acceptor().unwrap();
+
+  assert_eq!(acceptor.context().extra_chain_certs().len(), 1);
+  assert_eq!(
+    acceptor.context().certificate().unwrap().to_der().unwrap(),
+    certificate.to_der().unwrap(),
+  );
+  router.set_certificate("");
+  assert!(router.create_acceptor().is_err());
+  std::fs::remove_dir_all(directory).unwrap();
+}

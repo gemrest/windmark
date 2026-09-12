@@ -88,8 +88,7 @@ pub struct Router {
   certificate_content:   Option<String>,
   headers:               Arc<Mutex<Vec<Arc<dyn Partial>>>>,
   footers:               Arc<Mutex<Vec<Arc<dyn Partial>>>>,
-  ssl_acceptor:          Arc<SslAcceptor>,
-  manual_acceptor_set:   bool,
+  ssl_acceptor:          Option<Arc<SslAcceptor>>,
   #[cfg(feature = "logger")]
   default_logger:        bool,
   #[cfg(feature = "logger")]
@@ -472,14 +471,10 @@ impl Router {
   /// ```rust
   /// windmark::router::Router::new(); 
   /// ```
-  ///
-  /// # Panics
-  ///
-  /// if a default `SslAcceptor` could not be built.
   #[must_use]
   pub fn new() -> Self { Self::default() }
 
-  /// Set the filename of the private key file.
+  /// Set the filename of the private key file, replacing any inline key.
   ///
   /// # Examples
   ///
@@ -491,6 +486,7 @@ impl Router {
     private_key_file_name: impl Into<String> + AsRef<str>,
   ) -> &mut Self {
     self.private_key_file_name = private_key_file_name.into();
+    self.private_key_content = None;
 
     self
   }
@@ -511,7 +507,8 @@ impl Router {
     self
   }
 
-  /// Set the filename of the certificate chain file.
+  /// Set the filename of the certificate chain file, replacing any inline
+  /// chain.
   ///
   /// # Examples
   ///
@@ -523,11 +520,12 @@ impl Router {
     certificate_name: impl Into<String> + AsRef<str>,
   ) -> &mut Self {
     self.certificate_file_name = certificate_name.into();
+    self.certificate_content = None;
 
     self
   }
 
-  /// Set the content of the certificate chain file.
+  /// Set a PEM certificate chain, with the server certificate first.
   ///
   /// # Examples
   ///
@@ -666,15 +664,17 @@ impl Router {
   ///
   /// # Panics
   ///
-  /// if the client could not be accepted.
+  /// This method panics if a partial registry lock has been poisoned.
   ///
   /// # Errors
   ///
-  /// if the `TcpListener` could not be bound.
+  /// This method returns an error if TLS configuration or listener binding
+  /// fails.
   pub async fn run(&mut self) -> Result<(), Box<dyn Error>> {
-    if !self.manual_acceptor_set {
-      self.create_acceptor()?;
-    }
+    let acceptor = match &self.ssl_acceptor {
+      Some(acceptor) => acceptor.clone(),
+      None => Arc::new(self.create_acceptor()?),
+    };
 
     #[cfg(feature = "logger")]
     if self.default_logger {
@@ -723,7 +723,6 @@ impl Router {
       module_scheduling:   self.module_scheduling.clone(),
       options:             self.options.clone(),
     });
-    let acceptor = self.ssl_acceptor.clone();
 
     // Under Tokio, Ctrl+C stops the server from accepting new connections
     // without waiting for active connection tasks to finish. The async-std
@@ -759,18 +758,26 @@ impl Router {
     }
   }
 
-  fn create_acceptor(&mut self) -> Result<(), Box<dyn Error>> {
+  fn create_acceptor(&self) -> Result<SslAcceptor, Box<dyn Error>> {
     let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls())?;
 
-    if let Some(ref cert_content) = self.certificate_content {
-      builder.set_certificate(
-        openssl::x509::X509::from_pem(cert_content.as_bytes())?.as_ref(),
-      )?;
+    if let Some(ref content) = self.certificate_content {
+      let mut certificates =
+        openssl::x509::X509::stack_from_pem(content.as_bytes())?.into_iter();
+      let leaf = certificates.next().ok_or_else(|| {
+        std::io::Error::new(
+          std::io::ErrorKind::InvalidInput,
+          "the certificate chain is empty",
+        )
+      })?;
+
+      builder.set_certificate(&leaf)?;
+
+      for certificate in certificates {
+        builder.add_extra_chain_cert(certificate)?;
+      }
     } else {
-      builder.set_certificate_file(
-        &self.certificate_file_name,
-        ssl::SslFiletype::PEM,
-      )?;
+      builder.set_certificate_chain_file(&self.certificate_file_name)?;
     }
 
     if let Some(ref key_content) = self.private_key_content {
@@ -795,12 +802,10 @@ impl Router {
         .as_bytes(),
     )?;
 
-    self.ssl_acceptor = Arc::new(builder.build());
-
-    Ok(())
+    Ok(builder.build())
   }
 
-  /// Use a custom `SslAcceptor`.
+  /// Use a custom `SslAcceptor` instead of building one from the credentials.
   ///
   /// # Examples
   ///
@@ -823,8 +828,7 @@ impl Router {
   /// });
   /// ```
   pub fn set_ssl_acceptor(&mut self, ssl_acceptor: SslAcceptor) -> &mut Self {
-    self.ssl_acceptor = Arc::new(ssl_acceptor);
-    self.manual_acceptor_set = true;
+    self.ssl_acceptor = Some(Arc::new(ssl_acceptor));
 
     self
   }
@@ -1294,12 +1298,7 @@ impl Default for Router {
       certificate_file_name: String::new(),
       headers: Arc::new(Mutex::new(vec![])),
       footers: Arc::new(Mutex::new(vec![])),
-      ssl_acceptor: Arc::new(
-        SslAcceptor::mozilla_intermediate(SslMethod::tls())
-          .expect("failed to create default SSL acceptor")
-          .build(),
-      ),
-      manual_acceptor_set: false,
+      ssl_acceptor: None,
       #[cfg(feature = "logger")]
       default_logger: false,
       #[cfg(feature = "logger")]
