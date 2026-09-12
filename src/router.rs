@@ -320,7 +320,7 @@ fn serialize_response(
   footer: &str,
 ) -> Vec<u8> {
   let mut response = Vec::with_capacity(
-    status_line.len() + content.body_length(header, footer) + 2,
+    status_line.len() + content.body_capacity(header, footer) + 2,
   );
 
   response.extend_from_slice(status_line.as_bytes());

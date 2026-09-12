@@ -13,6 +13,9 @@ macro_rules! response {
 }
 
 /// A response holds the status and content returned by a handler.
+///
+/// Text bodies use LF line endings, including a final newline after a
+/// non-empty footer. Binary bodies are sent unchanged.
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct Response {
@@ -112,16 +115,16 @@ impl Response {
       return self.binary_content.unwrap_or_default();
     }
 
-    let mut body = Vec::with_capacity(self.body_length(header, footer));
+    let mut body = Vec::with_capacity(self.body_capacity(header, footer));
 
     self.append_body(&mut body, header, footer);
 
     body
   }
 
-  pub(crate) fn body_length(&self, header: &str, footer: &str) -> usize {
+  pub(crate) fn body_capacity(&self, header: &str, footer: &str) -> usize {
     match self.status {
-      20 => header.len() + self.content.len() + footer.len() + 1,
+      20 => header.len() + self.content.len() + footer.len() + 2,
       21 | 22 => self.binary_content.as_ref().map_or(0, Vec::len),
       _ => 0,
     }
@@ -135,10 +138,31 @@ impl Response {
   ) {
     match self.status {
       20 => {
-        body.extend_from_slice(header.as_bytes());
-        body.extend_from_slice(self.content.as_bytes());
+        let text = self.mime.as_deref().is_none_or(|mime| {
+          mime
+            .split_once('/')
+            .is_some_and(|(kind, _)| kind.eq_ignore_ascii_case("text"))
+        });
+
+        if text {
+          append_text(body, header);
+          append_text(body, &self.content);
+        } else {
+          body.extend_from_slice(header.as_bytes());
+          body.extend_from_slice(self.content.as_bytes());
+        }
+
         body.push(b'\n');
-        body.extend_from_slice(footer.as_bytes());
+
+        if text {
+          append_text(body, footer);
+
+          if body.last() != Some(&b'\n') {
+            body.push(b'\n');
+          }
+        } else {
+          body.extend_from_slice(footer.as_bytes());
+        }
       }
 
       21 | 22 =>
@@ -180,6 +204,18 @@ impl Response {
 
     self
   }
+}
+
+fn append_text(body: &mut Vec<u8>, mut text: &str) {
+  while let Some(position) = text.find('\r') {
+    body.extend_from_slice(&text.as_bytes()[..position]);
+    body.push(b'\n');
+
+    text = &text[position + 1..];
+    text = text.strip_prefix('\n').unwrap_or(text);
+  }
+
+  body.extend_from_slice(text.as_bytes());
 }
 
 impl std::future::IntoFuture for Response {

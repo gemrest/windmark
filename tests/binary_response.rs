@@ -42,7 +42,7 @@ fn serialize_body_text_success_wraps_with_header_and_footer() {
   let response = Response::success("body");
   let body = response.serialize_body("HEADER\n", "FOOTER");
 
-  assert_eq!(body, b"HEADER\nbody\nFOOTER");
+  assert_eq!(body, b"HEADER\nbody\nFOOTER\n");
 }
 
 #[test]
@@ -64,4 +64,19 @@ fn public_binary_serialization_returns_the_existing_allocation() {
     assert_eq!(body.capacity(), capacity);
     assert_eq!(body, NON_UTF8);
   }
+}
+
+#[test]
+fn text_serialization_normalizes_line_endings_and_terminates_the_footer() {
+  let response = Response::success("one\r\ntwo\rthree");
+
+  assert_eq!(
+    response.serialize_body("header\r\n", "footer"),
+    b"header\none\ntwo\nthree\nfooter\n"
+  );
+  assert_eq!(
+    Response::binary_success(b"one\r\ntwo\r", "text/plain")
+      .serialize_body("", ""),
+    b"one\r\ntwo\r"
+  );
 }

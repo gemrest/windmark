@@ -252,7 +252,7 @@ fn response_assembly_preserves_publicly_constructible_states() {
     (
       20,
       "20 text/gemini; charset=utf-8; lang=en",
-      b"HEADERbody\nFOOTER".as_slice(),
+      b"HEADERbody\nFOOTER\n".as_slice(),
     ),
     (21, "20 ", b"\x00\xff".as_slice()),
     (22, "20 ", b"\x00\xff".as_slice()),

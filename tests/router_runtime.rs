@@ -259,7 +259,7 @@ async fn callbacks_partials_and_case_folding_keep_their_existing_order() {
     request(
       address,
       "/Users/Alice",
-      b"20 text/gemini; charset=utf-8; lang=en\r\nHEADER\nAlice!\nFOOTER",
+      b"20 text/gemini; charset=utf-8; lang=en\r\nHEADER\nAlice!\nFOOTER\n",
     );
     request(
       address,
@@ -359,7 +359,7 @@ async fn cloned_routers_retain_partials_and_running_servers_keep_their_snapshot(
 
   serve_requests(router.clone(), move |address| {
     let expected =
-      b"20 text/gemini; charset=utf-8; lang=en\r\nHEADER\nBODY\nFOOTER";
+      b"20 text/gemini; charset=utf-8; lang=en\r\nHEADER\nBODY\nFOOTER\n";
 
     request(address, "/", expected);
     registration.add_header(|_: &windmark::context::RouteContext| {
@@ -377,7 +377,7 @@ async fn cloned_routers_retain_partials_and_running_servers_keep_their_snapshot(
       request(
         address,
         "/",
-        b"20 text/gemini; charset=utf-8; lang=en\r\nHEADER\nSECOND HEADER\nBODY\nFOOTER\nSECOND FOOTER",
+        b"20 text/gemini; charset=utf-8; lang=en\r\nHEADER\nSECOND HEADER\nBODY\nFOOTER\nSECOND FOOTER\n",
       );
     })
     .await;
