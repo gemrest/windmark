@@ -17,7 +17,8 @@ fmt:
 
 [private]
 generic-task task async-feature:
-  rustup run nightly cargo {{ task }} --no-default-features \
+  PATH="$(dirname "$(rustup which --toolchain nightly rustc)"):$PATH" \
+    cargo {{ task }} --no-default-features \
     {{ default-features }}{{ async-feature }}
 
 check async-feature:
