@@ -1,5 +1,8 @@
 use rossweisse::route;
-use std::{cell::Cell, future::IntoFuture};
+use std::{
+  future::IntoFuture,
+  sync::atomic::{AtomicUsize, Ordering},
+};
 use windmark::{
   context::{ErrorContext, HookContext, RouteContext},
   handler::{
@@ -33,17 +36,19 @@ impl Capsule {
   pub fn index(_: RouteContext) -> Response { Response::success("index") }
 }
 
-struct Counter(Cell<usize>);
+struct Counter(AtomicUsize);
 
 impl Module for Counter {
-  fn on_pre_route(&mut self, _: &HookContext) { self.0.set(self.0.get() + 1); }
+  fn on_pre_route(&self, _: &HookContext) {
+    self.0.fetch_add(1, Ordering::Relaxed);
+  }
 }
 
 struct AwaitableModule;
 
 #[async_trait::async_trait]
 impl AsyncModule for AwaitableModule {
-  async fn on_pre_route(&mut self, _: &HookContext) {}
+  async fn on_pre_route(&self, _: &HookContext) {}
 }
 
 struct Banner;
@@ -120,7 +125,7 @@ fn main() {
   let _route: &dyn RouteResponse = &Replies;
   let _error: &dyn ErrorResponse = &Replies;
 
-  router.attach(Counter(Cell::new(0)));
+  router.attach(Counter(AtomicUsize::new(0)));
   router.add_header(Banner);
   router.add_footer(Banner);
   router.set_pre_route_callback(Observer);

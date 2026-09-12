@@ -51,8 +51,14 @@ type TcpStream = async_std::net::TcpStream;
 type Stream = tokio_openssl::SslStream<TcpStream>;
 #[cfg(feature = "async-std")]
 type Stream = async_std_openssl::SslStream<TcpStream>;
-type SharedModule = Arc<Mutex<Box<dyn Module + Send>>>;
-type SharedAsyncModule = Arc<AsyncMutex<Box<dyn AsyncModule + Send>>>;
+
+struct ModuleEntry {
+  module:   Box<dyn Module>,
+  poisoned: AtomicBool,
+}
+
+type SharedModule = Arc<ModuleEntry>;
+type SharedAsyncModule = Arc<dyn AsyncModule>;
 
 #[derive(Default)]
 struct ModuleScheduling {
@@ -282,15 +288,23 @@ impl RequestHandler {
 fn call_modules(
   modules: &Mutex<Vec<SharedModule>>,
   scheduling: &ModuleScheduling,
-  hook: impl Fn(&mut dyn Module),
+  hook: impl Fn(&dyn Module),
 ) {
   let invoke = || {
     let modules = modules.lock().ok().map(|modules| modules.clone());
 
     if let Some(modules) = modules {
       for module in modules {
-        if let Ok(mut module) = module.lock() {
-          hook(module.as_mut());
+        if !module.poisoned.load(Ordering::Acquire) {
+          let result =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+              hook(module.module.as_ref());
+            }));
+
+          if let Err(panic) = result {
+            module.poisoned.store(true, Ordering::Release);
+            std::panic::resume_unwind(panic);
+          }
         }
       }
     }
@@ -323,8 +337,6 @@ async fn call_async_modules(
     let modules = modules.lock().await.clone();
 
     for module in modules {
-      let mut module = module.lock().await;
-
       match phase {
         HookPhase::PreRoute => module.on_pre_route(context).await,
         HookPhase::PostRoute => module.on_post_route(context).await,
@@ -1072,7 +1084,7 @@ impl Router {
   ///
   /// #[derive(Default)]
   /// struct Clicker {
-  ///   clicks: isize,
+  ///   clicks: std::sync::atomic::AtomicUsize,
   /// }
   ///
   /// #[async_trait::async_trait]
@@ -1081,21 +1093,24 @@ impl Router {
   ///     info!("clicker has been attached!");
   ///   }
   ///
-  ///   async fn on_pre_route(&mut self, context: &HookContext) {
-  ///     self.clicks += 1;
+  ///   async fn on_pre_route(&self, context: &HookContext) {
+  ///     let clicks = self
+  ///       .clicks
+  ///       .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+  ///       + 1;
   ///
   ///     info!(
   ///       "clicker has been called pre-route on {} with {} clicks!",
   ///       context.url.path(),
-  ///       self.clicks
+  ///       clicks
   ///     );
   ///   }
   ///
-  ///   async fn on_post_route(&mut self, context: &HookContext) {
+  ///   async fn on_post_route(&self, context: &HookContext) {
   ///     info!(
   ///       "clicker has been called post-route on {} with {} clicks!",
   ///       context.url.path(),
-  ///       self.clicks
+  ///       self.clicks.load(std::sync::atomic::Ordering::Relaxed)
   ///     );
   ///   }
   /// }
@@ -1110,8 +1125,7 @@ impl Router {
     mut module: impl AsyncModule + 'static,
   ) -> &mut Self {
     module.on_attach(self).await;
-    (*self.async_modules.lock().await)
-      .push(Arc::new(AsyncMutex::new(Box::new(module))));
+    (*self.async_modules.lock().await).push(Arc::new(module));
 
     self
   }
@@ -1135,7 +1149,7 @@ impl Router {
   ///
   /// #[derive(Default)]
   /// struct Clicker {
-  ///   clicks: isize,
+  ///   clicks: std::sync::atomic::AtomicUsize,
   /// }
   ///
   /// impl windmark::module::Module for Clicker {
@@ -1143,34 +1157,38 @@ impl Router {
   ///     info!("clicker has been attached!");
   ///   }
   ///
-  ///   fn on_pre_route(&mut self, context: &HookContext) {
-  ///     self.clicks += 1;
+  ///   fn on_pre_route(&self, context: &HookContext) {
+  ///     let clicks = self
+  ///       .clicks
+  ///       .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+  ///       + 1;
   ///
   ///     info!(
   ///       "clicker has been called pre-route on {} with {} clicks!",
   ///       context.url.path(),
-  ///       self.clicks
+  ///       clicks
   ///     );
   ///   }
   ///
-  ///   fn on_post_route(&mut self, context: &HookContext) {
+  ///   fn on_post_route(&self, context: &HookContext) {
   ///     info!(
   ///       "clicker has been called post-route on {} with {} clicks!",
   ///       context.url.path(),
-  ///       self.clicks
+  ///       self.clicks.load(std::sync::atomic::Ordering::Relaxed)
   ///     );
   ///   }
   /// }
   ///
   /// Router::new().attach(Clicker::default());
   /// ```
-  pub fn attach(
-    &mut self,
-    mut module: impl Module + 'static + Send,
-  ) -> &mut Self {
+  pub fn attach(&mut self, mut module: impl Module + 'static) -> &mut Self {
     module.on_attach(self);
-    (*self.modules.lock().expect("modules lock poisoned"))
-      .push(Arc::new(Mutex::new(Box::new(module))));
+    (*self.modules.lock().expect("modules lock poisoned")).push(Arc::new(
+      ModuleEntry {
+        module:   Box::new(module),
+        poisoned: AtomicBool::new(false),
+      },
+    ));
 
     self
   }

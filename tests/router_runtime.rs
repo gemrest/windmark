@@ -30,7 +30,7 @@ impl Module for Observer {
     self.0.lock().unwrap().push("attach");
   }
 
-  fn on_pre_route(&mut self, context: &HookContext) {
+  fn on_pre_route(&self, context: &HookContext) {
     if context.url.path() == "/Users/Alice" {
       assert_eq!(
         context.parameters.as_ref().unwrap().get("Name"),
@@ -41,7 +41,7 @@ impl Module for Observer {
     self.0.lock().unwrap().push("module-pre");
   }
 
-  fn on_post_route(&mut self, context: &HookContext) {
+  fn on_post_route(&self, context: &HookContext) {
     if context.url.path() == "/Users/Alice" {
       assert_eq!(
         context.parameters.as_ref().unwrap().get("Name"),
@@ -66,12 +66,12 @@ impl AsyncModule for AsyncObserver {
     self.events.lock().unwrap().push("async-attach");
   }
 
-  async fn on_pre_route(&mut self, _: &HookContext) {
+  async fn on_pre_route(&self, _: &HookContext) {
     assert!(self.initialized);
     self.events.lock().unwrap().push("async-pre");
   }
 
-  async fn on_post_route(&mut self, _: &HookContext) {
+  async fn on_post_route(&self, _: &HookContext) {
     self.events.lock().unwrap().push("async-post");
   }
 }
@@ -483,13 +483,13 @@ impl GatedModule {
 
 #[async_trait::async_trait]
 impl AsyncModule for GatedModule {
-  async fn on_pre_route(&mut self, context: &HookContext) {
+  async fn on_pre_route(&self, context: &HookContext) {
     if self.enter(context, false) {
       self.gate.wait_async().await;
     }
   }
 
-  async fn on_post_route(&mut self, context: &HookContext) {
+  async fn on_post_route(&self, context: &HookContext) {
     if self.enter(context, true) {
       self.gate.wait_async().await;
     }
@@ -501,7 +501,7 @@ impl AsyncModule for GatedModule {
   tokio::test(flavor = "multi_thread", worker_threads = 2)
 )]
 #[cfg_attr(feature = "async-std", async_std::test)]
-async fn async_module_locks_allow_progress_in_both_hook_phases() {
+async fn shared_async_modules_allow_progress_in_both_hook_phases() {
   for post_route in [false, true] {
     let mut router = Router::new();
     let gate = Arc::new(HookGate::default());
@@ -579,18 +579,10 @@ async fn async_module_locks_allow_progress_in_both_hook_phases() {
 
       let progressed = progress.recv_timeout(Duration::from_secs(5));
 
-      assert_eq!(
-        *events.lock().unwrap(),
-        [
-          (false, "/first".to_owned()),
-          (true, "/first".to_owned()),
-          (false, "/second".to_owned())
-        ]
-      );
+      second.join().unwrap();
       gate.release();
       first.join().unwrap();
-      second.join().unwrap();
-      progressed.expect("the first module was blocked by the second module");
+      progressed.expect("the second request did not reach the first module");
       assert_eq!(
         *events.lock().unwrap(),
         [
@@ -610,14 +602,14 @@ struct PanickingModule {
 }
 
 impl Module for PanickingModule {
-  fn on_pre_route(&mut self, context: &HookContext) {
+  fn on_pre_route(&self, context: &HookContext) {
     assert!(
       self.post_route || context.url.path() != "/panic",
       "pre-route panic"
     );
   }
 
-  fn on_post_route(&mut self, context: &HookContext) {
+  fn on_post_route(&self, context: &HookContext) {
     assert!(
       !self.post_route || context.url.path() != "/panic",
       "post-route panic"

@@ -1,10 +1,11 @@
 //! `cargo run --example stateful_module --features response-macros`
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use windmark::{context::HookContext, router::Router};
 
 #[derive(Default)]
 struct Clicker {
-  clicks: usize,
+  clicks: AtomicUsize,
 }
 
 impl windmark::module::Module for Clicker {
@@ -12,22 +13,22 @@ impl windmark::module::Module for Clicker {
     println!("module 'clicker' has been attached!");
   }
 
-  fn on_pre_route(&mut self, context: &HookContext) {
-    self.clicks += 1;
+  fn on_pre_route(&self, context: &HookContext) {
+    let clicks = self.clicks.fetch_add(1, Ordering::Relaxed) + 1;
 
     println!(
       "module 'clicker' has been called before the route '{}' with {} clicks!",
       context.url.path(),
-      self.clicks,
+      clicks,
     );
   }
 
-  fn on_post_route(&mut self, context: &HookContext) {
+  fn on_post_route(&self, context: &HookContext) {
     println!(
       "module 'clicker' clicker has been called after the route '{}' with {} \
        clicks!",
       context.url.path(),
-      self.clicks,
+      self.clicks.load(Ordering::Relaxed),
     );
   }
 }

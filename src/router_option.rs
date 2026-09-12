@@ -12,8 +12,8 @@ pub enum RouterOption {
   /// Routes that conflict under this matching rule cannot be registered
   /// together while the option is enabled.
   AllowCaseInsensitiveLookup,
-  /// If enabled, different modules may run concurrently across requests.
-  /// Each module remains exclusive. By default, each synchronous or
+  /// If enabled, module hooks may run concurrently across requests, including
+  /// multiple invocations of the same module. By default, each synchronous or
   /// asynchronous hook phase runs exclusively across its module collection.
   ///
   /// This option is shared by cloned routers, including running servers.

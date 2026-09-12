@@ -433,29 +433,32 @@ fn trailing_slash_fixes_preserve_case_insensitive_parameters() {
 }
 
 #[test]
-fn synchronous_module_locks_allow_other_modules_to_progress() {
+fn shared_synchronous_modules_allow_overlapping_invocations() {
   struct SignalingModule(std::sync::mpsc::Sender<()>);
 
   impl crate::module::Module for SignalingModule {
-    fn on_pre_route(&mut self, _: &crate::context::HookContext) {
+    fn on_pre_route(&self, _: &crate::context::HookContext) {
       self.0.send(()).unwrap();
     }
   }
 
   struct BlockingModule {
     entered: std::sync::mpsc::Sender<()>,
-    release: std::sync::mpsc::Receiver<()>,
-    blocked: bool,
+    release: std::sync::Mutex<std::sync::mpsc::Receiver<()>>,
+    blocked: std::sync::atomic::AtomicBool,
   }
 
   impl crate::module::Module for BlockingModule {
-    fn on_pre_route(&mut self, _: &crate::context::HookContext) {
-      if !self.blocked {
-        self.blocked = true;
-
+    fn on_pre_route(&self, _: &crate::context::HookContext) {
+      if !self
+        .blocked
+        .swap(true, std::sync::atomic::Ordering::Relaxed)
+      {
         self.entered.send(()).unwrap();
         self
           .release
+          .lock()
+          .unwrap()
           .recv_timeout(std::time::Duration::from_secs(5))
           .unwrap();
       }
@@ -465,17 +468,16 @@ fn synchronous_module_locks_allow_other_modules_to_progress() {
   let (signal, progress) = std::sync::mpsc::channel();
   let (entered, entry) = std::sync::mpsc::channel();
   let (release, resume) = std::sync::mpsc::channel();
-  let modules: std::sync::Arc<std::sync::Mutex<Vec<super::SharedModule>>> =
-    std::sync::Arc::new(std::sync::Mutex::new(vec![
-      std::sync::Arc::new(std::sync::Mutex::new(Box::new(SignalingModule(
-        signal,
-      )))),
-      std::sync::Arc::new(std::sync::Mutex::new(Box::new(BlockingModule {
-        entered,
-        release: resume,
-        blocked: false,
-      }))),
-    ]));
+  let mut router = super::Router::new();
+
+  router.attach(SignalingModule(signal));
+  router.attach(BlockingModule {
+    entered,
+    release: std::sync::Mutex::new(resume),
+    blocked: std::sync::atomic::AtomicBool::new(false),
+  });
+
+  let modules = router.modules.clone();
   let scheduling = std::sync::Arc::new(super::ModuleScheduling::default());
   let first_scheduling = scheduling.clone();
   let first_modules = modules.clone();
@@ -514,9 +516,9 @@ fn synchronous_module_locks_allow_other_modules_to_progress() {
   });
   let advanced = progress.recv_timeout(std::time::Duration::from_secs(5));
 
+  second.join().unwrap();
   release.send(()).unwrap();
   first.join().unwrap();
-  second.join().unwrap();
   advanced.expect("the first module was blocked by the second module");
 }
 
