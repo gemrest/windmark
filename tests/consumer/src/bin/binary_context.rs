@@ -1,8 +1,12 @@
+use windmark::{context::RouteContext, response::Response, router::Router};
+
 fn main() {
-  let body = b"hello";
-  let mime = "text/plain";
-  let _ = windmark::binary_success!(body, mime);
-  let _ =
-    windmark::binary_success!(context, context.url.path().as_bytes(), mime);
-  let _ = windmark::binary_success!(context => context.url.path().as_bytes());
+  let mut router = Router::new();
+
+  router.mount("/explicit", |context: RouteContext| {
+    Response::binary_success(context.url.path().as_bytes(), "text/plain")
+  });
+  router.mount("/inferred", |context: RouteContext| {
+    Response::binary_success_auto(context.url.path().as_bytes())
+  });
 }

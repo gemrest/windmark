@@ -20,8 +20,7 @@ Now supporting both [Tokio](https://tokio.rs/) and [`async-std`](https://async.r
 | Feature            | Description                                                                                             |
 | ------------------ | ------------------------------------------------------------------------------------------------------- |
 | `default`          | Base Windmark framework using [Tokio](https://tokio.rs/)                                                |
-| `auto-deduce-mime` | Exposes `Response`s and macros that automatically fill MIMEs for non-Gemini responses                   |
-| `response-macros`  | Simple macros for all `Response`s                                                                       |
+| `auto-deduce-mime` | Enables `Response::binary_success_auto` to infer the MIME type of binary content                   |
 | `tokio`            | Marks [Tokio](https://tokio.rs/) as the asynchronous runtime                                            |
 | `async-std`        | Marks [`async-std`](https://async.rs/) as the asynchronous runtime                                      |
 
@@ -37,9 +36,6 @@ tokio = { version = "1.26.0", features = ["full"] }
 # If you would like to use the built-in MIME deduction when `Success`-ing a file
 # (recommended)
 # windmark = { version = "0.7.0", features = ["auto-deduce-mime"] }
-
-# If you would like to use macro-based responses (as seen below)
-# windmark = { version = "0.7.0", features = ["response-macros"] }
 ```
 
 ### Implementing a Windmark Server

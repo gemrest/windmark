@@ -1,6 +1,6 @@
-//! `cargo run --example parameters --features response-macros`
+//! `cargo run --example parameters`
 
-use windmark::success;
+use windmark::response::Response;
 
 #[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -9,24 +9,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .set_certificate_file("windmark_public.pem")
     .mount(
       "/language/:language",
-      success!(
-        context,
-        format!(
+      |context: windmark::context::RouteContext| {
+        Response::success(format!(
           "Your language of choice is {}.",
           context.parameters.get("language").unwrap()
-        )
-      ),
+        ))
+      },
     )
     .mount(
       "/name/:first/:last",
-      success!(
-        context,
-        format!(
+      |context: windmark::context::RouteContext| {
+        Response::success(format!(
           "Your name is {} {}.",
           context.parameters.get("first").unwrap(),
           context.parameters.get("last").unwrap()
-        )
-      ),
+        ))
+      },
     )
     .run()
     .await

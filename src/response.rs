@@ -1,8 +1,5 @@
 //! This module provides the response type returned by handlers.
 
-#[cfg(feature = "response-macros")]
-mod macros;
-
 macro_rules! response {
   ($name:ident, $status:expr) => {
     pub fn $name<S>(content: S) -> Self

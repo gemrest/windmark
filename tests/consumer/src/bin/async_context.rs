@@ -1,12 +1,10 @@
 use std::future::Future;
-use windmark::context::RouteContext;
+use windmark::{context::RouteContext, response::Response};
 
 fn main() {
-  let greeting = String::from("Hello");
-  let route = windmark::success_async!(
-    context,
-    format!("{greeting} {}", context.url.path())
-  );
+  let route = |context: RouteContext| {
+    async move { Response::success(std::future::ready(context.url.path()).await) }
+  };
 
   for path in ["/one", "/two"] {
     let context = RouteContext {
@@ -23,13 +21,8 @@ fn main() {
       panic!("the response should be ready");
     };
 
-    assert_eq!(response.content().unwrap(), format!("Hello {path}"));
+    assert_eq!(response.content().unwrap(), path);
   }
-
-  let route = windmark::success_async!(
-    context,
-    std::future::ready(context.url.path()).await
-  );
 
   windmark::router::Router::new().mount("/", route);
 }

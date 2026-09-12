@@ -1,13 +1,13 @@
-//! `cargo run --example callbacks --features response-macros`
+//! `cargo run --example callbacks`
 
-use windmark::context::HookContext;
+use windmark::{context::HookContext, response::Response};
 
 #[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
   windmark::router::Router::new()
     .set_private_key_file("windmark_private.pem")
     .set_certificate_file("windmark_public.pem")
-    .mount("/", windmark::success!("Hello!"))
+    .mount("/", |_| Response::success("Hello!"))
     .set_pre_route_callback(|context: &HookContext| {
       println!(
         "accepted connection from {} to {}",
@@ -15,18 +15,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         context.url
       )
     })
-    .set_post_route_callback(
-      |context: &HookContext, content: &mut windmark::response::Response| {
-        if let Some(text) = content.content_mut() {
-          *text = text.replace("Hello", "Hi");
-        }
+    .set_post_route_callback(|context: &HookContext, content: &mut Response| {
+      if let Some(text) = content.content_mut() {
+        *text = text.replace("Hello", "Hi");
+      }
 
-        println!(
-          "prepared response for {}",
-          context.peer_address.unwrap().ip()
-        )
-      },
-    )
+      println!(
+        "prepared response for {}",
+        context.peer_address.unwrap().ip()
+      )
+    })
     .run()
     .await
 }

@@ -1,4 +1,6 @@
-//! `cargo run --example async --features response-macros`
+//! `cargo run --example async`
+
+use windmark::response::Response;
 
 #[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -18,15 +20,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
       *clicks += 1;
 
-      windmark::response::Response::success(*clicks)
+      Response::success(*clicks)
     }
   });
-  router.mount(
-    "/macro",
-    windmark::success_async!(
-      async { "This response was sent using an asynchronous macro." }.await
-    ),
-  );
+  router.mount("/async", |_| {
+    async {
+      Response::success("This response was sent using an asynchronous handler.")
+    }
+  });
 
   router.run().await
 }

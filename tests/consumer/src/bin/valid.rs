@@ -148,30 +148,4 @@ fn main() {
   assert!(response.serialize_body("header", "footer").is_empty());
   assert_eq!(Response::binary_success(Bytes, "text/plain").status(), 21);
   assert_eq!(Response::binary_success_auto(b"hello").status(), 22);
-  assert_eq!(windmark::binary_success!(b"hello")(context()).status(), 22);
-  assert_eq!(
-    windmark::binary_success_auto!(b"hello")(context()).status(),
-    22
-  );
-  assert_eq!(
-    windmark::binary_success!(request, request.url.path(), "text/plain")(
-      context()
-    )
-    .status(),
-    21
-  );
-  assert_eq!(
-    windmark::success!(request, request.url.path())(context())
-      .content()
-      .unwrap(),
-    "/path"
-  );
-
-  let body = "hello";
-  let mime = "text/plain";
-
-  assert_eq!(
-    windmark::binary_success!(body, mime)(context()).status(),
-    21
-  );
 }

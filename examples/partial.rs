@@ -1,4 +1,6 @@
-//! `cargo run --example partial --features response-macros`
+//! `cargo run --example partial`
+
+use windmark::response::Response;
 
 #[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -14,7 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .add_footer(|_: &windmark::context::RouteContext| {
       "\nCopyright (C) 2022".to_string()
     })
-    .mount("/", windmark::success!("Hello!"))
+    .mount("/", |_| Response::success("Hello!"))
     .run()
     .await
 }

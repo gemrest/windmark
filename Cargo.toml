@@ -21,7 +21,6 @@ categories = ["web-programming"]
 [features]
 default = ["tokio"]
 auto-deduce-mime = ["tree_magic_mini"]
-response-macros = []
 tokio = ["dep:tokio", "tokio-openssl"]
 async-std = ["dep:async-std", "async-std-openssl"]
 
@@ -56,8 +55,6 @@ language-tags = "0.3.2"
 
 tree_magic_mini = { version = "3.2.2", optional = true } # MIME
 
-paste = "1.0.12" # Token Pasting
-
 [dev-dependencies]
 pretty_env_logger = "0.5.0"
 rossweisse = { version = "0.0.3", path = "./rossweisse" }
@@ -66,55 +63,7 @@ rossweisse = { version = "0.0.3", path = "./rossweisse" }
 # `tokio` and `async-std` are mutually exclusive, so document the default
 # (`tokio`) runtime alongside the optional feature surface.
 all-features = false
-features = ["response-macros", "auto-deduce-mime"]
-
-[[example]]
-name = "async"
-required-features = ["response-macros"]
-
-[[example]]
-name = "async_stateful_module"
-required-features = ["response-macros"]
-
-[[example]]
-name = "binary"
-required-features = ["response-macros"]
-
-[[example]]
-name = "callbacks"
-required-features = ["response-macros"]
-
-[[example]]
-name = "certificate"
-required-features = ["response-macros"]
-
-[[example]]
-name = "default_logger"
-required-features = ["response-macros"]
-
-[[example]]
-name = "fix_path"
-required-features = ["response-macros"]
-
-[[example]]
-name = "parameters"
-required-features = ["response-macros"]
-
-[[example]]
-name = "partial"
-required-features = ["response-macros"]
-
-[[example]]
-name = "query"
-required-features = ["response-macros"]
-
-[[example]]
-name = "responses"
-required-features = ["response-macros"]
-
-[[example]]
-name = "stateful_module"
-required-features = ["response-macros"]
+features = ["auto-deduce-mime"]
 
 [[example]]
 name = "simple_async_std"

@@ -2,7 +2,7 @@
 
 ## [Async Stateful Module](./async_stateful_module.rs)
 
-`cargo run --example async_stateful_module --features response-macros`
+`cargo run --example async_stateful_module`
 
 Demonstrates use of the `AsyncModule` trait by implementing the module
 `Clicker` which tracks the global number of visits to the capsule.
@@ -12,35 +12,34 @@ tracked for clicks.
 
 ## [Async](./async.rs)
 
-`cargo run --example async --features response-macros`
+`cargo run --example async`
 
-This example shows how to define async routes with an async response macro
-and implement a click tracker using a shared variable protected by an async
-mutex.
+This example shows how to define async route handlers and implement a click
+tracker using a shared variable protected by an async mutex.
 
 ## [Binary](./binary.rs)
 
-`cargo run --example binary --features response-macros`
+`cargo run --example binary`
 
 Demonstrates the binary response functionality by using both manual
 and automatic mime resolution (`--features auto-deduce-mime`).
 
 ## [Callbacks](./callbacks.rs)
 
-`cargo run --example callbacks --features response-macros`
+`cargo run --example callbacks`
 
 This example shows how to register pre-route and post-route callbacks.
 
 ## [Certificate](./certificate.rs)
 
-`cargo run --example certificate --features response-macros`
+`cargo run --example certificate`
 
 Demonstrate the various certificate related responses as well as
 reading the client certificate to give conditional access.
 
 ## [Default Logger](./default_logger.rs)
 
-`cargo run --example default_logger --features response-macros`
+`cargo run --example default_logger`
 
 A simple example showing how an application initialises a logger for Windmark.
 
@@ -60,7 +59,7 @@ the error handler.
 
 ## [Fix Path](./fix_path.rs)
 
-`cargo run --example fix_path --features response-macros`
+`cargo run --example fix_path`
 
 A simple example which demonstrates use of the path fixer that attempts to resolve the closest match of a route when an invalid route is visited.
 
@@ -81,13 +80,13 @@ Demonstrate how to modify the MIME of a response before use.
 
 ## [Parameters](./parameters.rs)
 
-`cargo run --example parameters --features response-macros`
+`cargo run --example parameters`
 
 Demonstrate the use of route parameters (not URL queries).
 
 ## [Partial](./partial.rs)
 
-`cargo run --example partial --features response-macros`
+`cargo run --example partial`
 
 Demonstrates use of appending headers and footers to routes, globally.
 
@@ -95,13 +94,13 @@ If you would like to conditionally append headers and footers based on route, pl
 
 ## [Query](./query.rs)
 
-`cargo run --example query --features response-macros`
+`cargo run --example query`
 
 Demonstrates the inspection of URL queries parameters.
 
 ## [Responses](./responses.rs)
 
-`cargo run --example responses --features response-macros`
+`cargo run --example responses`
 
 Demonstrates the use of a wide variety of responses, additionally exposing the flexibility of response bodies types.
 
@@ -122,7 +121,7 @@ Demonstrates how to explicitly specify Windmark to use the [Tokio](https://githu
 
 ## [Stateful Module](./stateful_module.rs)
 
-`cargo run --example stateful_module --features response-macros`
+`cargo run --example stateful_module`
 
 Demonstrates use of `Module`s by implementing a click tracker
 

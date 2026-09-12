@@ -1,7 +1,7 @@
-//! `cargo run --example async_stateful_module --features response-macros`
+//! `cargo run --example async_stateful_module`
 
 use std::sync::atomic::{AtomicUsize, Ordering};
-use windmark::{context::HookContext, router::Router};
+use windmark::{context::HookContext, response::Response, router::Router};
 
 #[derive(Default)]
 struct Clicker {
@@ -45,6 +45,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   router.set_private_key_file("windmark_private.pem");
   router.set_certificate_file("windmark_public.pem");
   router.attach_async(Clicker::default()).await;
-  router.mount("/", windmark::success!("Hello!"));
+  router.mount("/", |_| Response::success("Hello!"));
   router.run().await
 }

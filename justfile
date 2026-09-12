@@ -2,7 +2,7 @@ import? 'cargo.just'
 
 set allow-duplicate-recipes := true
 
-default-features := "--features=auto-deduce-mime,response-macros,"
+default-features := "--features=auto-deduce-mime,"
 
 default:
   @just --list

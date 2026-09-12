@@ -1,1 +1,3 @@
-fn main() { let _ = windmark::binary_success!(b"hello"); }
+fn main() {
+  let _ = windmark::response::Response::binary_success_auto(b"hello");
+}

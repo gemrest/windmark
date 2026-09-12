@@ -1,4 +1,4 @@
-//! `cargo run --example certificate --features response-macros`
+//! `cargo run --example certificate`
 
 use windmark::response::Response;
 
@@ -26,10 +26,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
       }
     })
-    .mount(
-      "/invalid",
-      windmark::certificate_not_valid!("Your certificate is invalid."),
-    )
+    .mount("/invalid", |_| {
+      Response::certificate_not_valid("Your certificate is invalid.")
+    })
     .run()
     .await
 }

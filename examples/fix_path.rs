@@ -1,6 +1,6 @@
-//! `cargo run --example fix_path --features response-macros`
+//! `cargo run --example fix_path`
 
-use windmark::router_option::RouterOption;
+use windmark::{response::Response, router_option::RouterOption};
 
 #[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -12,10 +12,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       RouterOption::AddMissingTrailingSlash,
       RouterOption::AllowCaseInsensitiveLookup,
     ])
-    .mount(
-      "/close",
-      windmark::success!("Visit '/close/'; you should be close enough!"),
-    )
+    .mount("/close", |_| {
+      Response::success("Visit '/close/'; you should be close enough!")
+    })
     .run()
     .await
 }

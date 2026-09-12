@@ -9,11 +9,10 @@ publish = false
 [features]
 tokio = ["windmark/tokio", "dep:tokio"]
 async-std = ["windmark/async-std"]
-auto-deduce-mime = []
-mime = ["windmark/auto-deduce-mime"]
+auto-deduce-mime = ["windmark/auto-deduce-mime"]
 
 [dependencies]
-windmark = { path = "../..", default-features = false, features = ["response-macros"] }
+windmark = { path = "../..", default-features = false }
 rossweisse = { path = "../../rossweisse" }
 async-trait = "0.1.68"
 tokio = { version = "1.52.3", optional = true, features = ["macros", "rt"] }

@@ -1,7 +1,7 @@
 use std::{path::PathBuf, process::Command};
 
 #[test]
-fn consumer_api_and_macro_forms_match_expected_behavior() {
+fn consumer_api_matches_expected_behavior() {
   let manifest =
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/consumer/Cargo.toml");
   let target = std::env::var_os("CARGO_TARGET_DIR")
@@ -15,49 +15,61 @@ fn consumer_api_and_macro_forms_match_expected_behavior() {
   #[cfg(feature = "async-std")]
   let runtime = "async-std";
   let cases = [
-    ("invalid_response_fields", "private", "mime"),
-    ("valid", "", "mime,auto-deduce-mime"),
-    ("automatic_mime", "", "mime"),
-    ("binary_context", "", "mime"),
-    ("async_context", "", "mime"),
+    ("invalid_response_fields", "private", "auto-deduce-mime"),
+    ("valid", "", "auto-deduce-mime"),
+    ("automatic_mime", "", "auto-deduce-mime"),
+    ("binary_context", "", "auto-deduce-mime"),
+    ("async_context", "", "auto-deduce-mime"),
     ("automatic_mime_disabled", "binary_success_auto", ""),
     (
       "invalid_router_item",
       "requires a struct or impl block",
-      "mime",
+      "auto-deduce-mime",
     ),
-    ("invalid_route_item", "requires a function", "mime"),
+    (
+      "invalid_route_item",
+      "requires a function",
+      "auto-deduce-mime",
+    ),
     (
       "invalid_router_fields",
       "requires a struct with named fields or a unit struct",
-      "mime",
+      "auto-deduce-mime",
     ),
-    ("invalid_router_syntax", "expected", "mime"),
-    ("invalid_route_syntax", "expected", "mime"),
-    ("visibility", "", "mime"),
-    ("visibility_private", "struct `Capsule` is private", "mime"),
+    ("invalid_router_syntax", "expected", "auto-deduce-mime"),
+    ("invalid_route_syntax", "expected", "auto-deduce-mime"),
+    ("visibility", "", "auto-deduce-mime"),
+    (
+      "visibility_private",
+      "struct `Capsule` is private",
+      "auto-deduce-mime",
+    ),
     (
       "visibility_restricted",
       "struct `Capsule` is private",
-      "mime",
+      "auto-deduce-mime",
     ),
-    ("index_name", "", "mime"),
-    ("router_declarations", "", "mime"),
+    ("index_name", "", "auto-deduce-mime"),
+    ("router_declarations", "", "auto-deduce-mime"),
     (
       "invalid_router_duplicate",
       "duplicate field initialiser",
-      "mime",
+      "auto-deduce-mime",
     ),
     (
       "invalid_router_unknown",
       "unknown field initialiser",
-      "mime",
+      "auto-deduce-mime",
     ),
-    ("invalid_router_reserved", "reserved by Rossweisse", "mime"),
+    (
+      "invalid_router_reserved",
+      "reserved by Rossweisse",
+      "auto-deduce-mime",
+    ),
     (
       "invalid_route_argument",
       "only supported route argument",
-      "mime",
+      "auto-deduce-mime",
     ),
   ];
 
