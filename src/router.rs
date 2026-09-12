@@ -66,8 +66,8 @@ pub struct Router {
   private_key_content:   Option<String>,
   certificate_file_name: String,
   certificate_content:   Option<String>,
-  headers:               Arc<Mutex<Vec<Box<dyn Partial>>>>,
-  footers:               Arc<Mutex<Vec<Box<dyn Partial>>>>,
+  headers:               Arc<Mutex<Vec<Arc<dyn Partial>>>>,
+  footers:               Arc<Mutex<Vec<Arc<dyn Partial>>>>,
   ssl_acceptor:          Arc<SslAcceptor>,
   manual_acceptor_set:   bool,
   #[cfg(feature = "logger")]
@@ -88,8 +88,8 @@ pub struct Router {
 struct RequestHandler {
   routes:              Routes,
   error_handler:       Arc<dyn ErrorResponse>,
-  headers:             Arc<[Box<dyn Partial>]>,
-  footers:             Arc<[Box<dyn Partial>]>,
+  headers:             Arc<[Arc<dyn Partial>]>,
+  footers:             Arc<[Arc<dyn Partial>]>,
   pre_route_callback:  Arc<dyn PreRouteHook>,
   post_route_callback: Arc<dyn PostRouteHook>,
   character_set:       String,
@@ -246,7 +246,7 @@ fn serialize_response(
 }
 
 fn render_footer(
-  partials: &[Box<dyn Partial>],
+  partials: &[Arc<dyn Partial>],
   context: &RouteContext,
 ) -> String {
   let mut footer = String::new();
@@ -538,7 +538,7 @@ impl Router {
   /// ```
   pub fn add_header(&mut self, handler: impl Partial + 'static) -> &mut Self {
     (*self.headers.lock().expect("headers lock poisoned"))
-      .push(Box::new(handler));
+      .push(Arc::new(handler));
 
     self
   }
@@ -560,7 +560,7 @@ impl Router {
   /// ```
   pub fn add_footer(&mut self, handler: impl Partial + 'static) -> &mut Self {
     (*self.footers.lock().expect("footers lock poisoned"))
-      .push(Box::new(handler));
+      .push(Arc::new(handler));
 
     self
   }
@@ -620,15 +620,13 @@ impl Router {
         .headers
         .lock()
         .expect("headers lock poisoned")
-        .drain(..)
-        .collect::<Vec<_>>()
+        .clone()
         .into(),
       footers:             self
         .footers
         .lock()
         .expect("footers lock poisoned")
-        .drain(..)
-        .collect::<Vec<_>>()
+        .clone()
         .into(),
       pre_route_callback:  self.pre_route_callback.clone(),
       post_route_callback: self.post_route_callback.clone(),

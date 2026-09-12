@@ -331,3 +331,45 @@ async fn request_framing_handles_split_characters_and_terminates_errors() {
   })
   .await;
 }
+
+#[cfg_attr(
+  feature = "tokio",
+  tokio::test(flavor = "multi_thread", worker_threads = 2)
+)]
+#[cfg_attr(feature = "async-std", async_std::test)]
+async fn cloned_routers_retain_partials_and_running_servers_keep_their_snapshot(
+) {
+  let mut router = Router::new();
+
+  router.mount("/", |_| Response::success("BODY"));
+  router.add_header(|_: &windmark::context::RouteContext| "HEADER".to_owned());
+  router.add_footer(|_: &windmark::context::RouteContext| "FOOTER".to_owned());
+
+  let mut registration = router.clone();
+
+  serve_requests(router.clone(), move |address| {
+    let expected =
+      b"20 text/gemini; charset=utf-8; lang=en\r\nHEADER\nBODY\nFOOTER";
+
+    request(address, "/", expected);
+    registration.add_header(|_: &windmark::context::RouteContext| {
+      "SECOND HEADER".to_owned()
+    });
+    registration.add_footer(|_: &windmark::context::RouteContext| {
+      "SECOND FOOTER".to_owned()
+    });
+    request(address, "/", expected);
+  })
+  .await;
+
+  for configured in [router.clone(), router] {
+    serve_requests(configured, |address| {
+      request(
+        address,
+        "/",
+        b"20 text/gemini; charset=utf-8; lang=en\r\nHEADER\nSECOND HEADER\nBODY\nFOOTER\nSECOND FOOTER",
+      );
+    })
+    .await;
+  }
+}

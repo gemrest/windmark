@@ -204,18 +204,18 @@ fn footer_rendering_preserves_empty_values_and_callback_order() {
 
   for values in [vec![], vec![""], vec!["", ""], vec!["a", "", "b\n"]] {
     let calls = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
-    let partials: Vec<Box<dyn crate::handler::Partial>> = values
+    let partials: Vec<std::sync::Arc<dyn crate::handler::Partial>> = values
       .iter()
       .enumerate()
       .map(|(index, value)| {
         let calls = calls.clone();
         let value = (*value).to_owned();
 
-        Box::new(move |context: &crate::context::RouteContext| {
+        std::sync::Arc::new(move |context: &crate::context::RouteContext| {
           assert_eq!(context.url.path(), "/footer");
           calls.lock().unwrap().push(index);
           value.clone()
-        }) as Box<dyn crate::handler::Partial>
+        }) as std::sync::Arc<dyn crate::handler::Partial>
       })
       .collect();
 
