@@ -15,42 +15,39 @@ fn consumer_api_and_macro_forms_match_expected_behavior() {
   #[cfg(feature = "async-std")]
   let runtime = "async-std";
   let cases = [
-    ("valid", "", true),
-    ("automatic_mime", "requires the `auto-deduce-mime`", false),
-    ("binary_context", "cannot find value `context`", false),
-    (
-      "async_context",
-      "cannot return reference to function parameter",
-      false,
-    ),
+    ("valid", "", "mime,auto-deduce-mime"),
+    ("automatic_mime", "", "mime"),
+    ("binary_context", "", "mime"),
+    ("async_context", "", "mime"),
+    ("automatic_mime_disabled", "binary_success_auto", ""),
     (
       "invalid_router_item",
       "requires a struct or impl block",
-      false,
+      "mime",
     ),
-    ("invalid_route_item", "requires a function", false),
+    ("invalid_route_item", "requires a function", "mime"),
     (
       "invalid_router_fields",
       "requires a struct with named fields or a unit struct",
-      false,
+      "mime",
     ),
-    ("invalid_router_syntax", "expected", false),
-    ("invalid_route_syntax", "expected", false),
-    ("visibility", "", false),
-    ("visibility_private", "struct `Capsule` is private", false),
+    ("invalid_router_syntax", "expected", "mime"),
+    ("invalid_route_syntax", "expected", "mime"),
+    ("visibility", "", "mime"),
+    ("visibility_private", "struct `Capsule` is private", "mime"),
     (
       "visibility_restricted",
       "struct `Capsule` is private",
-      false,
+      "mime",
     ),
-    ("index_name", "", false),
+    ("index_name", "", "mime"),
   ];
 
-  for (name, diagnostic, automatic_mime) in cases {
-    let features = if automatic_mime {
-      format!("{runtime},auto-deduce-mime")
-    } else {
+  for (name, diagnostic, extra_features) in cases {
+    let features = if extra_features.is_empty() {
       runtime.to_owned()
+    } else {
+      format!("{runtime},{extra_features}")
     };
     let output = Command::new(env!("CARGO"))
       .arg(if diagnostic.is_empty() {

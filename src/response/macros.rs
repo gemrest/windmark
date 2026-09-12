@@ -1,7 +1,7 @@
 macro_rules! sync_response {
   ($($name:ident),*) => {
     $(
-      /// Trailing commas are not supported at the moment!
+      /// This macro does not accept a trailing comma.
       #[macro_export]
       macro_rules! $name {
         ($body:expr) => {
@@ -18,14 +18,20 @@ macro_rules! sync_response {
 macro_rules! async_response {
   ($($name:ident),*) => {
     $(::paste::paste! {
-      /// Trailing commas are not supported at the moment!
+      /// This macro does not accept a trailing comma.
       #[macro_export]
       macro_rules! [< $name _async >] {
         ($body:expr) => {
           |_: $crate::context::RouteContext| async { $crate::response::Response::$name($body) }
         };
         ($context:ident, $body:expr) => {
-          |$context: $crate::context::RouteContext| async { $crate::response::Response::$name($body) }
+          |$context: $crate::context::RouteContext| async {
+            // Move the request context while preserving borrows of other captures.
+            #[allow(clippy::redundant_locals)]
+            let $context = $context;
+
+            $crate::response::Response::$name($body)
+          }
         };
       }
     })*
@@ -65,53 +71,31 @@ response!(
 #[cfg(feature = "auto-deduce-mime")]
 response!(binary_success_auto);
 
-/// Trailing commas are not supported at the moment!
+/// Build a binary response handler with an explicit or inferred MIME type.
+///
+/// Automatic inference requires Windmark's `auto-deduce-mime` feature. Use
+/// `binary_success!(context => body)` to bind a context when inferring MIME;
+/// the two-expression `(body, mime)` form always specifies MIME explicitly.
 #[macro_export]
 macro_rules! binary_success {
-  ($body:expr, $mime:expr) => {
+  ($body:expr, $mime:expr $(,)?) => {
     |_: $crate::context::RouteContext| {
       $crate::response::Response::binary_success($body, $mime)
     }
   };
-  ($body:expr) => {{
-    #[cfg(not(feature = "auto-deduce-mime"))]
-    compile_error!(
-      "`binary_success` without a MIME type requires the `auto-deduce-mime` \
-       feature to be enabled"
-    );
-
+  ($body:expr $(,)?) => {
     |_: $crate::context::RouteContext| {
-      #[cfg(feature = "auto-deduce-mime")]
-      return $crate::response::Response::binary_success_auto($body);
-
-      #[cfg(not(feature = "auto-deduce-mime"))]
-      $crate::response::Response::binary_success(
-        $body,
-        "application/octet-stream",
-      )
+      $crate::response::Response::binary_success_auto($body)
     }
-  }};
-  ($context:ident, $body:expr, $mime:expr) => {
+  };
+  ($context:ident, $body:expr, $mime:expr $(,)?) => {
     |$context: $crate::context::RouteContext| {
       $crate::response::Response::binary_success($body, $mime)
     }
   };
-  ($context:ident, $body:expr) => {{
-    #[cfg(not(feature = "auto-deduce-mime"))]
-    compile_error!(
-      "`binary_success` without a MIME type requires the `auto-deduce-mime` \
-       feature to be enabled"
-    );
-
+  ($context:ident => $body:expr $(,)?) => {
     |$context: $crate::context::RouteContext| {
-      #[cfg(feature = "auto-deduce-mime")]
-      return $crate::response::Response::binary_success_auto($body);
-
-      #[cfg(not(feature = "auto-deduce-mime"))]
-      $crate::response::Response::binary_success(
-        $body,
-        "application/octet-stream",
-      )
+      $crate::response::Response::binary_success_auto($body)
     }
-  }};
+  };
 }
