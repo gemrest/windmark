@@ -12,4 +12,13 @@ pub enum RouterOption {
   /// Routes that conflict under this matching rule cannot be registered
   /// together while the option is enabled.
   AllowCaseInsensitiveLookup,
+  /// If enabled, different modules may run concurrently across requests.
+  /// Each module remains exclusive. By default, each synchronous or
+  /// asynchronous hook phase runs exclusively across its module collection.
+  ///
+  /// This option is shared by cloned routers, including running servers.
+  /// Changes apply when a hook phase selects its scheduling mode. An exclusive
+  /// phase waits for any concurrent phases to finish before invoking hooks.
+  /// Poisoned synchronous modules are skipped in either mode.
+  AllowConcurrentModules,
 }

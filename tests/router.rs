@@ -467,9 +467,16 @@ fn synchronous_module_locks_allow_other_modules_to_progress() {
         blocked: false,
       }))),
     ]));
+  let scheduling = std::sync::Arc::new(super::ModuleScheduling::default());
+  let first_scheduling = scheduling.clone();
   let first_modules = modules.clone();
+
+  scheduling
+    .concurrent
+    .store(true, std::sync::atomic::Ordering::Relaxed);
+
   let first = std::thread::spawn(move || {
-    super::call_modules(&first_modules, |module| {
+    super::call_modules(&first_modules, &first_scheduling, |module| {
       module.on_pre_route(&crate::context::HookContext {
         peer_address: None,
         url:          url::Url::parse("gemini://localhost/").unwrap(),
@@ -487,7 +494,7 @@ fn synchronous_module_locks_allow_other_modules_to_progress() {
     .unwrap();
 
   let second = std::thread::spawn(move || {
-    super::call_modules(&modules, |module| {
+    super::call_modules(&modules, &scheduling, |module| {
       module.on_pre_route(&crate::context::HookContext {
         peer_address: None,
         url:          url::Url::parse("gemini://localhost/").unwrap(),
@@ -502,4 +509,132 @@ fn synchronous_module_locks_allow_other_modules_to_progress() {
   first.join().unwrap();
   second.join().unwrap();
   advanced.expect("the first module was blocked by the second module");
+}
+
+#[test]
+fn module_scheduling_options_are_shared_across_router_clones() {
+  let mut router = super::Router::new();
+  let mut cloned = router.clone();
+  let enabled = || {
+    router
+      .module_scheduling
+      .concurrent
+      .load(std::sync::atomic::Ordering::Relaxed)
+  };
+
+  assert!(!enabled());
+  cloned
+    .add_options(&[crate::router_option::RouterOption::AllowConcurrentModules]);
+  assert!(enabled());
+  cloned.toggle_options(&[
+    crate::router_option::RouterOption::AllowConcurrentModules,
+  ]);
+  assert!(!enabled());
+  cloned.toggle_options(&[
+    crate::router_option::RouterOption::AllowConcurrentModules,
+  ]);
+  assert!(enabled());
+  router.remove_options(&[
+    crate::router_option::RouterOption::AllowConcurrentModules,
+  ]);
+  assert!(!cloned
+    .module_scheduling
+    .concurrent
+    .load(std::sync::atomic::Ordering::Relaxed));
+}
+
+#[test]
+fn synchronous_hook_phases_take_exclusive_or_shared_permits() {
+  let mut router = super::Router::new();
+
+  router.attach(SchedulingProbe);
+  super::call_modules(&router.modules, &router.module_scheduling, |_| {
+    assert!(router.module_scheduling.synchronous.try_read().is_err());
+  });
+  router
+    .add_options(&[crate::router_option::RouterOption::AllowConcurrentModules]);
+  super::call_modules(&router.modules, &router.module_scheduling, |_| {
+    assert!(router.module_scheduling.synchronous.try_read().is_ok());
+    assert!(router.module_scheduling.synchronous.try_write().is_err());
+  });
+}
+
+struct SchedulingProbe;
+
+impl crate::module::Module for SchedulingProbe {}
+
+#[async_trait::async_trait]
+impl crate::module::AsyncModule for SchedulingProbe {}
+
+#[cfg_attr(feature = "tokio", tokio::test(flavor = "current_thread"))]
+#[cfg_attr(feature = "async-std", async_std::test)]
+async fn exclusive_async_phases_wait_for_existing_concurrent_phases() {
+  use std::{future::Future, pin::pin, task::Poll};
+
+  let mut router = super::Router::new();
+  let context = crate::context::HookContext {
+    peer_address: None,
+    url:          url::Url::parse("gemini://localhost/").unwrap(),
+    parameters:   None,
+    certificate:  None,
+  };
+
+  router.attach_async(SchedulingProbe).await;
+
+  for phase in [super::HookPhase::PreRoute, super::HookPhase::PostRoute] {
+    let shared = router.module_scheduling.asynchronous.read().await;
+    let mut dispatch = pin!(super::call_async_modules(
+      &router.async_modules,
+      &router.module_scheduling,
+      &context,
+      phase,
+    ));
+
+    std::future::poll_fn(|context| {
+      assert!(dispatch.as_mut().poll(context).is_pending());
+      Poll::Ready(())
+    })
+    .await;
+    drop(shared);
+
+    dispatch.await;
+  }
+
+  router
+    .add_options(&[crate::router_option::RouterOption::AllowConcurrentModules]);
+
+  let scheduling = router.module_scheduling.clone();
+  let modules = router.async_modules.clone();
+  let shared = scheduling.asynchronous.read().await;
+  let mut concurrent = pin!(super::call_async_modules(
+    &modules,
+    &scheduling,
+    &context,
+    super::HookPhase::PreRoute,
+  ));
+
+  std::future::poll_fn(|context| {
+    assert!(concurrent.as_mut().poll(context).is_ready());
+    Poll::Ready(())
+  })
+  .await;
+  router.remove_options(&[
+    crate::router_option::RouterOption::AllowConcurrentModules,
+  ]);
+
+  let mut exclusive = pin!(super::call_async_modules(
+    &modules,
+    &scheduling,
+    &context,
+    super::HookPhase::PostRoute,
+  ));
+
+  std::future::poll_fn(|context| {
+    assert!(exclusive.as_mut().poll(context).is_pending());
+    Poll::Ready(())
+  })
+  .await;
+  drop(shared);
+
+  exclusive.await;
 }

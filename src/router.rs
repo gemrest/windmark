@@ -10,7 +10,7 @@ use crate::{
 #[cfg(feature = "async-std")]
 use async_std::{
   io::{ReadExt, WriteExt},
-  sync::Mutex as AsyncMutex,
+  sync::{Mutex as AsyncMutex, RwLock as AsyncRwLock},
 };
 use openssl::ssl::{self, SslAcceptor, SslMethod};
 use std::{
@@ -18,13 +18,18 @@ use std::{
   error::Error,
   fmt::Write,
   future::IntoFuture,
-  sync::{Arc, Mutex},
+  sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+    Mutex,
+    RwLock,
+  },
   time,
 };
 #[cfg(feature = "tokio")]
 use tokio::{
   io::{AsyncReadExt, AsyncWriteExt},
-  sync::Mutex as AsyncMutex,
+  sync::{Mutex as AsyncMutex, RwLock as AsyncRwLock},
 };
 use url::Url;
 
@@ -59,6 +64,19 @@ type Stream = async_std_openssl::SslStream<TcpStream>;
 type SharedModule = Arc<Mutex<Box<dyn Module + Send>>>;
 type SharedAsyncModule = Arc<AsyncMutex<Box<dyn AsyncModule + Send>>>;
 
+#[derive(Default)]
+struct ModuleScheduling {
+  concurrent:   AtomicBool,
+  synchronous:  RwLock<()>,
+  asynchronous: AsyncRwLock<()>,
+}
+
+#[derive(Clone, Copy)]
+enum HookPhase {
+  PreRoute,
+  PostRoute,
+}
+
 /// A router dispatches requests through its handlers, partials, and modules.
 #[derive(Clone)]
 pub struct Router {
@@ -83,6 +101,7 @@ pub struct Router {
   port:                  u16,
   async_modules:         Arc<AsyncMutex<Vec<SharedAsyncModule>>>,
   modules:               Arc<Mutex<Vec<SharedModule>>>,
+  module_scheduling:     Arc<ModuleScheduling>,
   options:               HashSet<RouterOption>,
   listener_address:      String,
 }
@@ -98,6 +117,7 @@ struct RequestHandler {
   languages_joined:    String,
   async_modules:       Arc<AsyncMutex<Vec<SharedAsyncModule>>>,
   modules:             Arc<Mutex<Vec<SharedModule>>>,
+  module_scheduling:   Arc<ModuleScheduling>,
   options:             HashSet<RouterOption>,
 }
 
@@ -164,13 +184,15 @@ impl RequestHandler {
       parameters:   route.as_ref().ok().map(|route| route.parameters.clone()),
       certificate:  peer_certificate.clone(),
     };
-    let async_modules = self.async_modules.lock().await.clone();
 
-    for module in async_modules {
-      module.lock().await.on_pre_route(&hook_context).await;
-    }
-
-    call_modules(&self.modules, |module| {
+    call_async_modules(
+      &self.async_modules,
+      &self.module_scheduling,
+      &hook_context,
+      HookPhase::PreRoute,
+    )
+    .await;
+    call_modules(&self.modules, &self.module_scheduling, |module| {
       module.on_pre_route(&hook_context);
     });
     self.pre_route_callback.call(&hook_context);
@@ -201,13 +223,15 @@ impl RequestHandler {
         ))
         .await
     };
-    let async_modules = self.async_modules.lock().await.clone();
 
-    for module in async_modules {
-      module.lock().await.on_post_route(&hook_context).await;
-    }
-
-    call_modules(&self.modules, |module| {
+    call_async_modules(
+      &self.async_modules,
+      &self.module_scheduling,
+      &hook_context,
+      HookPhase::PostRoute,
+    )
+    .await;
+    call_modules(&self.modules, &self.module_scheduling, |module| {
       module.on_post_route(&hook_context);
     });
     self.post_route_callback.call(&hook_context, &mut content);
@@ -227,16 +251,65 @@ impl RequestHandler {
 
 fn call_modules(
   modules: &Mutex<Vec<SharedModule>>,
+  scheduling: &ModuleScheduling,
   hook: impl Fn(&mut dyn Module),
 ) {
-  let modules = modules.lock().ok().map(|modules| modules.clone());
+  let invoke = || {
+    let modules = modules.lock().ok().map(|modules| modules.clone());
 
-  if let Some(modules) = modules {
-    for module in modules {
-      if let Ok(mut module) = module.lock() {
-        hook(module.as_mut());
+    if let Some(modules) = modules {
+      for module in modules {
+        if let Ok(mut module) = module.lock() {
+          hook(module.as_mut());
+        }
       }
     }
+  };
+
+  if scheduling.concurrent.load(Ordering::Relaxed) {
+    let _permit = scheduling
+      .synchronous
+      .read()
+      .unwrap_or_else(std::sync::PoisonError::into_inner);
+
+    invoke();
+  } else {
+    let _permit = scheduling
+      .synchronous
+      .write()
+      .unwrap_or_else(std::sync::PoisonError::into_inner);
+
+    invoke();
+  }
+}
+
+async fn call_async_modules(
+  modules: &AsyncMutex<Vec<SharedAsyncModule>>,
+  scheduling: &ModuleScheduling,
+  context: &HookContext,
+  phase: HookPhase,
+) {
+  let invoke = async {
+    let modules = modules.lock().await.clone();
+
+    for module in modules {
+      let mut module = module.lock().await;
+
+      match phase {
+        HookPhase::PreRoute => module.on_pre_route(context).await,
+        HookPhase::PostRoute => module.on_post_route(context).await,
+      }
+    }
+  };
+
+  if scheduling.concurrent.load(Ordering::Relaxed) {
+    let _permit = scheduling.asynchronous.read().await;
+
+    invoke.await;
+  } else {
+    let _permit = scheduling.asynchronous.write().await;
+
+    invoke.await;
   }
 }
 
@@ -647,6 +720,7 @@ impl Router {
       languages_joined:    self.languages.join(","),
       async_modules:       self.async_modules.clone(),
       modules:             self.modules.clone(),
+      module_scheduling:   self.module_scheduling.clone(),
       options:             self.options.clone(),
     });
     let acceptor = self.ssl_acceptor.clone();
@@ -1111,7 +1185,14 @@ impl Router {
           .expect("routes conflict under case-insensitive matching");
       }
 
-      self.options.insert(*option);
+      if *option == RouterOption::AllowConcurrentModules {
+        self
+          .module_scheduling
+          .concurrent
+          .store(true, Ordering::Relaxed);
+      } else {
+        self.options.insert(*option);
+      }
     }
 
     self
@@ -1135,7 +1216,12 @@ impl Router {
   /// ```
   pub fn toggle_options(&mut self, options: &[RouterOption]) -> &mut Self {
     for option in options {
-      if self.options.contains(option) {
+      if *option == RouterOption::AllowConcurrentModules {
+        self
+          .module_scheduling
+          .concurrent
+          .fetch_xor(true, Ordering::Relaxed);
+      } else if self.options.contains(option) {
         self.remove_options(std::slice::from_ref(option));
       } else {
         self.add_options(std::slice::from_ref(option));
@@ -1161,7 +1247,14 @@ impl Router {
         self.routes.disable_case_insensitive();
       }
 
-      self.options.remove(option);
+      if *option == RouterOption::AllowConcurrentModules {
+        self
+          .module_scheduling
+          .concurrent
+          .store(false, Ordering::Relaxed);
+      } else {
+        self.options.remove(option);
+      }
     }
 
     self
@@ -1220,6 +1313,7 @@ impl Default for Router {
       port: 1965,
       modules: Arc::new(Mutex::new(vec![])),
       async_modules: Arc::new(AsyncMutex::new(vec![])),
+      module_scheduling: Arc::new(ModuleScheduling::default()),
       options: HashSet::new(),
       private_key_content: None,
       certificate_content: None,

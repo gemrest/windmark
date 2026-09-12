@@ -483,6 +483,7 @@ async fn async_module_locks_allow_progress_in_both_hook_phases() {
     let (entered, entry) = std::sync::mpsc::channel();
     let (progressed, progress) = std::sync::mpsc::channel();
 
+    router.add_options(&[RouterOption::AllowConcurrentModules]);
     router.set_error_handler(|_| Response::success("BODY"));
 
     let route_wait = route_gate.clone();

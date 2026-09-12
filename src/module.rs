@@ -1,8 +1,9 @@
 use crate::context::HookContext;
 
-/// Each module runs one hook at a time. Different modules may run concurrently
-/// across requests, while each request visits modules in registration order.
+/// Synchronous modules run hooks in registration order for each request.
 ///
+/// Each module remains exclusive. Hook phases run exclusively across requests
+/// unless `RouterOption::AllowConcurrentModules` is enabled.
 /// If a hook panics, subsequent requests skip that module because its lock is
 /// poisoned; other modules remain available.
 pub trait Module {
@@ -19,9 +20,11 @@ pub trait Module {
   fn on_post_route(&mut self, _: &HookContext) {}
 }
 
-/// Each module runs one hook at a time, including across awaits. Different
-/// modules may run concurrently across requests, while each request visits
-/// modules in registration order.
+/// Asynchronous modules run hooks in registration order for each request.
+///
+/// Each module remains exclusive, including across awaits. Hook phases run
+/// exclusively across requests unless `RouterOption::AllowConcurrentModules`
+/// is enabled.
 #[async_trait::async_trait]
 pub trait AsyncModule: Send + Sync {
   /// The router calls this hook during attachment, before registering
