@@ -169,8 +169,16 @@ fn exchange(
 }
 
 async fn serve_requests(
+  router: Router,
+  client: impl FnOnce(SocketAddr) + Send + 'static,
+) {
+  serve_requests_until(router, client, std::future::pending()).await;
+}
+
+async fn serve_requests_until(
   mut router: Router,
   client: impl FnOnce(SocketAddr) + Send + 'static,
+  shutdown: impl std::future::Future<Output = ()> + Send + 'static,
 ) {
   let reservation = TcpListener::bind("127.0.0.1:0").unwrap();
   let address = reservation.local_addr().unwrap();
@@ -181,10 +189,13 @@ async fn serve_requests(
   drop(reservation);
 
   #[cfg(feature = "tokio")]
-  let server = tokio::spawn(async move { router.run().await.unwrap() });
+  let server =
+    tokio::spawn(async move { router.run_until(shutdown).await.unwrap() });
   #[cfg(feature = "async-std")]
   let server =
-    async_std::task::spawn(async move { router.run().await.unwrap() });
+    async_std::task::spawn(
+      async move { router.run_until(shutdown).await.unwrap() },
+    );
   #[cfg(feature = "tokio")]
   let run_client = tokio::task::spawn_blocking;
   #[cfg(feature = "async-std")]
@@ -689,6 +700,198 @@ async fn index_route_attributes_preserve_names_and_select_the_root_path() {
   .await;
 }
 
+async fn pause(duration: Duration) {
+  #[cfg(feature = "tokio")]
+  tokio::time::sleep(duration).await;
+  #[cfg(feature = "async-std")]
+  async_std::task::sleep(duration).await;
+}
+
+#[cfg_attr(
+  feature = "tokio",
+  tokio::test(flavor = "multi_thread", worker_threads = 2)
+)]
+#[cfg_attr(feature = "async-std", async_std::test)]
+async fn connection_deadlines_release_stalled_handshakes_and_requests() {
+  let mut router = Router::new();
+  let mut limits = windmark::router::ConnectionLimits::default();
+
+  limits.max_connections = std::num::NonZeroUsize::new(1);
+  limits.handshake_timeout = Some(Duration::from_millis(50));
+  limits.request_timeout = Some(Duration::from_millis(50));
+  limits.shutdown_timeout = Some(Duration::from_millis(50));
+
+  router.set_connection_limits(limits);
+  router.mount("/", |_| Response::success("ready"));
+  serve_requests(router, |address| {
+    let mut stalled = connect_tcp(address);
+
+    stalled
+      .set_read_timeout(Some(Duration::from_secs(5)))
+      .unwrap();
+
+    let result = stalled.read(&mut [0]);
+
+    assert!(
+      matches!(result, Ok(0))
+        || result.is_err_and(|error| {
+          error.kind() == std::io::ErrorKind::ConnectionReset
+        })
+    );
+
+    let mut stalled = connect(address);
+
+    stalled.write_all(b"gemini://localhost/").unwrap();
+
+    let started = Instant::now();
+    let result = stalled.read(&mut [0]);
+
+    assert!(result.is_err() || matches!(result, Ok(0)));
+    assert!(started.elapsed() < Duration::from_secs(2));
+    request(
+      address,
+      "/",
+      b"20 text/gemini; charset=utf-8; lang=en\r\nready\n",
+    );
+  })
+  .await;
+}
+
+#[cfg_attr(
+  feature = "tokio",
+  tokio::test(flavor = "multi_thread", worker_threads = 2)
+)]
+#[cfg_attr(feature = "async-std", async_std::test)]
+async fn connection_admission_caps_active_handlers() {
+  use std::sync::atomic::{AtomicUsize, Ordering};
+
+  let active = Arc::new(AtomicUsize::new(0));
+  let peak = Arc::new(AtomicUsize::new(0));
+  let observed = peak.clone();
+  let mut router = Router::new();
+  let mut limits = windmark::router::ConnectionLimits::default();
+
+  limits.max_connections = std::num::NonZeroUsize::new(1);
+
+  router.set_connection_limits(limits);
+  router.mount("/", move |_| {
+    let active = active.clone();
+    let peak = peak.clone();
+
+    async move {
+      let count = active.fetch_add(1, Ordering::SeqCst) + 1;
+
+      peak.fetch_max(count, Ordering::SeqCst);
+      pause(Duration::from_millis(40)).await;
+      active.fetch_sub(1, Ordering::SeqCst);
+
+      Response::success("ready")
+    }
+  });
+  serve_requests(router, move |address| {
+    let start = Arc::new(std::sync::Barrier::new(3));
+    let clients: Vec<_> = (0..2)
+      .map(|_| {
+        let start = start.clone();
+
+        std::thread::spawn(move || {
+          start.wait();
+          request(
+            address,
+            "/",
+            b"20 text/gemini; charset=utf-8; lang=en\r\nready\n",
+          );
+        })
+      })
+      .collect();
+
+    start.wait();
+
+    for client in clients {
+      client.join().unwrap();
+    }
+
+    assert_eq!(observed.load(Ordering::SeqCst), 1);
+  })
+  .await;
+}
+
+#[cfg_attr(
+  feature = "tokio",
+  tokio::test(flavor = "multi_thread", worker_threads = 2)
+)]
+#[cfg_attr(feature = "async-std", async_std::test)]
+async fn shutdown_drains_completed_handlers_and_cancels_unfinished_handlers() {
+  use std::sync::atomic::{AtomicBool, Ordering};
+
+  struct Completion(Arc<AtomicBool>);
+
+  impl Drop for Completion {
+    fn drop(&mut self) { self.0.store(true, Ordering::SeqCst); }
+  }
+
+  for finish in [true, false] {
+    let started = Arc::new(AtomicBool::new(false));
+    let stopping = started.clone();
+    let dropped = Arc::new(AtomicBool::new(false));
+    let observed = dropped.clone();
+    let mut router = Router::new();
+    let mut limits = windmark::router::ConnectionLimits::default();
+
+    limits.drain_timeout = Duration::from_millis(100);
+
+    router.set_connection_limits(limits);
+    router.mount("/", move |_| {
+      let completion = Completion(dropped.clone());
+      let started = started.clone();
+
+      async move {
+        started.store(true, Ordering::SeqCst);
+
+        if finish {
+          pause(Duration::from_millis(10)).await;
+        } else {
+          std::future::pending::<()>().await;
+        }
+
+        drop(completion);
+
+        Response::success("finished")
+      }
+    });
+    serve_requests_until(
+      router,
+      move |address| {
+        let mut stream = connect(address);
+        let started = Instant::now();
+
+        if finish {
+          exchange(
+            stream,
+            &[b"gemini://localhost/\r\n"],
+            b"20 text/gemini; charset=utf-8; lang=en\r\nfinished\n",
+          );
+        } else {
+          stream.write_all(b"gemini://localhost/\r\n").unwrap();
+
+          let result = stream.read(&mut [0]);
+
+          assert!(result.is_err() || matches!(result, Ok(0)));
+          assert!(started.elapsed() < Duration::from_secs(2));
+        }
+
+        assert!(observed.load(Ordering::SeqCst));
+      },
+      async move {
+        while !stopping.load(Ordering::SeqCst) {
+          pause(Duration::from_millis(1)).await;
+        }
+      },
+    )
+    .await;
+  }
+}
+
 #[cfg_attr(
   feature = "tokio",
   tokio::test(flavor = "multi_thread", worker_threads = 2)
@@ -752,4 +955,46 @@ async fn startup_preserves_an_existing_logger() {
     })
     .await;
   }
+}
+
+#[cfg_attr(
+  feature = "tokio",
+  tokio::test(flavor = "multi_thread", worker_threads = 2)
+)]
+#[cfg_attr(feature = "async-std", async_std::test)]
+async fn write_deadlines_release_connections_when_clients_stop_reading() {
+  use std::num::NonZeroUsize;
+  use windmark::router::ConnectionLimits;
+
+  let mut limits = ConnectionLimits::default();
+
+  limits.max_connections = NonZeroUsize::new(1);
+  limits.write_timeout = Some(Duration::from_millis(50));
+
+  let mut router = Router::new();
+
+  router.set_connection_limits(limits);
+  router.mount("/large", |_| {
+    Response::binary_success(
+      vec![0; 32 * 1024 * 1024],
+      "application/octet-stream",
+    )
+  });
+  router.mount("/", |_| Response::success("ready"));
+  serve_requests(router, |address| {
+    let mut stalled = connect(address);
+
+    stalled.write_all(b"gemini://localhost/large\r\n").unwrap();
+
+    let started = Instant::now();
+
+    request(
+      address,
+      "/",
+      b"20 text/gemini; charset=utf-8; lang=en\r\nready\n",
+    );
+    assert!(started.elapsed() < Duration::from_secs(2));
+    drop(stalled);
+  })
+  .await;
 }

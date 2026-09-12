@@ -32,9 +32,12 @@ use tokio::{
   sync::{Mutex as AsyncMutex, RwLock as AsyncRwLock},
 };
 
+mod connections;
 mod request;
 mod routes;
 
+use connections::with_timeout;
+pub use connections::ConnectionLimits;
 use routes::Routes;
 
 const MAX_REQUEST_URI_BYTES: usize = 1024;
@@ -94,6 +97,7 @@ pub struct Router {
   module_scheduling:     Arc<ModuleScheduling>,
   options:               HashSet<RouterOption>,
   listener_address:      String,
+  connection_limits:     ConnectionLimits,
 }
 
 struct RequestHandler {
@@ -109,6 +113,7 @@ struct RequestHandler {
   modules:             Arc<Mutex<Vec<SharedModule>>>,
   module_scheduling:   Arc<ModuleScheduling>,
   options:             HashSet<RouterOption>,
+  connection_limits:   ConnectionLimits,
 }
 
 impl RequestHandler {
@@ -122,7 +127,7 @@ impl RequestHandler {
     let mut footer = String::new();
     let mut header = String::new();
     let mut request = Vec::new();
-    let request = async {
+    let request = with_timeout(self.connection_limits.request_timeout, async {
       let url = loop {
         let size = match stream.read(&mut buffer).await {
           Ok(0) => return Ok(None),
@@ -157,8 +162,8 @@ impl RequestHandler {
       };
 
       Ok(Some(url))
-    }
-    .await;
+    })
+    .await?;
     let mut url = match request {
       Ok(Some(url)) => url,
       Ok(None) => return Ok(()),
@@ -167,7 +172,11 @@ impl RequestHandler {
           "59 The server (Windmark) received a bad request: {error}\r\n"
         );
 
-        stream.write_all(response.as_bytes()).await?;
+        with_timeout(
+          self.connection_limits.write_timeout,
+          stream.write_all(response.as_bytes()),
+        )
+        .await??;
 
         return Ok(());
       }
@@ -260,7 +269,11 @@ impl RequestHandler {
     };
     let response = serialize_response(content, &status_line, &header, &footer);
 
-    stream.write_all(&response).await?;
+    with_timeout(
+      self.connection_limits.write_timeout,
+      stream.write_all(&response),
+    )
+    .await??;
 
     Ok(())
   }
@@ -363,65 +376,6 @@ fn render_footer(
   }
 
   footer
-}
-
-/// Spawn a task to complete the TLS handshake on an accepted connection and
-/// dispatch it through `handler`.
-fn spawn_connection(
-  handler: Arc<RequestHandler>,
-  acceptor: Arc<SslAcceptor>,
-  stream: TcpStream,
-) {
-  #[cfg(feature = "tokio")]
-  let spawner = tokio::spawn;
-  #[cfg(feature = "async-std")]
-  let spawner = async_std::task::spawn;
-
-  spawner(async move {
-    let ssl = match ssl::Ssl::new(acceptor.context()) {
-      Ok(ssl) => ssl,
-      Err(e) => {
-        error!("ssl context error: {e:?}");
-
-        return;
-      }
-    };
-    #[cfg(feature = "tokio")]
-    let quick_stream = tokio_openssl::SslStream::new(ssl, stream);
-    #[cfg(feature = "async-std")]
-    let quick_stream = async_std_openssl::SslStream::new(ssl, stream);
-
-    match quick_stream {
-      Ok(mut stream) => {
-        if let Err(e) = std::pin::Pin::new(&mut stream).accept().await {
-          warn!("stream accept error: {e:?}");
-
-          return;
-        }
-
-        if let Err(e) = handler.handle(&mut stream).await {
-          error!("handle error: {e}");
-
-          return;
-        }
-
-        #[cfg(feature = "tokio")]
-        let shutdown = stream.shutdown();
-        #[cfg(feature = "async-std")]
-        let shutdown = std::future::poll_fn(|context| {
-          async_std::io::Write::poll_close(
-            std::pin::Pin::new(&mut stream),
-            context,
-          )
-        });
-
-        if let Err(error) = shutdown.await {
-          error!("TLS shutdown error: {error}");
-        }
-      }
-      Err(e) => error!("ssl stream error: {e:?}"),
-    }
-  });
 }
 
 /// Build a protocol-valid response header from the handler's response.
@@ -742,8 +696,10 @@ impl Router {
   ///
   /// Under the default Tokio runtime, the server runs until it receives an
   /// interrupt (Ctrl+C / SIGINT), at which point it stops accepting new
-  /// connections and returns. The `async-std` runtime runs until the process
-  /// is terminated.
+  /// connections and drains for the configured period before returning. The
+  /// default drain period is zero. The `async-std` runtime runs until the
+  /// process is terminated; use `run_until` for application-controlled
+  /// shutdown.
   ///
   /// # Examples
   ///
@@ -760,6 +716,54 @@ impl Router {
   /// This method returns an error if TLS configuration or listener binding
   /// fails.
   pub async fn run(&mut self) -> Result<(), Box<dyn Error>> {
+    #[cfg(feature = "tokio")]
+    let shutdown = async {
+      let _ = tokio::signal::ctrl_c().await;
+    };
+    #[cfg(feature = "async-std")]
+    let shutdown = std::future::pending();
+
+    self.run_until(shutdown).await
+  }
+
+  /// Set connection limits for subsequent server starts.
+  ///
+  /// # Examples
+  ///
+  /// ```rust
+  /// let mut limits = windmark::router::ConnectionLimits::default();
+  ///
+  /// limits.max_connections = std::num::NonZeroUsize::new(256);
+  /// limits.request_timeout = Some(std::time::Duration::from_secs(30));
+  /// limits.drain_timeout = std::time::Duration::from_secs(5);
+  ///
+  /// windmark::router::Router::new().set_connection_limits(limits);
+  /// ```
+  pub const fn set_connection_limits(
+    &mut self,
+    limits: ConnectionLimits,
+  ) -> &mut Self {
+    self.connection_limits = limits;
+
+    self
+  }
+
+  /// Serve requests until `shutdown` completes, then drain active connections
+  /// for the configured period. Remaining handler futures are cancelled.
+  /// Dropping this future also cancels the server's connection tasks.
+  ///
+  /// # Errors
+  ///
+  /// This method returns an error if TLS configuration or listener binding
+  /// fails.
+  ///
+  /// # Panics
+  ///
+  /// This method panics if a partial registry lock has been poisoned.
+  pub async fn run_until(
+    &mut self,
+    shutdown: impl std::future::Future<Output = ()>,
+  ) -> Result<(), Box<dyn Error>> {
     let acceptor = match &self.ssl_acceptor {
       Some(acceptor) => acceptor.clone(),
       None => Arc::new(self.create_acceptor()?),
@@ -811,40 +815,12 @@ impl Router {
       modules:             self.modules.clone(),
       module_scheduling:   self.module_scheduling.clone(),
       options:             self.options.clone(),
+      connection_limits:   self.connection_limits,
     });
 
-    // Under Tokio, Ctrl+C stops the server from accepting new connections
-    // without waiting for active connection tasks to finish. The async-std
-    // runtime continues accepting connections until the process exits.
-    #[cfg(feature = "tokio")]
-    {
-      loop {
-        tokio::select! {
-          connection = listener.accept() => match connection {
-            Ok((stream, _)) =>
-              spawn_connection(handler.clone(), acceptor.clone(), stream),
-            Err(e) => error!("tcp stream error: {e:?}"),
-          },
-          _ = tokio::signal::ctrl_c() => {
-            #[cfg(feature = "logger")]
-            info!("windmark received an interrupt; shutting down");
+    connections::serve(listener, handler, acceptor, shutdown).await;
 
-            break;
-          }
-        }
-      }
-
-      Ok(())
-    }
-
-    #[cfg(feature = "async-std")]
-    loop {
-      match listener.accept().await {
-        Ok((stream, _)) =>
-          spawn_connection(handler.clone(), acceptor.clone(), stream),
-        Err(e) => error!("tcp stream error: {e:?}"),
-      }
-    }
+    Ok(())
   }
 
   fn create_acceptor(&self) -> Result<SslAcceptor, Box<dyn Error>> {
@@ -1406,6 +1382,7 @@ impl Default for Router {
       private_key_content: None,
       certificate_content: None,
       listener_address: "0.0.0.0".to_string(),
+      connection_limits: ConnectionLimits::default(),
     }
   }
 }
