@@ -915,7 +915,6 @@ async fn invalid_response_headers_become_complete_failure_responses() {
   .await;
 }
 
-#[cfg(feature = "logger")]
 #[cfg_attr(
   feature = "tokio",
   tokio::test(flavor = "multi_thread", worker_threads = 2)
@@ -939,7 +938,6 @@ async fn startup_preserves_an_existing_logger() {
   for _ in 0..2 {
     let mut router = Router::new();
 
-    router.enable_default_logger(true);
     router.mount("/", |_| Response::success("ready"));
     serve_requests(router, |address| {
       request(

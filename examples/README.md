@@ -40,9 +40,9 @@ reading the client certificate to give conditional access.
 
 ## [Default Logger](./default_logger.rs)
 
-`cargo run --example default_logger --features logger,response-macros`
+`cargo run --example default_logger --features response-macros`
 
-A simple example showing the use of the default logger implementation.
+A simple example showing how an application initialises a logger for Windmark.
 
 ## [Empty](./empty.rs)
 

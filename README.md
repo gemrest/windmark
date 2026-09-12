@@ -20,7 +20,6 @@ Now supporting both [Tokio](https://tokio.rs/) and [`async-std`](https://async.r
 | Feature            | Description                                                                                             |
 | ------------------ | ------------------------------------------------------------------------------------------------------- |
 | `default`          | Base Windmark framework using [Tokio](https://tokio.rs/)                                                |
-| `logger`           | Enables the default [`pretty_env_logger`](https://github.com/seanmonstar/pretty-env-logger) integration |
 | `auto-deduce-mime` | Exposes `Response`s and macros that automatically fill MIMEs for non-Gemini responses                   |
 | `response-macros`  | Simple macros for all `Response`s                                                                       |
 | `tokio`            | Marks [Tokio](https://tokio.rs/) as the asynchronous runtime                                            |
@@ -34,9 +33,6 @@ Now supporting both [Tokio](https://tokio.rs/) and [`async-std`](https://async.r
 [dependencies]
 windmark = "0.7.0"
 tokio = { version = "1.26.0", features = ["full"] }
-
-# If you would like to use the built-in logger (recommended)
-# windmark = { version = "0.7.0", features = ["logger"] }
 
 # If you would like to use the built-in MIME deduction when `Success`-ing a file
 # (recommended)

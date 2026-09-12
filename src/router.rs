@@ -89,10 +89,6 @@ pub struct Router {
   headers:               Arc<Mutex<Vec<Arc<dyn Partial>>>>,
   footers:               Arc<Mutex<Vec<Arc<dyn Partial>>>>,
   ssl_acceptor:          Option<Arc<SslAcceptor>>,
-  #[cfg(feature = "logger")]
-  default_logger:        bool,
-  #[cfg(feature = "logger")]
-  log_filter:            String,
   pre_route_callback:    Arc<dyn PreRouteHook>,
   post_route_callback:   Arc<dyn PostRouteHook>,
   character_set:         String,
@@ -784,13 +780,6 @@ impl Router {
       None => Arc::new(self.create_acceptor()?),
     };
 
-    #[cfg(feature = "logger")]
-    if self.default_logger {
-      let _ = pretty_env_logger::formatted_builder()
-        .parse_filters(&self.log_filter)
-        .try_init();
-    }
-
     #[cfg(feature = "tokio")]
     let listener = tokio::net::TcpListener::bind(format!(
       "{}:{}",
@@ -804,7 +793,6 @@ impl Router {
     ))
     .await?;
 
-    #[cfg(feature = "logger")]
     info!("windmark is listening for connections");
 
     let handler = Arc::new(RequestHandler {
@@ -909,54 +897,6 @@ impl Router {
   /// ```
   pub fn set_ssl_acceptor(&mut self, ssl_acceptor: SslAcceptor) -> &mut Self {
     self.ssl_acceptor = Some(Arc::new(ssl_acceptor));
-
-    self
-  }
-
-  /// Enable the default logger (the
-  /// [`pretty_env_logger`](https://crates.io/crates/pretty_env_logger) and
-  /// [`log`](https://crates.io/crates/log) crates).
-  #[cfg(feature = "logger")]
-  pub fn enable_default_logger(&mut self, enable: bool) -> &mut Self {
-    self.default_logger = enable;
-
-    if self.log_filter.is_empty() {
-      self.log_filter = "windmark=trace".to_string();
-    }
-
-    self
-  }
-
-  /// Set the default logger's log level.
-  ///
-  /// If you enable Windmark's default logger with `enable_default_logger`,
-  /// Windmark will only emit its own logs. By setting a log level with
-  /// this method, you are overriding the default log level, so you must choose
-  /// to enable logs from Windmark with the `log_windmark` parameter.
-  ///
-  /// Log level "language" is detailed
-  /// [here](https://docs.rs/env_logger/0.9.0/env_logger/#enabling-logging).
-  ///
-  /// # Examples
-  ///
-  /// ```rust
-  /// windmark::router::Router::new()
-  ///   .enable_default_logger(true)
-  ///   .set_log_level("your_crate_name=trace", true);
-  /// // Use this setting to emit only logs from your crate.
-  /// // .set_log_level("your_crate_name=trace", false);
-  /// ```
-  #[cfg(feature = "logger")]
-  pub fn set_log_level(
-    &mut self,
-    log_level: impl Into<String> + AsRef<str>,
-    log_windmark: bool,
-  ) -> &mut Self {
-    self.log_filter = format!(
-      "{}{}",
-      if log_windmark { "windmark," } else { "" },
-      log_level.into()
-    );
 
     self
   }
@@ -1372,8 +1312,8 @@ impl Router {
 impl Default for Router {
   fn default() -> Self {
     Self {
-      routes: Routes::default(),
-      error_handler: Arc::new(|_| {
+      routes:                Routes::default(),
+      error_handler:         Arc::new(|_| {
         async {
           Response::not_found(
             "This capsule has not implemented an error handler...",
@@ -1382,28 +1322,24 @@ impl Default for Router {
       }),
       private_key_file_name: String::new(),
       certificate_file_name: String::new(),
-      headers: Arc::new(Mutex::new(vec![])),
-      footers: Arc::new(Mutex::new(vec![])),
-      ssl_acceptor: None,
-      #[cfg(feature = "logger")]
-      default_logger: false,
-      #[cfg(feature = "logger")]
-      log_filter: String::new(),
-      pre_route_callback: Arc::new((|_| {}) as fn(&HookContext)),
-      post_route_callback: Arc::new(
+      headers:               Arc::new(Mutex::new(vec![])),
+      footers:               Arc::new(Mutex::new(vec![])),
+      ssl_acceptor:          None,
+      pre_route_callback:    Arc::new((|_| {}) as fn(&HookContext)),
+      post_route_callback:   Arc::new(
         (|_, _: &mut Response| {}) as fn(&HookContext, &mut Response),
       ),
-      character_set: "utf-8".to_string(),
-      languages: vec!["en".to_string()],
-      port: 1965,
-      modules: Arc::new(Mutex::new(vec![])),
-      async_modules: Arc::new(AsyncMutex::new(vec![])),
-      module_scheduling: Arc::new(ModuleScheduling::default()),
-      options: HashSet::new(),
-      private_key_content: None,
-      certificate_content: None,
-      listener_address: "0.0.0.0".to_string(),
-      connection_limits: ConnectionLimits::default(),
+      character_set:         "utf-8".to_string(),
+      languages:             vec!["en".to_string()],
+      port:                  1965,
+      modules:               Arc::new(Mutex::new(vec![])),
+      async_modules:         Arc::new(AsyncMutex::new(vec![])),
+      module_scheduling:     Arc::new(ModuleScheduling::default()),
+      options:               HashSet::new(),
+      private_key_content:   None,
+      certificate_content:   None,
+      listener_address:      "0.0.0.0".to_string(),
+      connection_limits:     ConnectionLimits::default(),
     }
   }
 }

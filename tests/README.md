@@ -4,8 +4,8 @@ Run the complete workspace with an explicitly selected runtime:
 
 ```sh
 cargo test --workspace --features windmark/tokio
-cargo test --workspace --no-default-features --features windmark/tokio,windmark/logger,windmark/auto-deduce-mime,windmark/response-macros
-cargo test --workspace --no-default-features --features windmark/async-std,windmark/logger,windmark/auto-deduce-mime,windmark/response-macros
+cargo test --workspace --no-default-features --features windmark/tokio,windmark/auto-deduce-mime,windmark/response-macros
+cargo test --workspace --no-default-features --features windmark/async-std,windmark/auto-deduce-mime,windmark/response-macros
 ```
 
 The qualified runtime feature also selects the runtime for Rossweisse's

@@ -30,9 +30,9 @@ jobs:
           - name: Default
             flags: --features windmark/tokio
           - name: Tokio
-            flags: --no-default-features --features windmark/tokio,windmark/logger,windmark/auto-deduce-mime,windmark/response-macros
+            flags: --no-default-features --features windmark/tokio,windmark/auto-deduce-mime,windmark/response-macros
           - name: Async-Std
-            flags: --no-default-features --features windmark/async-std,windmark/logger,windmark/auto-deduce-mime,windmark/response-macros
+            flags: --no-default-features --features windmark/async-std,windmark/auto-deduce-mime,windmark/response-macros
     name: Check ${{ matrix.name }}
     steps:
       - uses: actions/checkout@v4
