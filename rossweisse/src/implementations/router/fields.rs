@@ -5,6 +5,7 @@ use syn::punctuated::Punctuated;
 pub fn fields(arguments: TokenStream, item: syn::ItemStruct) -> TokenStream {
   let field_initializers =
     syn::parse_macro_input!(arguments as super::parser::FieldInitializers);
+  let visibility = item.vis;
   let router_identifier = item.ident;
   let named_fields = match item.fields {
     syn::Fields::Named(fields) => fields,
@@ -46,7 +47,7 @@ pub fn fields(arguments: TokenStream, item: syn::ItemStruct) -> TokenStream {
   };
   let output_fields = named_fields.named;
   let output = quote! {
-    struct #router_identifier {
+    #visibility struct #router_identifier {
       #output_fields
       router: ::windmark::router::Router,
     }
