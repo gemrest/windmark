@@ -30,12 +30,12 @@ Now supporting both [Tokio](https://tokio.rs/) and [`async-std`](https://async.r
 # Cargo.toml
 
 [dependencies]
-windmark = "0.7.0"
+windmark = "0.8.0"
 tokio = { version = "1.26.0", features = ["full"] }
 
 # If you would like to use the built-in MIME deduction when `Success`-ing a file
 # (recommended)
-# windmark = { version = "0.7.0", features = ["auto-deduce-mime"] }
+# windmark = { version = "0.8.0", features = ["auto-deduce-mime"] }
 ```
 
 ### Implementing a Windmark Server

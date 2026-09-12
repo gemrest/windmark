@@ -6,7 +6,7 @@ members = ["rossweisse"]
 [package]
 autotests = false
 name = "windmark"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["Fuwn <contact@fuwn.me>"]
 edition = "2021"
 description = "An elegant and highly performant async Gemini server framework"
@@ -57,7 +57,7 @@ tree_magic_mini = { version = "3.2.2", optional = true } # MIME
 
 [dev-dependencies]
 pretty_env_logger = "0.5.0"
-rossweisse = { version = "0.0.3", path = "./rossweisse" }
+rossweisse = { version = "0.0.4", path = "./rossweisse" }
 
 [package.metadata.docs.rs]
 # `tokio` and `async-std` are mutually exclusive, so document the default
