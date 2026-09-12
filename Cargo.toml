@@ -133,3 +133,6 @@ name = "router_runtime"
 
 [[test]]
 name = "module"
+
+[[test]]
+name = "response"

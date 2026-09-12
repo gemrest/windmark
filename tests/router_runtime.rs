@@ -272,7 +272,10 @@ async fn callbacks_partials_and_case_folding_keep_their_existing_order() {
   router.set_post_route_callback(
     move |_: &HookContext, response: &mut Response| {
       recorded.lock().unwrap().push("callback-post");
-      response.content.push('!');
+
+      if let Some(content) = response.content_mut() {
+        content.push('!');
+      }
     },
   );
   serve_requests(router, move |address| {

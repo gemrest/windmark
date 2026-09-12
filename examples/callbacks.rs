@@ -17,7 +17,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     })
     .set_post_route_callback(
       |context: &HookContext, content: &mut windmark::response::Response| {
-        content.content = content.content.replace("Hello", "Hi");
+        if let Some(text) = content.content_mut() {
+          *text = text.replace("Hello", "Hi");
+        }
 
         println!(
           "prepared response for {}",

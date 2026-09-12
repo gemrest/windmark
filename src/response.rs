@@ -20,15 +20,17 @@ macro_rules! response {
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct Response {
-  pub status:  i32,
-  pub mime:    Option<String>,
-  pub content: String,
+  status:        i32,
+  payload:       Payload,
+  mime:          Option<String>,
+  character_set: Option<String>,
+  languages:     Option<Vec<String>>,
+}
 
-  /// The router emits these bytes verbatim instead of `content` for status
-  /// `21`/`22`.
-  pub binary_content: Option<Vec<u8>>,
-  pub character_set:  Option<String>,
-  pub languages:      Option<Vec<String>>,
+#[derive(Clone)]
+enum Payload {
+  Text(String),
+  Binary(Vec<u8>),
 }
 
 impl Response {
@@ -78,7 +80,7 @@ impl Response {
   ) -> Self {
     let mut response = Self::new(21, String::new());
 
-    response.binary_content = Some(content.as_ref().to_vec());
+    response.payload = Payload::Binary(content.as_ref().to_vec());
 
     response.with_mime(mime);
 
@@ -92,7 +94,7 @@ impl Response {
 
     response.with_mime(tree_magic_mini::from_u8(content));
 
-    response.binary_content = Some(content.to_vec());
+    response.payload = Payload::Binary(content.to_vec());
 
     response
   }
@@ -102,8 +104,11 @@ impl Response {
     Self {
       status,
       mime: None,
-      content: content.into(),
-      binary_content: None,
+      payload: if matches!(status, 21 | 22) {
+        Payload::Binary(Vec::new())
+      } else {
+        Payload::Text(content.into())
+      },
       character_set: None,
       languages: None,
     }
@@ -112,8 +117,8 @@ impl Response {
   #[doc(hidden)]
   #[must_use]
   pub fn serialize_body(self, header: &str, footer: &str) -> Vec<u8> {
-    if matches!(self.status, 21 | 22) {
-      return self.binary_content.unwrap_or_default();
+    if let Payload::Binary(bytes) = self.payload {
+      return bytes;
     }
 
     let mut body = Vec::with_capacity(self.body_capacity(header, footer));
@@ -123,11 +128,16 @@ impl Response {
     body
   }
 
-  pub(crate) fn body_capacity(&self, header: &str, footer: &str) -> usize {
-    match self.status {
-      20 => header.len() + self.content.len() + footer.len() + 2,
-      21 | 22 => self.binary_content.as_ref().map_or(0, Vec::len),
-      _ => 0,
+  pub(crate) const fn body_capacity(
+    &self,
+    header: &str,
+    footer: &str,
+  ) -> usize {
+    match &self.payload {
+      Payload::Text(content) if self.status == 20 =>
+        header.len() + content.len() + footer.len() + 2,
+      Payload::Binary(bytes) => bytes.len(),
+      Payload::Text(_) => 0,
     }
   }
 
@@ -137,8 +147,8 @@ impl Response {
     header: &str,
     footer: &str,
   ) {
-    match self.status {
-      20 => {
+    match &self.payload {
+      Payload::Text(content) if self.status == 20 => {
         let text = self.mime.as_deref().is_none_or(|mime| {
           mime
             .split_once('/')
@@ -147,10 +157,10 @@ impl Response {
 
         if text {
           append_text(body, header);
-          append_text(body, &self.content);
+          append_text(body, content);
         } else {
           body.extend_from_slice(header.as_bytes());
-          body.extend_from_slice(self.content.as_bytes());
+          body.extend_from_slice(content.as_bytes());
         }
 
         body.push(b'\n');
@@ -165,14 +175,77 @@ impl Response {
           body.extend_from_slice(footer.as_bytes());
         }
       }
-
-      21 | 22 =>
-        if let Some(bytes) = &self.binary_content {
-          body.extend_from_slice(bytes);
-        },
-
-      _ => {}
+      Payload::Binary(bytes) => body.extend_from_slice(bytes),
+      Payload::Text(_) => {}
     }
+  }
+
+  /// Return the status supplied to the constructor, including internal binary
+  /// statuses 21 and 22. Replace the response to change its status or payload
+  /// kind.
+  #[must_use]
+  pub const fn status(&self) -> i32 { self.status }
+
+  /// Return text content or header metadata, or `None` for binary responses.
+  #[must_use]
+  pub fn content(&self) -> Option<&str> {
+    match &self.payload {
+      Payload::Text(content) => Some(content),
+      Payload::Binary(_) => None,
+    }
+  }
+
+  /// Borrow text content or header metadata for editing.
+  pub const fn content_mut(&mut self) -> Option<&mut String> {
+    match &mut self.payload {
+      Payload::Text(content) => Some(content),
+      Payload::Binary(_) => None,
+    }
+  }
+
+  /// Return the binary payload, or `None` for text and metadata responses.
+  #[must_use]
+  pub fn binary_content(&self) -> Option<&[u8]> {
+    match &self.payload {
+      Payload::Binary(bytes) => Some(bytes),
+      Payload::Text(_) => None,
+    }
+  }
+
+  /// Borrow the binary payload for editing or replacing its owned buffer.
+  pub const fn binary_content_mut(&mut self) -> Option<&mut Vec<u8>> {
+    match &mut self.payload {
+      Payload::Binary(bytes) => Some(bytes),
+      Payload::Text(_) => None,
+    }
+  }
+
+  /// Return the response's media type override.
+  #[must_use]
+  pub fn mime(&self) -> Option<&str> { self.mime.as_deref() }
+
+  /// Borrow the media type override; set it to `None` to restore the default.
+  pub const fn mime_mut(&mut self) -> &mut Option<String> { &mut self.mime }
+
+  /// Return the response's character set override.
+  #[must_use]
+  pub fn character_set(&self) -> Option<&str> { self.character_set.as_deref() }
+
+  /// Borrow the character set override; set it to `None` to use the router's
+  /// default.
+  pub const fn character_set_mut(&mut self) -> &mut Option<String> {
+    &mut self.character_set
+  }
+
+  /// Return the response's language override, including an explicitly empty
+  /// list.
+  #[must_use]
+  pub fn languages(&self) -> Option<&[String]> { self.languages.as_deref() }
+
+  /// Borrow the language override; set it to `None` to use the router's
+  /// default.
+  pub const fn languages_mut(&mut self) -> &mut Option<Vec<String>> {
+    &mut self.languages
   }
 
   pub fn with_mime(

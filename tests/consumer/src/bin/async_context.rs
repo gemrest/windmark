@@ -23,7 +23,7 @@ fn main() {
       panic!("the response should be ready");
     };
 
-    assert_eq!(response.content, format!("Hello {path}"));
+    assert_eq!(response.content().unwrap(), format!("Hello {path}"));
   }
 
   let route = windmark::success_async!(

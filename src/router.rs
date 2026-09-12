@@ -384,20 +384,18 @@ fn status_line(
   default_character_set: &str,
   default_languages: &str,
 ) -> Result<String, &'static str> {
-  let status = content.status;
+  let status = content.status();
 
   if matches!(status, 20..=22) {
-    let mime = content.mime.as_deref().unwrap_or(if status == 20 {
+    let mime = content.mime().unwrap_or(if status == 20 {
       "text/gemini"
     } else {
       "application/octet-stream"
     });
     let metadata = if status == 20 {
-      let character_set = content
-        .character_set
-        .as_deref()
-        .unwrap_or(default_character_set);
-      let languages = content.languages.as_ref().map_or_else(
+      let character_set =
+        content.character_set().unwrap_or(default_character_set);
+      let languages = content.languages().map_or_else(
         || default_languages.to_owned(),
         |languages| languages.join(","),
       );
@@ -434,7 +432,12 @@ fn status_line(
     return Err("undefined response status");
   }
 
-  let metadata = content.content.lines().next().unwrap_or_default();
+  let metadata = content
+    .content()
+    .unwrap_or_default()
+    .lines()
+    .next()
+    .unwrap_or_default();
 
   if metadata.chars().any(char::is_control) {
     return Err("response metadata contains a control character");

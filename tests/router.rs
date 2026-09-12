@@ -265,7 +265,9 @@ fn response_assembly_preserves_publicly_constructible_states() {
   ] {
     let mut response = Response::new(status, "body");
 
-    response.binary_content = Some(vec![0, 0xff]);
+    if let Some(bytes) = response.binary_content_mut() {
+      *bytes = vec![0, 0xff];
+    }
 
     let status_line = line(&response);
     let expected = [expected_line.as_bytes(), b"\r\n", expected_body].concat();

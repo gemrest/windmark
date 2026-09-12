@@ -11,9 +11,9 @@ const NON_UTF8: &[u8] = &[
 fn binary_success_preserves_non_utf8_bytes() {
   let response = Response::binary_success(NON_UTF8, "image/png");
 
-  assert_eq!(response.status, 21);
-  assert_eq!(response.mime.as_deref(), Some("image/png"));
-  assert_eq!(response.binary_content.as_deref(), Some(NON_UTF8));
+  assert_eq!(response.status(), 21);
+  assert_eq!(response.mime(), Some("image/png"));
+  assert_eq!(response.binary_content(), Some(NON_UTF8));
 }
 
 #[test]
@@ -29,8 +29,8 @@ fn serialize_body_writes_binary_bytes_verbatim() {
 fn binary_success_auto_preserves_non_utf8_bytes() {
   let response = Response::binary_success_auto(NON_UTF8);
 
-  assert_eq!(response.status, 22);
-  assert_eq!(response.binary_content.as_deref(), Some(NON_UTF8));
+  assert_eq!(response.status(), 22);
+  assert_eq!(response.binary_content(), Some(NON_UTF8));
   assert_eq!(
     response.serialize_body("ignored-header", "ignored-footer"),
     NON_UTF8,
@@ -56,7 +56,7 @@ fn public_binary_serialization_returns_the_existing_allocation() {
     let pointer = bytes.as_ptr();
     let capacity = bytes.capacity();
 
-    response.binary_content = Some(bytes);
+    *response.binary_content_mut().unwrap() = bytes;
 
     let body = response.serialize_body("ignored-header", "ignored-footer");
 

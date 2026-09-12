@@ -15,6 +15,7 @@ fn consumer_api_and_macro_forms_match_expected_behavior() {
   #[cfg(feature = "async-std")]
   let runtime = "async-std";
   let cases = [
+    ("invalid_response_fields", "private", "mime"),
     ("valid", "", "mime,auto-deduce-mime"),
     ("automatic_mime", "", "mime"),
     ("binary_context", "", "mime"),

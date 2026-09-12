@@ -60,7 +60,9 @@ impl PreRouteHook for Observer {
 
 impl PostRouteHook for Observer {
   fn call(&self, _: &HookContext, response: &mut Response) {
-    response.content.push('!');
+    if let Some(content) = response.content_mut() {
+      content.push('!');
+    }
   }
 }
 
@@ -127,39 +129,44 @@ fn main() {
   router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
   assert_eq!(capsule.count, 7);
   assert!(capsule.label.is_empty());
-  assert_eq!(Capsule::index(context()).content, "index");
+  assert_eq!(Capsule::index(context()).content().unwrap(), "index");
 
   let mut response = Response::input::<String>("prompt".to_owned());
 
-  response.status = 79;
-  response.mime = Some("text/plain; charset=iso-8859-1".to_owned());
-  response.character_set = Some("iso-8859-1".to_owned());
-  response.languages = Some(vec!["en".to_owned()]);
-  response.binary_content = Some(vec![0xff]);
-  response.content = "metadata".to_owned();
+  assert_eq!(response.content(), Some("prompt"));
+
+  response = Response::new(79, "metadata");
+  *response.mime_mut() = Some("text/plain; charset=iso-8859-1".to_owned());
+  *response.character_set_mut() = Some("iso-8859-1".to_owned());
+  *response.languages_mut() = Some(vec!["en".to_owned()]);
 
   assert!(response.serialize_body("header", "footer").is_empty());
-  assert_eq!(Response::binary_success(Bytes, "text/plain").status, 21);
-  assert_eq!(Response::binary_success_auto(b"hello").status, 22);
-  assert_eq!(windmark::binary_success!(b"hello")(context()).status, 22);
+  assert_eq!(Response::binary_success(Bytes, "text/plain").status(), 21);
+  assert_eq!(Response::binary_success_auto(b"hello").status(), 22);
+  assert_eq!(windmark::binary_success!(b"hello")(context()).status(), 22);
   assert_eq!(
-    windmark::binary_success_auto!(b"hello")(context()).status,
+    windmark::binary_success_auto!(b"hello")(context()).status(),
     22
   );
   assert_eq!(
     windmark::binary_success!(request, request.url.path(), "text/plain")(
       context()
     )
-    .status,
+    .status(),
     21
   );
   assert_eq!(
-    windmark::success!(request, request.url.path())(context()).content,
+    windmark::success!(request, request.url.path())(context())
+      .content()
+      .unwrap(),
     "/path"
   );
 
   let body = "hello";
   let mime = "text/plain";
 
-  assert_eq!(windmark::binary_success!(body, mime)(context()).status, 21);
+  assert_eq!(
+    windmark::binary_success!(body, mime)(context()).status(),
+    21
+  );
 }
