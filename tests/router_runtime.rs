@@ -1160,3 +1160,65 @@ async fn default_acceptor_supports_modern_tls_and_rejects_obsolete_choices() {
   )
   .await;
 }
+
+#[cfg_attr(
+  feature = "tokio",
+  tokio::test(flavor = "multi_thread", worker_threads = 2)
+)]
+#[cfg_attr(feature = "async-std", async_std::test)]
+async fn protocol_validation_and_normalization_apply_on_the_wire() {
+  let mut router = Router::new();
+
+  router.mount("/redirect", |_| Response::temporary_redirect("1:foo"));
+  router.mount("/authority", |_| {
+    Response::temporary_redirect("gemini://a@b@c/")
+  });
+  router.mount("/wildcard", |_| Response::binary_success("body", "text/*"));
+  router.mount("/language", |_| {
+    Response::binary_success("body", "text/gemini; lang=bogus_tag")
+  });
+  router.mount("/charset", |_| {
+    let mut response = Response::success("café");
+
+    response.with_character_set("iso-8859-1");
+
+    response
+  });
+  router.mount("/encoded", |_| {
+    let mut response = Response::binary_success([0xe9], "text/plain");
+
+    response.with_character_set("iso-8859-1");
+
+    response
+  });
+  router.mount("/caf%C3%A9/~user/:Name", |context| {
+    Response::success(context.parameters.get("Name").unwrap())
+  });
+  serve_requests(router, |address| {
+    for path in [
+      "/redirect",
+      "/authority",
+      "/wildcard",
+      "/language",
+      "/charset",
+    ] {
+      request(
+        address,
+        path,
+        b"40 The server could not encode the response\r\n",
+      );
+    }
+
+    request(
+      address,
+      "/encoded",
+      b"20 text/plain; charset=iso-8859-1\r\n\xe9",
+    );
+    request(
+      address,
+      "/caf%c3%a9/%7euser/%41lice",
+      b"20 text/gemini; charset=utf-8; lang=en\r\n%41lice\n",
+    );
+  })
+  .await;
+}
