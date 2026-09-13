@@ -1085,3 +1085,78 @@ async fn binding_captures_routes_but_preserves_shared_module_registration() {
     ]
   );
 }
+
+#[cfg_attr(
+  feature = "tokio",
+  tokio::test(flavor = "multi_thread", worker_threads = 2)
+)]
+#[cfg_attr(feature = "async-std", async_std::test)]
+async fn default_acceptor_supports_modern_tls_and_rejects_obsolete_choices() {
+  use openssl::ssl::SslVersion;
+
+  let credentials = acceptor();
+  let mut router = Router::new();
+
+  router.set_certificate(
+    String::from_utf8(
+      credentials
+        .context()
+        .certificate()
+        .unwrap()
+        .to_pem()
+        .unwrap(),
+    )
+    .unwrap(),
+  );
+  router.set_private_key(
+    String::from_utf8(
+      credentials
+        .context()
+        .private_key()
+        .unwrap()
+        .private_key_to_pem_pkcs8()
+        .unwrap(),
+    )
+    .unwrap(),
+  );
+  router.set_listener_address("127.0.0.1");
+  router.set_port(0);
+  router.mount("/", |_| Response::success("ready"));
+
+  let bound = router.bind().await.unwrap();
+
+  serve_bound_requests(
+    bound,
+    |address| {
+      for (version, cipher, accepted) in [
+        (SslVersion::TLS1_2, "ECDHE-ECDSA-AES128-GCM-SHA256", true),
+        (SslVersion::TLS1_3, "DEFAULT", true),
+        (SslVersion::TLS1_2, "ECDHE-ECDSA-AES128-SHA", false),
+        (SslVersion::TLS1_1, "ALL:@SECLEVEL=0", false),
+        (SslVersion::TLS1, "ALL:@SECLEVEL=0", false),
+      ] {
+        let mut connector = SslConnector::builder(SslMethod::tls()).unwrap();
+
+        connector.set_verify(SslVerifyMode::NONE);
+        connector.set_min_proto_version(Some(version)).unwrap();
+        connector.set_max_proto_version(Some(version)).unwrap();
+        connector.set_cipher_list(cipher).unwrap();
+
+        let connection =
+          connector.build().connect("localhost", connect_tcp(address));
+
+        if accepted {
+          exchange(
+            connection.unwrap(),
+            &[b"gemini://localhost/\r\n"],
+            b"20 text/gemini; charset=utf-8; lang=en\r\nready\n",
+          );
+        } else {
+          assert!(connection.is_err());
+        }
+      }
+    },
+    std::future::pending(),
+  )
+  .await;
+}

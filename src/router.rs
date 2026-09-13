@@ -842,7 +842,9 @@ impl Router {
   }
 
   fn create_acceptor(&self) -> Result<SslAcceptor, Box<dyn Error>> {
-    let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls())?;
+    let mut builder = SslAcceptor::mozilla_intermediate_v5(SslMethod::tls())?;
+
+    builder.set_min_proto_version(Some(ssl::SslVersion::TLS1_2))?;
 
     if let Some(ref content) = self.certificate_content {
       let mut certificates =
@@ -897,7 +899,7 @@ impl Router {
   ///
   /// windmark::router::Router::new().set_ssl_acceptor({
   ///   let mut builder =
-  ///     ssl::SslAcceptor::mozilla_intermediate(ssl::SslMethod::tls()).unwrap();
+  ///     ssl::SslAcceptor::mozilla_intermediate_v5(ssl::SslMethod::tls()).unwrap();
   ///
   ///   builder
   ///     .set_private_key_file("windmark_private.pem", ssl::SslFiletype::PEM)
