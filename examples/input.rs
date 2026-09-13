@@ -9,14 +9,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .set_certificate_file("windmark_public.pem")
     .mount("/input", |context: RouteContext| {
       if let Some(name) = context.url.query() {
-        Response::success(format!("Your name is {}!", name))
+        match percent_encoding::percent_decode_str(name).decode_utf8() {
+          Ok(name) => Response::success(format!("Your name is {name}!")),
+          Err(_) => Response::bad_request("Input must be valid UTF-8."),
+        }
       } else {
         Response::input("What is your name?")
       }
     })
     .mount("/sensitive", |context: RouteContext| {
-      if let Some(password) = context.url.query() {
-        Response::success(format!("Your password is {}!", password))
+      if context.url.query().is_some() {
+        Response::success("Your input was received.")
       } else {
         Response::sensitive_input("What is your password?")
       }
