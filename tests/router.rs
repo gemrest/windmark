@@ -149,11 +149,8 @@ fn success_status_line_uses_the_response_mime() {
 fn success_status_line_uses_the_response_character_set() {
   let mut response = Response::success("hi");
 
-  response.with_character_set("iso-8859-1");
-  assert_eq!(
-    line(&response),
-    "20 text/gemini; charset=iso-8859-1; lang=en"
-  );
+  response.with_character_set("UTF-8");
+  assert_eq!(line(&response), "20 text/gemini; charset=UTF-8; lang=en");
 }
 
 #[test]
@@ -873,4 +870,68 @@ fn redirects_validate_authorities_without_normalizing_the_target() {
       format!("30 {target}")
     );
   }
+}
+
+#[test]
+fn response_metadata_resolves_overrides_and_rejects_invalid_parameters() {
+  let mut response = Response::success("body");
+
+  response.with_mime("text/gemini; charset=iso-8859-1; lang=fr; note=\"a b\"");
+  response.with_character_set("utf-8");
+  response.with_languages(["en", "de"]);
+
+  let metadata = line(&response)
+    .strip_prefix("20 ")
+    .unwrap()
+    .parse::<mime::Mime>()
+    .unwrap();
+
+  assert_eq!(
+    metadata
+      .params()
+      .filter(|(name, _)| *name == mime::CHARSET)
+      .count(),
+    1
+  );
+  assert_eq!(metadata.get_param("charset").unwrap(), "utf-8");
+  assert_eq!(metadata.get_param("lang").unwrap(), "en,de");
+  assert_eq!(metadata.get_param("note").unwrap(), "a b");
+  response.with_languages(Vec::<String>::new());
+  assert!(!line(&response).contains("lang="));
+
+  for media_type in [
+    "text/*",
+    "*/*",
+    "text/gemini; lang=bogus_tag",
+    "text/gemini; lang=\"en,\"",
+    "text/plain; charset=utf-8; CHARSET=utf-8",
+    "text/plain; note=\"café\"",
+  ] {
+    assert!(
+      status_line(&Response::binary_success([], media_type), "utf-8", "en")
+        .is_err(),
+      "{media_type}"
+    );
+  }
+}
+
+#[test]
+fn character_sets_describe_bytes_without_transcoding_them() {
+  let mut response = Response::success("café");
+
+  response.with_character_set("iso-8859-1");
+  assert!(status_line(&response, "utf-8", "en").is_err());
+  response.with_character_set("utf-16");
+  assert!(status_line(&response, "utf-8", "en").is_err());
+
+  let mut response =
+    Response::binary_success([0x63, 0x61, 0x66, 0xe9], "text/plain");
+
+  response.with_character_set("iso-8859-1");
+  response.with_languages(["fr"]);
+  assert_eq!(
+    line(&response),
+    "20 text/plain; charset=iso-8859-1; lang=fr"
+  );
+  assert_eq!(response.serialize_body("", ""), [0x63, 0x61, 0x66, 0xe9]);
 }

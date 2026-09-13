@@ -217,7 +217,8 @@ impl Response {
     }
   }
 
-  /// Return the response's media type override.
+  /// Return the response's media type override. Explicit character-set and
+  /// language setters override parameters included in this value.
   #[must_use]
   pub fn mime(&self) -> Option<&str> { self.mime.as_deref() }
 
@@ -228,8 +229,8 @@ impl Response {
   #[must_use]
   pub fn character_set(&self) -> Option<&str> { self.character_set.as_deref() }
 
-  /// Borrow the character set override; set it to `None` to use the router's
-  /// default.
+  /// Borrow the character set override; `None` preserves a MIME parameter or,
+  /// for string responses without one, uses the router's default.
   pub const fn character_set_mut(&mut self) -> &mut Option<String> {
     &mut self.character_set
   }
@@ -239,12 +240,16 @@ impl Response {
   #[must_use]
   pub fn languages(&self) -> Option<&[String]> { self.languages.as_deref() }
 
-  /// Borrow the language override; set it to `None` to use the router's
-  /// default.
+  /// Borrow the language override; `None` preserves a MIME parameter or,
+  /// for string responses without one, uses the router's default.
   pub const fn languages_mut(&mut self) -> &mut Option<Vec<String>> {
     &mut self.languages
   }
 
+  /// Set the media type and its parameters. Explicit character-set and
+  /// language overrides take precedence; router defaults fill omitted
+  /// parameters on string responses. Invalid metadata produces a temporary
+  /// failure when the server sends the response.
   pub fn with_mime(
     &mut self,
     mime: impl Into<String> + AsRef<str>,
@@ -254,6 +259,8 @@ impl Response {
     self
   }
 
+  /// Declare the payload's character set without transcoding it. String
+  /// responses require UTF-8; use a binary response for pre-encoded content.
   pub fn with_character_set(
     &mut self,
     character_set: impl Into<String> + AsRef<str>,

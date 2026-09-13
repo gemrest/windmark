@@ -397,43 +397,8 @@ fn status_line(
   let status = content.status();
 
   if matches!(status, 20..=22) {
-    let mime = content.mime().unwrap_or(if status == 20 {
-      "text/gemini"
-    } else {
-      "application/octet-stream"
-    });
-    let metadata = if status == 20 {
-      let character_set =
-        content.character_set().unwrap_or(default_character_set);
-      let languages = content.languages().map_or_else(
-        || default_languages.to_owned(),
-        |languages| languages.join(","),
-      );
-      let mut metadata =
-        format!("{mime}; charset={}", mime_parameter(character_set));
-
-      if !languages.is_empty() {
-        if languages
-          .split(',')
-          .any(|language| language_tags::LanguageTag::parse(language).is_err())
-        {
-          return Err("invalid response language tag");
-        }
-
-        write!(&mut metadata, "; lang={}", mime_parameter(&languages))
-          .expect("writing to a string cannot fail");
-      }
-
-      metadata
-    } else {
-      mime.to_owned()
-    };
-
-    if metadata.chars().any(char::is_control)
-      || metadata.parse::<mime::Mime>().is_err()
-    {
-      return Err("invalid response media type or parameters");
-    }
+    let metadata =
+      response_metadata(content, default_character_set, default_languages)?;
 
     return Ok(format!("20 {metadata}"));
   }
@@ -466,6 +431,112 @@ fn status_line(
   } else {
     Ok(format!("{status} {metadata}"))
   }
+}
+
+fn response_metadata(
+  content: &Response,
+  default_character_set: &str,
+  default_languages: &str,
+) -> Result<String, &'static str> {
+  let text_payload = content.status() == 20;
+  let media_type = content.mime().unwrap_or(if text_payload {
+    "text/gemini"
+  } else {
+    "application/octet-stream"
+  });
+
+  if !media_type.is_ascii() || media_type.chars().any(char::is_control) {
+    return Err("invalid response media type or parameters");
+  }
+
+  let media_type = media_type
+    .parse::<mime::Mime>()
+    .map_err(|_| "invalid response media type or parameters")?;
+
+  if media_type.type_() == mime::STAR || media_type.subtype() == mime::STAR {
+    return Err("response media type must not contain a wildcard");
+  }
+
+  let mut parameters = Vec::<(String, String)>::new();
+
+  for (name, value) in media_type.params() {
+    if parameters
+      .iter()
+      .any(|(existing, _)| name == existing.as_str())
+    {
+      return Err("duplicate response media type parameter");
+    }
+
+    let mut decoded = String::new();
+    let mut characters = value.as_str().chars();
+
+    while let Some(character) = characters.next() {
+      decoded.push(if character == '\\' {
+        characters
+          .next()
+          .ok_or("invalid quoted media type parameter")?
+      } else {
+        character
+      });
+    }
+
+    parameters.push((name.as_str().to_ascii_lowercase(), decoded));
+  }
+
+  let language_override =
+    content.languages().map(|languages| languages.join(","));
+
+  for (name, explicit, fallback) in [
+    ("charset", content.character_set(), default_character_set),
+    ("lang", language_override.as_deref(), default_languages),
+  ] {
+    let existing = parameters
+      .iter()
+      .position(|(parameter, _)| parameter == name);
+
+    if let Some(value) = explicit
+      .or_else(|| (text_payload && existing.is_none()).then_some(fallback))
+    {
+      if let Some(position) = existing {
+        parameters.remove(position);
+      }
+
+      if name != "lang" || !value.is_empty() {
+        parameters.push((name.to_owned(), value.to_owned()));
+      }
+    }
+  }
+
+  let mut metadata = media_type.essence_str().to_owned();
+
+  for (name, value) in parameters {
+    if !value.is_ascii() || value.chars().any(char::is_control) {
+      return Err("invalid response media type parameter");
+    }
+
+    if text_payload && name == "charset" && !value.eq_ignore_ascii_case("utf-8")
+    {
+      return Err("string responses require the UTF-8 character set");
+    }
+
+    if media_type.essence_str() == "text/gemini"
+      && name == "lang"
+      && value
+        .split(',')
+        .any(|language| language_tags::LanguageTag::parse(language).is_err())
+    {
+      return Err("invalid response language tag");
+    }
+
+    write!(&mut metadata, "; {name}={}", mime_parameter(&value))
+      .expect("writing to a string cannot fail");
+  }
+
+  metadata
+    .parse::<mime::Mime>()
+    .map_err(|_| "invalid response media type or parameters")?;
+
+  Ok(metadata)
 }
 
 fn mime_parameter(value: &str) -> String {
@@ -1152,9 +1223,12 @@ impl Router {
 
   /// Specify a custom character set.
   ///
-  /// A character set specified in a [`Response`] overrides this setting.
+  /// A character set specified in a [`Response`] or its MIME parameters
+  /// overrides this setting.
   ///
   /// The default character set is `"utf-8"`.
+  /// String responses require UTF-8. To serve another encoding, use a binary
+  /// response with an explicit character set; its bytes are sent unchanged.
   ///
   /// # Examples
   ///
@@ -1172,7 +1246,8 @@ impl Router {
 
   /// Specify a custom language.
   ///
-  /// Languages specified in a [`Response`] override this setting.
+  /// Languages specified in a [`Response`] or its MIME parameters override
+  /// this setting. Router defaults apply only to string responses.
   ///
   /// The default language is `"en"`.
   ///
