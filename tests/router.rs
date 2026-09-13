@@ -808,3 +808,69 @@ fn credentials_load_complete_chains_and_use_the_last_setter() {
   assert!(router.create_acceptor().is_err());
   std::fs::remove_dir_all(directory).unwrap();
 }
+
+#[test]
+fn redirects_validate_the_first_path_segment_without_restricting_schemes() {
+  for target in ["1:foo", ":foo", "a_b:foo", "1:foo/bar"] {
+    assert!(
+      status_line(&Response::temporary_redirect(target), "utf-8", "en")
+        .is_err()
+    );
+  }
+
+  for target in [
+    "./1:foo",
+    "../page",
+    "/1:foo",
+    "?query:part",
+    "#part",
+    "https://example.com/",
+    "mailto:user@example.com",
+  ] {
+    assert!(
+      status_line(&Response::temporary_redirect(target), "utf-8", "en").is_ok()
+    );
+  }
+
+  assert!(super::request::parse_uri("http:/user@example.org/").is_err());
+}
+
+#[test]
+fn redirects_validate_authorities_without_normalizing_the_target() {
+  for target in [
+    "gemini://a@b@c/",
+    "//a@b@c/",
+    "//user[name]@example.com/",
+    "//example.com:port/",
+    "//example.com:12:34/",
+    "//example[host]/",
+    "//[::1]suffix/",
+    "//[::1]:port/",
+    "//[invalid]/",
+    "//[v1.]/",
+    "//[v1.a@b]/",
+  ] {
+    assert!(
+      status_line(&Response::temporary_redirect(target), "utf-8", "en")
+        .is_err(),
+      "{target}"
+    );
+  }
+
+  for target in [
+    "https://user:password@example.com:443/path",
+    "//user%40name@example.com/",
+    "//[::1]:1965/",
+    "//[v1.example:address]/",
+    "//example.com:/",
+    "//example.com:99999/",
+    "file:///path",
+    "//example.com/path@part?query@part#fragment@part",
+  ] {
+    assert_eq!(
+      status_line(&Response::temporary_redirect(target), "utf-8", "en")
+        .unwrap(),
+      format!("30 {target}")
+    );
+  }
+}
