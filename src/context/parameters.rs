@@ -15,15 +15,21 @@ impl Parameters {
     parameters: &matchit::Params<'_, '_>,
     lookup: &str,
     original: &str,
+    offsets: &[usize],
   ) -> Self {
     Self(
       parameters
         .iter()
         .map(|(name, value)| {
-          // Matchit borrows each value from the lookup path. ASCII case folding
-          // preserves byte offsets, so the original path has the same spans.
+          // Matchit borrows from the lookup path. Percent decoding needs a
+          // boundary map; ASCII case folding alone preserves byte offsets.
           let start = value.as_ptr().addr() - lookup.as_ptr().addr();
           let end = start + value.len();
+          let (start, end) = if offsets.is_empty() {
+            (start, end)
+          } else {
+            (offsets[start], offsets[end])
+          };
 
           (name.to_owned(), original[start..end].to_owned())
         })

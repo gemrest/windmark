@@ -671,6 +671,9 @@ impl Router {
   /// Map routes to URL paths.
   ///
   /// This method supports both synchronous and asynchronous handlers.
+  /// Percent-escape case and escaped unreserved characters are normalised
+  /// for matching. Captures retain their original spelling; escaped slashes
+  /// remain distinct from path separators.
   ///
   /// # Examples
   ///
@@ -687,7 +690,8 @@ impl Router {
   /// # Panics
   ///
   /// This method panics if the route is invalid or conflicts with a mounted
-  /// route, including conflicts under case-insensitive matching when enabled.
+  /// route after URI normalisation, including conflicts under case-insensitive
+  /// matching when enabled.
   pub fn mount<R>(
     &mut self,
     route: impl Into<String> + AsRef<str>,
@@ -697,10 +701,12 @@ impl Router {
     R: IntoFuture<Output = Response> + Send + 'static,
     <R as IntoFuture>::IntoFuture: Send,
   {
+    let route = route.into();
+
     self
       .routes
       .insert(
-        route.into(),
+        &route,
         Arc::new(move |context: RouteContext| handler(context).into_future()),
       )
       .expect("failed to mount route");

@@ -935,3 +935,52 @@ fn character_sets_describe_bytes_without_transcoding_them() {
   );
   assert_eq!(response.serialize_body("", ""), [0x63, 0x61, 0x66, 0xe9]);
 }
+
+#[test]
+fn percent_equivalent_routes_preserve_original_captures_and_reserved_escapes() {
+  let mut router = super::Router::new();
+
+  router.mount("/caf%C3%A9/~user/:Name/*Rest", |_| {
+    Response::success("body")
+  });
+
+  for path in [
+    "/caf%c3%a9/%7euser/%41lice/Photo%2fone.PNG",
+    "/caf%C3%A9/~user/%41lice/Photo%2fone.PNG",
+  ] {
+    let matched = router.routes.at(path).unwrap();
+
+    assert_eq!(matched.parameters.get("Name"), Some("%41lice"));
+    assert_eq!(matched.parameters.get("Rest"), Some("Photo%2fone.PNG"));
+  }
+
+  router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+
+  let matched = router
+    .routes
+    .at("/CAF%c3%a9/%7EUSER/%41LiCe/Ä%2fOne")
+    .unwrap();
+
+  assert_eq!(matched.parameters.get("Name"), Some("%41LiCe"));
+  assert_eq!(matched.parameters.get("Rest"), Some("Ä%2fOne"));
+  router.remove_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+  assert!(router.routes.at("/CAF%C3%A9/~USER/Alice/file").is_err());
+}
+
+#[test]
+fn equivalent_route_collisions_leave_registered_handlers_available() {
+  let mut router = super::Router::new();
+
+  router.mount("/%7euser", |_| Response::success("original"));
+
+  let collision =
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+      router.mount("/~user", |_| Response::success("replacement"));
+    }));
+
+  assert!(collision.is_err());
+  assert!(router.routes.contains("/%7Euser"));
+  router.mount("/encoded%2Fslash", |_| Response::success("encoded"));
+  assert!(router.routes.contains("/encoded%2fslash"));
+  assert!(!router.routes.contains("/encoded/slash"));
+}
