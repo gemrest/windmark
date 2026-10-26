@@ -41,7 +41,7 @@ fn unmatched_path_without_options_is_returned_unchanged() {
 
 #[test]
 fn dynamic_route_is_matched_without_modification() {
-  assert_eq!(resolve(&[], "/posts/42", &["/posts/:id"]), "/posts/42");
+  assert_eq!(resolve(&[], "/posts/42", &["/posts/{id}"]), "/posts/42");
 }
 
 #[test]
@@ -303,7 +303,7 @@ fn response_assembly_preserves_publicly_constructible_states() {
 fn case_insensitive_routes_preserve_parameter_names_and_values() {
   let mut router = super::Router::new();
 
-  router.mount("/Users/:Name/Files/*FilePath", |_| {
+  router.mount("/Users/{Name}/Files/{*FilePath}", |_| {
     Response::success("file")
   });
   router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
@@ -323,9 +323,9 @@ fn case_insensitive_routes_preserve_static_priority_and_inline_parameters() {
   let mut router = super::Router::new();
 
   router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
-  router.mount("/Users/:Name", |_| Response::success("user"));
+  router.mount("/Users/{Name}", |_| Response::success("user"));
   router.mount("/Users/Me", |_| Response::success("profile"));
-  router.mount("/Files/Prefix:Name", |_| Response::success("file"));
+  router.mount("/Files/Prefix{Name}", |_| Response::success("file"));
 
   let profile = router.routes.at("/users/ME").unwrap();
   let file = router.routes.at("/FILES/prefixREPORT.PDF").unwrap();
@@ -335,10 +335,46 @@ fn case_insensitive_routes_preserve_static_priority_and_inline_parameters() {
 }
 
 #[test]
+fn legacy_parameter_syntax_is_rejected_with_the_braced_form() {
+  for (route, braced_route) in [
+    ("/users/:name", "/users/{name}"),
+    ("/files/*path", "/files/{*path}"),
+    ("/:first/static/:second/", "/{first}/static/{second}/"),
+  ] {
+    let panic = std::panic::catch_unwind(|| {
+      super::Router::new().mount(route, |_| Response::success("legacy"));
+    })
+    .unwrap_err();
+    let message = panic.downcast_ref::<String>().unwrap();
+
+    assert!(
+      message.contains(&format!("write `{braced_route}`")),
+      "{message}"
+    );
+  }
+}
+
+#[test]
+fn literal_colons_and_escaped_braces_mount_as_static_text() {
+  let mut router = super::Router::new();
+
+  router.mount("/time/12:30", |_| Response::success("time"));
+  router.mount("/Literal/{{Braces}}/{Name}.GMI", |_| {
+    Response::success("braces")
+  });
+  router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+
+  let matched = router.routes.at("/literal/{braces}/ÄLICE.gmi").unwrap();
+
+  assert!(router.routes.contains("/TIME/12:30"));
+  assert_eq!(matched.parameters.get("Name"), Some("ÄLICE"));
+}
+
+#[test]
 fn case_insensitive_routes_restore_repeated_values_from_their_own_positions() {
   let mut router = super::Router::new();
 
-  router.mount("/Same/:First/:Second", |_| Response::success("pair"));
+  router.mount("/Same/{First}/{Second}", |_| Response::success("pair"));
   router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
 
   let matched = router.routes.at("/same/SAME/SaMe").unwrap();
@@ -351,7 +387,7 @@ fn case_insensitive_routes_restore_repeated_values_from_their_own_positions() {
 fn case_insensitive_matching_can_be_disabled_reenabled_and_cloned() {
   let mut router = super::Router::new();
 
-  router.mount("/Mixed/:Name", |_| Response::success("mixed"));
+  router.mount("/Mixed/{Name}", |_| Response::success("mixed"));
   assert!(!router.routes.contains("/mixed/Alice"));
   router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
   assert!(router.routes.contains("/mixed/Alice"));
@@ -393,10 +429,10 @@ fn mounting_case_conflicts_preserves_existing_routes() {
   let mut router = super::Router::new();
 
   router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
-  router.mount("/Users/:Name", |_| Response::success("user"));
+  router.mount("/Users/{Name}", |_| Response::success("user"));
 
   let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-    router.mount("/users/:Other", |_| Response::success("conflict"));
+    router.mount("/users/{Other}", |_| Response::success("conflict"));
   }));
 
   assert!(result.is_err());
@@ -413,7 +449,7 @@ fn mounting_case_conflicts_preserves_existing_routes() {
 fn trailing_slash_fixes_preserve_case_insensitive_parameters() {
   let mut router = super::Router::new();
 
-  router.mount("/Users/:Name/", |_| Response::success("user"));
+  router.mount("/Users/{Name}/", |_| Response::success("user"));
   router.add_options(&[
     RouterOption::AllowCaseInsensitiveLookup,
     RouterOption::AddMissingTrailingSlash,
@@ -940,7 +976,7 @@ fn character_sets_describe_bytes_without_transcoding_them() {
 fn percent_equivalent_routes_preserve_original_captures_and_reserved_escapes() {
   let mut router = super::Router::new();
 
-  router.mount("/caf%C3%A9/~user/:Name/*Rest", |_| {
+  router.mount("/caf%C3%A9/~user/{Name}/{*Rest}", |_| {
     Response::success("body")
   });
 

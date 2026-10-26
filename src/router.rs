@@ -675,6 +675,10 @@ impl Router {
   /// for matching. Captures retain their original spelling; escaped slashes
   /// remain distinct from path separators.
   ///
+  /// Routes capture a segment with `{name}`, which may carry a static prefix
+  /// or suffix (`/img-{id}.png`), and the rest of the path with a trailing
+  /// `{*name}`. Write `{{` and `}}` for literal braces.
+  ///
   /// # Examples
   ///
   /// ```rust
@@ -684,14 +688,21 @@ impl Router {
   ///   .mount("/", |_| {
   ///     async { Response::success("This is the index page!") }
   ///   })
-  ///   .mount("/about", |_| async { Response::success("About that...") });
+  ///   .mount("/about", |_| async { Response::success("About that...") })
+  ///   .mount("/users/{name}", |context| {
+  ///     Response::success(format!(
+  ///       "Hello, {}!",
+  ///       context.parameters.get("name").unwrap_or_default()
+  ///     ))
+  ///   });
   /// ```
   ///
   /// # Panics
   ///
   /// This method panics if the route is invalid or conflicts with a mounted
   /// route after URI normalisation, including conflicts under case-insensitive
-  /// matching when enabled.
+  /// matching when enabled. It also panics if a segment starts with `:` or
+  /// `*`, the parameter syntax Windmark used before 0.10.
   pub fn mount<R>(
     &mut self,
     route: impl Into<String> + AsRef<str>,
@@ -702,6 +713,13 @@ impl Router {
     <R as IntoFuture>::IntoFuture: Send,
   {
     let route = route.into();
+
+    if let Some(braced_route) = routes::braced_legacy_parameters(&route) {
+      panic!(
+        "route `{route}` uses the removed `:name` or `*name` parameter \
+         syntax; write `{braced_route}` instead"
+      );
+    }
 
     self
       .routes

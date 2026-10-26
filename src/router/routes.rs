@@ -88,17 +88,32 @@ impl Routes {
   }
 }
 
-fn normalize_pattern(path: &str) -> String {
-  let mut normalized = String::with_capacity(path.len());
-
-  for segment in path.split_inclusive('/') {
-    let parameter = segment.find([':', '*']).unwrap_or(segment.len());
-
-    normalized.push_str(&normalize_path(&segment[..parameter], None));
-    normalized.push_str(&segment[parameter..]);
+/// Rewrite segments written in the `:name` and `*name` parameter syntax of
+/// matchit 0.7 into their braced form, or return `None` when there are none.
+/// Matchit 0.9 treats those segments as literal text, so they would otherwise
+/// mount without error and never match.
+pub(super) fn braced_legacy_parameters(path: &str) -> Option<String> {
+  if !path.split('/').any(is_legacy_parameter) {
+    return None;
   }
 
-  normalized
+  let segments = path.split('/').map(|segment| {
+    if is_legacy_parameter(segment) {
+      format!("{{{}}}", segment.strip_prefix(':').unwrap_or(segment))
+    } else {
+      segment.to_owned()
+    }
+  });
+
+  Some(segments.collect::<Vec<_>>().join("/"))
+}
+
+fn is_legacy_parameter(segment: &str) -> bool {
+  segment.len() > 1 && segment.starts_with([':', '*'])
+}
+
+fn normalize_pattern(path: &str) -> String {
+  map_static_text(path, |text| normalize_path(text, None))
 }
 
 fn normalize_path<'path>(
@@ -169,14 +184,50 @@ fn normalize_path<'path>(
 }
 
 fn fold_pattern(path: &str) -> String {
-  let mut folded = String::with_capacity(path.len());
+  map_static_text(path, |text| Cow::Owned(text.to_ascii_lowercase()))
+}
 
-  for segment in path.split_inclusive('/') {
-    let parameter = segment.find([':', '*']).unwrap_or(segment.len());
+/// Apply `transform` to the static text of a route pattern, copying `{name}`
+/// and `{*name}` parameters through unchanged. Escaped braces (`{{` and `}}`)
+/// are static text.
+fn map_static_text(
+  pattern: &str,
+  transform: impl Fn(&str) -> Cow<'_, str>,
+) -> String {
+  let mut mapped = String::with_capacity(pattern.len());
+  let mut remainder = pattern;
 
-    folded.push_str(&segment[..parameter].to_ascii_lowercase());
-    folded.push_str(&segment[parameter..]);
+  while let Some(start) = find_parameter(remainder) {
+    let end = remainder[start..]
+      .find('}')
+      .map_or(remainder.len(), |length| start + length + 1);
+
+    mapped.push_str(&transform(&remainder[..start]));
+    mapped.push_str(&remainder[start..end]);
+
+    remainder = &remainder[end..];
   }
 
-  folded
+  mapped.push_str(&transform(remainder));
+
+  mapped
+}
+
+fn find_parameter(pattern: &str) -> Option<usize> {
+  let bytes = pattern.as_bytes();
+  let mut position = 0;
+
+  while position < bytes.len() {
+    if bytes[position] == b'{' {
+      if bytes.get(position + 1) != Some(&b'{') {
+        return Some(position);
+      }
+
+      position += 1;
+    }
+
+    position += 1;
+  }
+
+  None
 }

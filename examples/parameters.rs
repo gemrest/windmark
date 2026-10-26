@@ -8,7 +8,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .set_private_key_file("windmark_private.pem")
     .set_certificate_file("windmark_public.pem")
     .mount(
-      "/language/:language",
+      "/language/{language}",
       |context: windmark::context::RouteContext| {
         Response::success(format!(
           "Your language of choice is {}.",
@@ -17,7 +17,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       },
     )
     .mount(
-      "/name/:first/:last",
+      "/name/{first}/{last}",
       |context: windmark::context::RouteContext| {
         Response::success(format!(
           "Your name is {} {}.",

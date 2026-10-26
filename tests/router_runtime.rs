@@ -259,7 +259,7 @@ async fn callbacks_partials_and_case_folding_keep_their_existing_order() {
 
   let recorded = events.clone();
 
-  router.mount("/Users/:Name", move |context: RouteContext| {
+  router.mount("/Users/{Name}", move |context: RouteContext| {
     recorded.lock().unwrap().push("route");
     Response::success(context.parameters.get("Name").unwrap())
   });
@@ -1191,7 +1191,7 @@ async fn protocol_validation_and_normalization_apply_on_the_wire() {
 
     response
   });
-  router.mount("/caf%C3%A9/~user/:Name", |context| {
+  router.mount("/caf%C3%A9/~user/{Name}", |context| {
     Response::success(context.parameters.get("Name").unwrap())
   });
   serve_requests(router, |address| {
