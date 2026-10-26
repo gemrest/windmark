@@ -778,7 +778,7 @@ name = "rossweisse"
 version = "0.0.4"
 dependencies = [
  "quote",
- "syn 2.0.119",
+ "syn 3.0.9",
 ]
 
 [[package]]
