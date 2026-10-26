@@ -26,12 +26,12 @@ async-std = ["dep:async-std", "async-std-openssl"]
 
 [dependencies]
 # SSL
-openssl = "0.10.80"
+openssl = "0.10.81"
 tokio-openssl = { version = "0.6.3", optional = true }
 async-std-openssl = { version = "0.6.3", optional = true }
 
 # Non-blocking I/O
-tokio = { version = "1.52.3", default-features = false, features = [
+tokio = { version = "1.54.1", default-features = false, features = [
   "rt-multi-thread",
   "sync",
   "net",
@@ -40,12 +40,12 @@ tokio = { version = "1.52.3", default-features = false, features = [
   "signal",
   "time",
 ], optional = true }
-async-trait = "0.1.68"
-futures-util = "0.3.31"
+async-trait = "0.1.92"
+futures-util = "0.3.34"
 async-std = { version = "1.12.0", features = ["attributes"], optional = true }
 
 # Logging
-log = "0.4.30"
+log = "0.4.34"
 
 # URL
 url = "2.2.2"

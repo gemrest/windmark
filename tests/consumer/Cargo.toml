@@ -14,5 +14,5 @@ auto-deduce-mime = ["windmark/auto-deduce-mime"]
 [dependencies]
 windmark = { path = "../..", default-features = false }
 rossweisse = { path = "../../rossweisse" }
-async-trait = "0.1.68"
-tokio = { version = "1.52.3", optional = true, features = ["macros", "rt"] }
+async-trait = "0.1.92"
+tokio = { version = "1.54.1", optional = true, features = ["macros", "rt"] }
