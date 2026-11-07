@@ -683,6 +683,27 @@ async fn exclusive_async_phases_wait_for_existing_concurrent_phases() {
   exclusive.await;
 }
 
+#[cfg_attr(feature = "tokio", tokio::test(flavor = "current_thread"))]
+#[cfg_attr(feature = "async-std", async_std::test)]
+async fn attached_modules_record_their_type_names() {
+  struct Named;
+
+  impl crate::module::Module for Named {}
+
+  #[async_trait::async_trait]
+  impl crate::module::AsyncModule for Named {}
+
+  let mut router = super::Router::new();
+
+  router.attach(Named);
+  router.attach_async(Named).await;
+
+  let async_name = router.async_modules.lock().await[0].name;
+
+  assert!(router.modules.lock().unwrap()[0].name.ends_with("::Named"));
+  assert!(async_name.ends_with("::Named"));
+}
+
 #[test]
 fn request_uris_reject_forbidden_syntax_before_normalization() {
   for request in [

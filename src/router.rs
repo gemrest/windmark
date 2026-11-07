@@ -56,16 +56,26 @@ type Stream = tokio_openssl::SslStream<TcpStream>;
 type Stream = async_std_openssl::SslStream<TcpStream>;
 
 struct ModuleEntry<M: ?Sized> {
+  name:     &'static str,
   module:   Box<M>,
   poisoned: AtomicBool,
 }
 
 impl<M: ?Sized> ModuleEntry<M> {
-  fn new(module: Box<M>) -> Arc<Self> {
+  fn new(name: &'static str, module: Box<M>) -> Arc<Self> {
     Arc::new(Self {
+      name,
       module,
       poisoned: AtomicBool::new(false),
     })
+  }
+
+  fn poison(&self) {
+    self.poisoned.store(true, Ordering::Release);
+    warn!(
+      "module `{}` panicked in a request hook and will be skipped",
+      self.name
+    );
   }
 }
 
@@ -310,7 +320,7 @@ fn call_modules(
             }));
 
           if let Err(panic) = result {
-            module.poisoned.store(true, Ordering::Release);
+            module.poison();
             std::panic::resume_unwind(panic);
           }
         }
@@ -354,7 +364,7 @@ async fn call_async_modules(
         if let Err(panic) =
           std::panic::AssertUnwindSafe(hook).catch_unwind().await
         {
-          module.poisoned.store(true, Ordering::Release);
+          module.poison();
           std::panic::resume_unwind(panic);
         }
       }
@@ -1196,7 +1206,10 @@ impl Router {
     mut module: impl AsyncModule + 'static,
   ) -> &mut Self {
     module.on_attach(self).await;
-    (*self.async_modules.lock().await).push(ModuleEntry::new(Box::new(module)));
+    (*self.async_modules.lock().await).push(ModuleEntry::new(
+      std::any::type_name_of_val(&module),
+      Box::new(module),
+    ));
 
     self
   }
@@ -1254,8 +1267,9 @@ impl Router {
   /// ```
   pub fn attach(&mut self, mut module: impl Module + 'static) -> &mut Self {
     module.on_attach(self);
-    (*self.modules.lock().expect("modules lock poisoned"))
-      .push(ModuleEntry::new(Box::new(module)));
+    (*self.modules.lock().expect("modules lock poisoned")).push(
+      ModuleEntry::new(std::any::type_name_of_val(&module), Box::new(module)),
+    );
 
     self
   }
