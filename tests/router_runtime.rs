@@ -621,20 +621,42 @@ impl Module for PanickingModule {
   }
 }
 
+struct PanickingAsyncModule(PanickingModule);
+
+#[async_trait::async_trait]
+impl AsyncModule for PanickingAsyncModule {
+  async fn on_pre_route(&self, context: &HookContext) {
+    Module::on_pre_route(&self.0, context);
+  }
+
+  async fn on_post_route(&self, context: &HookContext) {
+    Module::on_post_route(&self.0, context);
+  }
+}
+
 #[cfg_attr(
   feature = "tokio",
   tokio::test(flavor = "multi_thread", worker_threads = 2)
 )]
 #[cfg_attr(feature = "async-std", async_std::test)]
-async fn poisoned_modules_do_not_disable_other_modules() {
-  for post_route in [false, true] {
+async fn poisoned_modules_are_skipped_without_disabling_other_modules() {
+  for (asynchronous, post_route) in
+    [(false, false), (false, true), (true, false), (true, true)]
+  {
     let mut router = Router::new();
     let events = Arc::new(Mutex::new(Vec::new()));
+    let panicking = PanickingModule {
+      post_route,
+    };
 
     router.set_error_handler(|_| Response::success("BODY"));
-    router.attach(PanickingModule {
-      post_route,
-    });
+
+    if asynchronous {
+      router.attach_async(PanickingAsyncModule(panicking)).await;
+    } else {
+      router.attach(panicking);
+    }
+
     router.attach(Observer(events.clone()));
     events.lock().unwrap().clear();
     serve_requests(router, move |address| {
@@ -644,6 +666,7 @@ async fn poisoned_modules_do_not_disable_other_modules() {
         request(address, "/panic", expected)
       })
       .is_err());
+      request(address, "/panic", expected);
       events.lock().unwrap().clear();
       request(address, "/healthy", expected);
       assert_eq!(*events.lock().unwrap(), ["module-pre", "module-post"]);

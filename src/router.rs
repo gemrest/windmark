@@ -12,6 +12,7 @@ use async_std::{
   io::{ReadExt, WriteExt},
   sync::{Mutex as AsyncMutex, RwLock as AsyncRwLock},
 };
+use futures_util::FutureExt;
 use openssl::ssl::{self, SslAcceptor, SslMethod};
 use std::{
   collections::HashSet,
@@ -54,13 +55,22 @@ type Stream = tokio_openssl::SslStream<TcpStream>;
 #[cfg(feature = "async-std")]
 type Stream = async_std_openssl::SslStream<TcpStream>;
 
-struct ModuleEntry {
-  module:   Box<dyn Module>,
+struct ModuleEntry<M: ?Sized> {
+  module:   Box<M>,
   poisoned: AtomicBool,
 }
 
-type SharedModule = Arc<ModuleEntry>;
-type SharedAsyncModule = Arc<dyn AsyncModule>;
+impl<M: ?Sized> ModuleEntry<M> {
+  fn new(module: Box<M>) -> Arc<Self> {
+    Arc::new(Self {
+      module,
+      poisoned: AtomicBool::new(false),
+    })
+  }
+}
+
+type SharedModule = Arc<ModuleEntry<dyn Module>>;
+type SharedAsyncModule = Arc<ModuleEntry<dyn AsyncModule>>;
 
 #[derive(Default)]
 struct ModuleScheduling {
@@ -335,9 +345,18 @@ async fn call_async_modules(
     let modules = modules.lock().await.clone();
 
     for module in modules {
-      match phase {
-        HookPhase::PreRoute => module.on_pre_route(context).await,
-        HookPhase::PostRoute => module.on_post_route(context).await,
+      if !module.poisoned.load(Ordering::Acquire) {
+        let hook = match phase {
+          HookPhase::PreRoute => module.module.on_pre_route(context),
+          HookPhase::PostRoute => module.module.on_post_route(context),
+        };
+
+        if let Err(panic) =
+          std::panic::AssertUnwindSafe(hook).catch_unwind().await
+        {
+          module.poisoned.store(true, Ordering::Release);
+          std::panic::resume_unwind(panic);
+        }
       }
     }
   };
@@ -1177,7 +1196,7 @@ impl Router {
     mut module: impl AsyncModule + 'static,
   ) -> &mut Self {
     module.on_attach(self).await;
-    (*self.async_modules.lock().await).push(Arc::new(module));
+    (*self.async_modules.lock().await).push(ModuleEntry::new(Box::new(module)));
 
     self
   }
@@ -1235,12 +1254,8 @@ impl Router {
   /// ```
   pub fn attach(&mut self, mut module: impl Module + 'static) -> &mut Self {
     module.on_attach(self);
-    (*self.modules.lock().expect("modules lock poisoned")).push(Arc::new(
-      ModuleEntry {
-        module:   Box::new(module),
-        poisoned: AtomicBool::new(false),
-      },
-    ));
+    (*self.modules.lock().expect("modules lock poisoned"))
+      .push(ModuleEntry::new(Box::new(module)));
 
     self
   }

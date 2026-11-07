@@ -28,6 +28,8 @@ pub trait Module: Send + Sync {
 /// `RouterOption::AllowConcurrentModules` is enabled. Concurrent phases may
 /// invoke the same module while an earlier invocation awaits work. Modules
 /// own their state synchronisation; attachment still receives exclusive access.
+/// If a hook panics, subsequent invocations skip that module. Invocations
+/// already running may finish; other modules remain available.
 #[async_trait::async_trait]
 pub trait AsyncModule: Send + Sync {
   /// The router calls this hook during attachment, before registering

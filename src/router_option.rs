@@ -19,6 +19,6 @@ pub enum RouterOption {
   /// This option is shared by cloned routers, including running servers.
   /// Changes apply when a hook phase selects its scheduling mode. An exclusive
   /// phase waits for any concurrent phases to finish before invoking hooks.
-  /// Poisoned synchronous modules are skipped in either mode.
+  /// Poisoned modules are skipped in either mode.
   AllowConcurrentModules,
 }
