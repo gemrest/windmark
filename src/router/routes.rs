@@ -69,6 +69,8 @@ impl Routes {
   ) -> Result<MatchedRoute<'_>, matchit::MatchError> {
     let mut offsets = Vec::new();
     let mut lookup = normalize_path(path, Some(&mut offsets));
+    let original_offsets =
+      matches!(lookup, Cow::Owned(_)).then_some(offsets.as_slice());
     let routes = self.folded.as_ref().map_or(&self.exact, |routes| {
       lookup.to_mut().make_ascii_lowercase();
 
@@ -82,7 +84,7 @@ impl Routes {
         &matched.params,
         &lookup,
         path,
-        &offsets,
+        original_offsets,
       ),
     })
   }
