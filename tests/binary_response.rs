@@ -1,11 +1,7 @@
 use windmark::response::Response;
 
-// PNG magic + bytes invalid as UTF-8 (lone continuation bytes, lone 4-byte
-// lead, reserved C0/C1 leads, DEL).
-const NON_UTF8: &[u8] = &[
-  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x80, 0x81, 0xFE, 0xFF, 0xC0,
-  0xC1, 0xF5, 0x00, 0x7F,
-];
+const NON_UTF8: &[u8] =
+  b"\x89PNG\r\n\x1a\n\x80\x81\xFE\xFF\xC0\xC1\xF5\x00\x7F";
 
 #[test]
 fn binary_success_preserves_non_utf8_bytes() {
