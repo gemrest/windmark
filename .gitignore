@@ -1,17 +1,6 @@
-# Cargo
 target
-
-# CLion
 .idea
-
-# Privacy-Enhanced Mail
 *.pem
-
-# Visual Studio Code
 .vscode
-
-# macOS
 .DS_Store
-
-# Fuwn/justfiles
 *.just
