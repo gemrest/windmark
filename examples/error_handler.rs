@@ -6,7 +6,6 @@ use std::sync::{
 };
 use windmark::response::Response;
 
-#[allow(clippy::unnecessary_literal_unwrap)]
 #[windmark::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
   let error_count = Arc::new(AtomicUsize::new(0));
@@ -20,11 +19,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
       println!("{count} errors so far");
       Response::permanent_failure("e")
     })
-    .mount("/error", |_| {
-      let nothing = None::<String>;
-
-      // This deliberately panics without invoking the unmatched-route handler.
-      Response::success(nothing.unwrap())
+    .mount("/", |_| {
+      Response::success("Visit any other path to see the error handler.")
     })
     .run()
     .await

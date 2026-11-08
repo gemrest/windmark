@@ -53,9 +53,7 @@ An empty example which starts up a server but has no mounted routes.
 
 `cargo run --example error_handler`
 
-This example shows how to handle requests that do not match a route. It also
-includes an `/error` route that deliberately panics; this panic does not invoke
-the error handler.
+This example shows how to handle requests that do not match a route.
 
 ## [Fix Path](./fix_path.rs)
 
