@@ -9,7 +9,6 @@
   unused,
   warnings
 )]
-#![allow(clippy::module_name_repetitions)]
 #![doc = include_str!("../README.md")]
 
 #[cfg(all(feature = "tokio", feature = "async-std"))]

@@ -1,5 +1,3 @@
-#![allow(clippy::significant_drop_tightening)]
-
 use crate::{
   context::{ErrorContext, HookContext, RouteContext},
   handler::{ErrorResponse, Partial, PostRouteHook, PreRouteHook},
@@ -141,11 +139,7 @@ struct RequestHandler {
 }
 
 impl RequestHandler {
-  #[allow(
-    clippy::too_many_lines,
-    clippy::significant_drop_in_scrutinee,
-    clippy::cognitive_complexity
-  )]
+  #[allow(clippy::too_many_lines)]
   async fn handle(&self, stream: &mut Stream) -> Result<(), Box<dyn Error>> {
     let mut buffer = [0u8; MAX_REQUEST_URI_BYTES];
     let mut footer = String::new();
