@@ -3,6 +3,7 @@ import? 'cargo.just'
 set allow-duplicate-recipes := true
 
 default-features := "--features=auto-deduce-mime,"
+rustfmt-toolchain := "nightly-2026-05-25"
 
 default:
   @just --list
@@ -10,10 +11,11 @@ default:
 fetch:
   curl https://raw.githubusercontent.com/Fuwn/justfiles/refs/heads/main/cargo.just > cargo.just
 
-# `cargo fmt` resolves `rustfmt` via PATH, so prepend the nightly toolchain's
-# bin to reach nightly rustfmt (the unstable rustfmt.toml options need it).
+# `cargo fmt` resolves `rustfmt` via PATH, so prepend the pinned nightly
+# toolchain's bin to reach nightly rustfmt (the unstable rustfmt.toml options
+# need it). Keep the pin in step with the format job in CI.
 fmt:
-  PATH="$(dirname "$(rustup which --toolchain nightly rustfmt)"):$PATH" cargo fmt
+  PATH="$(dirname "$(rustup which --toolchain {{ rustfmt-toolchain }} rustfmt)"):$PATH" cargo fmt
 
 [private]
 generic-task task async-feature:
