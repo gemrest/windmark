@@ -659,7 +659,12 @@ fn response_headers_reject_invalid_statuses_and_metadata() {
     Response::binary_success([], "text/plain\r\ninjected"),
     Response::binary_success([], "invalid media type"),
   ] {
-    assert!(default_status_line(&response).is_err());
+    assert!(
+      default_status_line(&response).is_err(),
+      "{} {:?}",
+      response.status(),
+      response.content()
+    );
   }
 
   assert_eq!(
@@ -776,7 +781,10 @@ fn credentials_load_complete_chains_and_use_the_last_setter() {
 #[test]
 fn redirects_validate_the_first_path_segment_without_restricting_schemes() {
   for target in ["1:foo", ":foo", "a_b:foo", "1:foo/bar"] {
-    assert!(default_status_line(&Response::temporary_redirect(target)).is_err());
+    assert!(
+      default_status_line(&Response::temporary_redirect(target)).is_err(),
+      "{target}"
+    );
   }
 
   for target in [
@@ -788,7 +796,10 @@ fn redirects_validate_the_first_path_segment_without_restricting_schemes() {
     "https://example.com/",
     "mailto:user@example.com",
   ] {
-    assert!(default_status_line(&Response::temporary_redirect(target)).is_ok());
+    assert!(
+      default_status_line(&Response::temporary_redirect(target)).is_ok(),
+      "{target}"
+    );
   }
 
   assert!(parse_uri("http:/user@example.org/").is_err());
