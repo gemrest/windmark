@@ -1148,39 +1148,18 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// use log::info;
+  /// use std::sync::atomic::{AtomicUsize, Ordering};
   /// use windmark::{context::HookContext, router::Router};
   ///
   /// #[derive(Default)]
-  /// struct Clicker {
-  ///   clicks: std::sync::atomic::AtomicUsize,
-  /// }
+  /// struct Clicker(AtomicUsize);
   ///
   /// #[async_trait::async_trait]
   /// impl windmark::module::AsyncModule for Clicker {
-  ///   async fn on_attach(&mut self, _: &mut Router) {
-  ///     info!("clicker has been attached!");
-  ///   }
-  ///
   ///   async fn on_pre_route(&self, context: &HookContext) {
-  ///     let clicks = self
-  ///       .clicks
-  ///       .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-  ///       + 1;
+  ///     let clicks = self.0.fetch_add(1, Ordering::Relaxed) + 1;
   ///
-  ///     info!(
-  ///       "clicker has been called pre-route on {} with {} clicks!",
-  ///       context.url.path(),
-  ///       clicks
-  ///     );
-  ///   }
-  ///
-  ///   async fn on_post_route(&self, context: &HookContext) {
-  ///     info!(
-  ///       "clicker has been called post-route on {} with {} clicks!",
-  ///       context.url.path(),
-  ///       self.clicks.load(std::sync::atomic::Ordering::Relaxed)
-  ///     );
+  ///     log::info!("{} is click number {clicks}", context.url.path());
   ///   }
   /// }
   ///
@@ -1189,6 +1168,8 @@ impl Router {
   /// Router::new().attach_async(Clicker::default()).await;
   /// # }
   /// ```
+  ///
+  /// `examples/async_stateful_module.rs` implements every hook.
   pub async fn attach_async(
     &mut self,
     mut module: impl AsyncModule + 'static,
@@ -1216,43 +1197,24 @@ impl Router {
   /// # Examples
   ///
   /// ```rust
-  /// use log::info;
-  /// use windmark::{context::HookContext, response::Response, router::Router};
+  /// use std::sync::atomic::{AtomicUsize, Ordering};
+  /// use windmark::{context::HookContext, router::Router};
   ///
   /// #[derive(Default)]
-  /// struct Clicker {
-  ///   clicks: std::sync::atomic::AtomicUsize,
-  /// }
+  /// struct Clicker(AtomicUsize);
   ///
   /// impl windmark::module::Module for Clicker {
-  ///   fn on_attach(&mut self, _: &mut Router) {
-  ///     info!("clicker has been attached!");
-  ///   }
-  ///
   ///   fn on_pre_route(&self, context: &HookContext) {
-  ///     let clicks = self
-  ///       .clicks
-  ///       .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-  ///       + 1;
+  ///     let clicks = self.0.fetch_add(1, Ordering::Relaxed) + 1;
   ///
-  ///     info!(
-  ///       "clicker has been called pre-route on {} with {} clicks!",
-  ///       context.url.path(),
-  ///       clicks
-  ///     );
-  ///   }
-  ///
-  ///   fn on_post_route(&self, context: &HookContext) {
-  ///     info!(
-  ///       "clicker has been called post-route on {} with {} clicks!",
-  ///       context.url.path(),
-  ///       self.clicks.load(std::sync::atomic::Ordering::Relaxed)
-  ///     );
+  ///     log::info!("{} is click number {clicks}", context.url.path());
   ///   }
   /// }
   ///
   /// Router::new().attach(Clicker::default());
   /// ```
+  ///
+  /// `examples/stateful_module.rs` implements every hook.
   pub fn attach(&mut self, mut module: impl Module + 'static) -> &mut Self {
     module.on_attach(self);
     (*self.modules.lock().expect("modules lock poisoned")).push(
