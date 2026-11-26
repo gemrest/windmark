@@ -1152,12 +1152,14 @@ impl Router {
   /// use windmark::{context::HookContext, router::Router};
   ///
   /// #[derive(Default)]
-  /// struct Clicker(AtomicUsize);
+  /// struct Clicker {
+  ///   clicks: AtomicUsize,
+  /// }
   ///
   /// #[async_trait::async_trait]
   /// impl windmark::module::AsyncModule for Clicker {
   ///   async fn on_pre_route(&self, context: &HookContext) {
-  ///     let clicks = self.0.fetch_add(1, Ordering::Relaxed) + 1;
+  ///     let clicks = self.clicks.fetch_add(1, Ordering::Relaxed) + 1;
   ///
   ///     log::info!("{} is click number {clicks}", context.url.path());
   ///   }
@@ -1201,11 +1203,13 @@ impl Router {
   /// use windmark::{context::HookContext, router::Router};
   ///
   /// #[derive(Default)]
-  /// struct Clicker(AtomicUsize);
+  /// struct Clicker {
+  ///   clicks: AtomicUsize,
+  /// }
   ///
   /// impl windmark::module::Module for Clicker {
   ///   fn on_pre_route(&self, context: &HookContext) {
-  ///     let clicks = self.0.fetch_add(1, Ordering::Relaxed) + 1;
+  ///     let clicks = self.clicks.fetch_add(1, Ordering::Relaxed) + 1;
   ///
   ///     log::info!("{} is click number {clicks}", context.url.path());
   ///   }
