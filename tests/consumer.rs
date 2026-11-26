@@ -15,69 +15,36 @@ fn consumer_api_matches_expected_behavior() {
   #[cfg(feature = "async-std")]
   let runtime = "async-std";
   let cases = [
-    ("invalid_response_fields", "private", "auto-deduce-mime"),
-    ("valid", "", "auto-deduce-mime"),
-    ("automatic_mime", "", "auto-deduce-mime"),
-    ("binary_context", "", "auto-deduce-mime"),
-    ("async_context", "", "auto-deduce-mime"),
-    ("automatic_mime_disabled", "binary_success_auto", ""),
-    (
-      "invalid_router_item",
-      "requires a struct or impl block",
-      "auto-deduce-mime",
-    ),
-    (
-      "invalid_route_item",
-      "requires a function",
-      "auto-deduce-mime",
-    ),
+    ("invalid_response_fields", "private"),
+    ("valid", ""),
+    ("automatic_mime", ""),
+    ("binary_context", ""),
+    ("async_context", ""),
+    ("automatic_mime_disabled", "binary_success_auto"),
+    ("invalid_router_item", "requires a struct or impl block"),
+    ("invalid_route_item", "requires a function"),
     (
       "invalid_router_fields",
       "requires a struct with named fields or a unit struct",
-      "auto-deduce-mime",
     ),
-    ("invalid_router_syntax", "expected", "auto-deduce-mime"),
-    ("invalid_route_syntax", "expected", "auto-deduce-mime"),
-    ("visibility", "", "auto-deduce-mime"),
-    (
-      "visibility_private",
-      "struct `Capsule` is private",
-      "auto-deduce-mime",
-    ),
-    (
-      "visibility_restricted",
-      "struct `Capsule` is private",
-      "auto-deduce-mime",
-    ),
-    ("index_name", "", "auto-deduce-mime"),
-    ("router_declarations", "", "auto-deduce-mime"),
-    (
-      "invalid_router_duplicate",
-      "duplicate field initialiser",
-      "auto-deduce-mime",
-    ),
-    (
-      "invalid_router_unknown",
-      "unknown field initialiser",
-      "auto-deduce-mime",
-    ),
-    (
-      "invalid_router_reserved",
-      "reserved by Rossweisse",
-      "auto-deduce-mime",
-    ),
-    (
-      "invalid_route_argument",
-      "only supported route argument",
-      "auto-deduce-mime",
-    ),
+    ("invalid_router_syntax", "expected"),
+    ("invalid_route_syntax", "expected"),
+    ("visibility", ""),
+    ("visibility_private", "struct `Capsule` is private"),
+    ("visibility_restricted", "struct `Capsule` is private"),
+    ("index_name", ""),
+    ("router_declarations", ""),
+    ("invalid_router_duplicate", "duplicate field initialiser"),
+    ("invalid_router_unknown", "unknown field initialiser"),
+    ("invalid_router_reserved", "reserved by Rossweisse"),
+    ("invalid_route_argument", "only supported route argument"),
   ];
 
-  for (name, diagnostic, extra_features) in cases {
-    let features = if extra_features.is_empty() {
+  for (name, diagnostic) in cases {
+    let features = if name == "automatic_mime_disabled" {
       runtime.to_owned()
     } else {
-      format!("{runtime},{extra_features}")
+      format!("{runtime},auto-deduce-mime")
     };
     let output = Command::new(env!("CARGO"))
       .arg(if diagnostic.is_empty() {
