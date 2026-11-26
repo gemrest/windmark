@@ -1,13 +1,15 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use std::collections::HashSet;
+use syn::{parse::Parser, punctuated::Punctuated, Error, MetaNameValue, Token};
 
 pub fn fields(
   arguments: TokenStream,
   mut item: syn::ItemStruct,
-) -> TokenStream {
+) -> syn::Result<TokenStream> {
   let field_initializers =
-    syn::parse_macro_input!(arguments as super::parser::FieldInitializers);
+    Punctuated::<MetaNameValue, Token![,]>::parse_terminated
+      .parse(arguments)?;
 
   if matches!(item.fields, syn::Fields::Unit) {
     item.fields = syn::Fields::Named(syn::parse_quote!({}));
@@ -15,37 +17,30 @@ pub fn fields(
   }
 
   let syn::Fields::Named(fields) = &mut item.fields else {
-    return syn::Error::new_spanned(
+    return Err(Error::new_spanned(
       item.fields,
       "`#[rossweisse::router]` requires a struct with named fields or a unit \
        struct",
-    )
-    .to_compile_error()
-    .into();
+    ));
   };
   let mut supplied_fields = HashSet::new();
 
-  for initializer in &field_initializers.0 {
-    if !supplied_fields.insert(initializer.identifier.to_string()) {
-      return syn::Error::new_spanned(
-        &initializer.identifier,
+  for initializer in &field_initializers {
+    let identifier = initializer.path.require_ident()?;
+
+    if !supplied_fields.insert(identifier.to_string()) {
+      return Err(Error::new_spanned(
+        identifier,
         "duplicate field initialiser",
-      )
-      .to_compile_error()
-      .into();
+      ));
     }
 
     if !fields
       .named
       .iter()
-      .any(|field| field.ident.as_ref() == Some(&initializer.identifier))
+      .any(|field| field.ident.as_ref() == Some(identifier))
     {
-      return syn::Error::new_spanned(
-        &initializer.identifier,
-        "unknown field initialiser",
-      )
-      .to_compile_error()
-      .into();
+      return Err(Error::new_spanned(identifier, "unknown field initialiser"));
     }
   }
 
@@ -54,24 +49,21 @@ pub fn fields(
     .iter()
     .find(|field| field.ident.as_ref().is_some_and(|name| name == "router"))
   {
-    return syn::Error::new_spanned(
+    return Err(Error::new_spanned(
       field,
       "the field name `router` is reserved by Rossweisse",
-    )
-    .to_compile_error()
-    .into();
+    ));
   }
 
   let initializers = fields.named.iter().map(|field| {
     let name = &field.ident;
-    let conditions = super::conditional_attributes(&field.attrs);
+    let conditions = crate::conditional_attributes(&field.attrs);
     let initializer: syn::Expr = field_initializers
-      .0
       .iter()
-      .find(|initializer| name.as_ref() == Some(&initializer.identifier))
+      .find(|initializer| initializer.path.get_ident() == name.as_ref())
       .map_or_else(
         || syn::parse_quote! { ::std::default::Default::default() },
-        |initializer| initializer.expression.clone(),
+        |initializer| initializer.value.clone(),
       );
 
     quote! {
@@ -91,25 +83,27 @@ pub fn fields(
     .push(syn::parse_quote!(router: ::windmark::router::Router));
 
   let name = &item.ident;
-  let conditions = super::conditional_attributes(&item.attrs);
+  let conditions = crate::conditional_attributes(&item.attrs);
   let (implementation_generics, type_generics, where_clause) =
     item.generics.split_for_impl();
 
-  quote! {
-    #item
+  Ok(
+    quote! {
+      #item
 
-    #(#conditions)*
-    impl #implementation_generics #name #type_generics #where_clause {
-      fn _new() -> Self { #initialization }
+      #(#conditions)*
+      impl #implementation_generics #name #type_generics #where_clause {
+        fn _new() -> Self { #initialization }
 
-      pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.router.run().await
-      }
+        pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+          self.router.run().await
+        }
 
-      pub fn router(&mut self) -> &mut ::windmark::router::Router {
-        &mut self.router
+        pub fn router(&mut self) -> &mut ::windmark::router::Router {
+          &mut self.router
+        }
       }
     }
-  }
-  .into()
+    .into(),
+  )
 }

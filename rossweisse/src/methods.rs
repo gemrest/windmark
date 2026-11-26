@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
 
-pub fn methods(_arguments: TokenStream, item: &syn::ItemImpl) -> TokenStream {
+pub fn methods(item: &syn::ItemImpl) -> syn::Result<TokenStream> {
   let mut mounts = Vec::new();
 
   for member in &item.items {
@@ -14,12 +14,10 @@ pub fn methods(_arguments: TokenStream, item: &syn::ItemImpl) -> TokenStream {
       .iter()
       .any(|reserved| name == reserved)
     {
-      return syn::Error::new_spanned(
+      return Err(syn::Error::new_spanned(
         name,
         "this method name is reserved by Rossweisse",
-      )
-      .to_compile_error()
-      .into();
+      ));
     }
 
     let Some(route_attribute) = method.attrs.iter().find(|attribute| {
@@ -39,7 +37,7 @@ pub fn methods(_arguments: TokenStream, item: &syn::ItemImpl) -> TokenStream {
     } else {
       format!("/{name}")
     };
-    let conditions = super::conditional_attributes(&method.attrs);
+    let conditions = crate::conditional_attributes(&method.attrs);
 
     mounts.push(quote! {
       #(#conditions)*
@@ -50,21 +48,23 @@ pub fn methods(_arguments: TokenStream, item: &syn::ItemImpl) -> TokenStream {
   let (implementation_generics, _, where_clause) =
     item.generics.split_for_impl();
   let name = &item.self_ty;
-  let conditions = super::conditional_attributes(&item.attrs);
+  let conditions = crate::conditional_attributes(&item.attrs);
 
-  quote! {
-    #item
+  Ok(
+    quote! {
+      #item
 
-    #(#conditions)*
-    impl #implementation_generics #name #where_clause {
-      pub fn new() -> Self {
-        let mut router = Self::_new();
+      #(#conditions)*
+      impl #implementation_generics #name #where_clause {
+        pub fn new() -> Self {
+          let mut router = Self::_new();
 
-        #(#mounts)*
+          #(#mounts)*
 
-        router
+          router
+        }
       }
     }
-  }
-  .into()
+    .into(),
+  )
 }
