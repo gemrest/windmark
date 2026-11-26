@@ -1,9 +1,48 @@
-use super::{resolve_lookup_path, status_line};
-use crate::{response::Response, router_option::RouterOption};
+use super::{
+  call_async_modules,
+  call_modules,
+  resolve_lookup_path,
+  status_line,
+  HookPhase,
+  ModuleScheduling,
+  Router,
+};
+use crate::{
+  context::{HookContext, Parameters, RouteContext},
+  handler::Partial,
+  module::{AsyncModule, Module},
+  response::Response,
+  router_option::RouterOption::{
+    self,
+    AddMissingTrailingSlash,
+    AllowCaseInsensitiveLookup,
+    AllowConcurrentModules,
+    RemoveExtraTrailingSlash,
+  },
+};
 use matchit::Router as MatchRouter;
-use std::collections::HashSet;
+use std::{
+  collections::HashSet,
+  sync::{
+    atomic::{AtomicBool, Ordering},
+    mpsc,
+    Arc,
+    Mutex,
+  },
+  time::Duration,
+};
 
-/// Resolve `request_path` against a router holding `routes`, under `options`.
+const HOOK_TIMEOUT: Duration = Duration::from_secs(5);
+
+fn hook_context() -> HookContext {
+  HookContext {
+    peer_address: None,
+    url:          "gemini://localhost/".parse().unwrap(),
+    parameters:   None,
+    certificate:  None,
+  }
+}
+
 fn resolve(
   options: &[RouterOption],
   request_path: &str,
@@ -18,8 +57,7 @@ fn resolve(
   let option_set = options.iter().copied().collect::<HashSet<_>>();
 
   resolve_lookup_path(&option_set, request_path, |candidate| {
-    let lookup = if options.contains(&RouterOption::AllowCaseInsensitiveLookup)
-    {
+    let lookup = if options.contains(&AllowCaseInsensitiveLookup) {
       candidate.to_ascii_lowercase()
     } else {
       candidate.to_owned()
@@ -30,92 +68,40 @@ fn resolve(
 }
 
 #[test]
-fn exact_match_is_returned_unchanged() {
+fn lookup_paths_without_fixes_are_returned_unchanged() {
   assert_eq!(resolve(&[], "/foo", &["/foo"]), "/foo");
-}
-
-#[test]
-fn unmatched_path_without_options_is_returned_unchanged() {
   assert_eq!(resolve(&[], "/missing", &["/foo"]), "/missing");
-}
-
-#[test]
-fn dynamic_route_is_matched_without_modification() {
   assert_eq!(resolve(&[], "/posts/42", &["/posts/{id}"]), "/posts/42");
+  assert_eq!(
+    resolve(&[AllowCaseInsensitiveLookup], "/FoO", &["/foo"]),
+    "/FoO"
+  );
 }
 
 #[test]
-fn case_insensitive_lookup_preserves_the_path() {
+fn trailing_slash_fixes_apply_only_when_their_target_route_exists() {
+  let remove_extra_trailing_slash = [RemoveExtraTrailingSlash];
+
+  assert_eq!(
+    resolve(&remove_extra_trailing_slash, "/foo/", &["/foo"]),
+    "/foo"
+  );
+  assert_eq!(resolve(&remove_extra_trailing_slash, "/", &["/"]), "/");
+  assert_eq!(
+    resolve(&remove_extra_trailing_slash, "/foo/", &["/bar"]),
+    "/foo/"
+  );
+  assert_eq!(
+    resolve(&remove_extra_trailing_slash, "/foo/", &["/foo", "/foo/"]),
+    "/foo/"
+  );
+  assert_eq!(
+    resolve(&[AddMissingTrailingSlash], "/foo", &["/foo/"]),
+    "/foo/"
+  );
   assert_eq!(
     resolve(
-      &[RouterOption::AllowCaseInsensitiveLookup],
-      "/FoO",
-      &["/foo"]
-    ),
-    "/FoO",
-  );
-}
-
-#[test]
-fn extra_trailing_slash_is_removed_when_unslashed_route_exists() {
-  assert_eq!(
-    resolve(
-      &[RouterOption::RemoveExtraTrailingSlash],
-      "/foo/",
-      &["/foo"]
-    ),
-    "/foo",
-  );
-}
-
-#[test]
-fn root_path_is_left_untouched_by_trailing_slash_removal() {
-  assert_eq!(
-    resolve(&[RouterOption::RemoveExtraTrailingSlash], "/", &["/"]),
-    "/",
-  );
-}
-
-#[test]
-fn missing_trailing_slash_is_added_when_slashed_route_exists() {
-  assert_eq!(
-    resolve(&[RouterOption::AddMissingTrailingSlash], "/foo", &["/foo/"]),
-    "/foo/",
-  );
-}
-
-#[test]
-fn trailing_slash_fix_is_skipped_when_the_target_route_is_absent() {
-  assert_eq!(
-    resolve(
-      &[RouterOption::RemoveExtraTrailingSlash],
-      "/foo/",
-      &["/bar"]
-    ),
-    "/foo/",
-  );
-}
-
-#[test]
-fn exact_match_takes_precedence_over_trailing_slash_fix() {
-  assert_eq!(
-    resolve(
-      &[RouterOption::RemoveExtraTrailingSlash],
-      "/foo/",
-      &["/foo", "/foo/"],
-    ),
-    "/foo/",
-  );
-}
-
-#[test]
-fn case_insensitive_lookup_combines_with_trailing_slash_removal() {
-  assert_eq!(
-    resolve(
-      &[
-        RouterOption::AllowCaseInsensitiveLookup,
-        RouterOption::RemoveExtraTrailingSlash,
-      ],
+      &[AllowCaseInsensitiveLookup, RemoveExtraTrailingSlash],
       "/Foo/",
       &["/foo"],
     ),
@@ -123,101 +109,67 @@ fn case_insensitive_lookup_combines_with_trailing_slash_removal() {
   );
 }
 
-/// Format `response`'s status line with the router's default charset and
-/// language (matching `Router::default`).
-fn line(response: &Response) -> String {
-  status_line(response, "utf-8", "en").unwrap()
+fn default_status_line(response: &Response) -> Result<String, &'static str> {
+  let router = Router::default();
+
+  status_line(response, &router.character_set, &router.languages.join(","))
 }
 
 #[test]
-fn success_status_line_falls_back_to_router_defaults() {
-  assert_eq!(
-    line(&Response::success("hi")),
-    "20 text/gemini; charset=utf-8; lang=en",
-  );
-}
-
-#[test]
-fn success_status_line_uses_the_response_mime() {
-  let mut response = Response::success("hi");
-
-  response.with_mime("text/plain");
-  assert_eq!(line(&response), "20 text/plain; charset=utf-8; lang=en");
-}
-
-#[test]
-fn success_status_line_uses_the_response_character_set() {
-  let mut response = Response::success("hi");
-
-  response.with_character_set("UTF-8");
-  assert_eq!(line(&response), "20 text/gemini; charset=UTF-8; lang=en");
-}
-
-#[test]
-fn success_status_line_joins_the_response_languages() {
-  let mut response = Response::success("hi");
-
-  response.with_languages(["en", "fr"]);
-  assert_eq!(
-    line(&response),
-    "20 text/gemini; charset=utf-8; lang=\"en,fr\""
-  );
-}
-
-#[test]
-fn binary_success_is_sent_as_a_plain_success_with_its_mime() {
-  assert_eq!(
-    line(&Response::binary_success([0xFFu8], "image/png")),
-    "20 image/png"
-  );
-}
-
-#[test]
-fn status_21_without_a_mime_uses_binary_media_type() {
-  assert_eq!(line(&Response::new(21, "")), "20 application/octet-stream");
-}
-
-#[test]
-fn redirect_status_line_uses_its_content_as_the_meta() {
-  assert_eq!(
-    line(&Response::temporary_redirect("/elsewhere")),
-    "30 /elsewhere"
-  );
-}
-
-#[test]
-fn failure_status_line_uses_only_the_first_line_of_content() {
-  assert_eq!(line(&Response::new(40, "down\nfor maintenance")), "40 down");
-}
-
-#[test]
-fn input_status_line_uses_its_prompt_as_the_meta() {
-  assert_eq!(line(&Response::input("Your name?")), "10 Your name?");
+fn status_lines_combine_response_metadata_with_router_defaults() {
+  for (response, expected) in [
+    (
+      Response::success("hi"),
+      "20 text/gemini; charset=utf-8; lang=en",
+    ),
+    (
+      Response::success("hi").with_mime("text/plain").clone(),
+      "20 text/plain; charset=utf-8; lang=en",
+    ),
+    (
+      Response::success("hi").with_character_set("UTF-8").clone(),
+      "20 text/gemini; charset=UTF-8; lang=en",
+    ),
+    (
+      Response::success("hi").with_languages(["en", "fr"]).clone(),
+      "20 text/gemini; charset=utf-8; lang=\"en,fr\"",
+    ),
+    (
+      Response::binary_success([0xFFu8], "image/png"),
+      "20 image/png",
+    ),
+    (Response::new(21, ""), "20 application/octet-stream"),
+    (Response::temporary_redirect("/elsewhere"), "30 /elsewhere"),
+    (Response::new(40, "down\nfor maintenance"), "40 down"),
+    (Response::input("Your name?"), "10 Your name?"),
+  ] {
+    assert_eq!(default_status_line(&response).as_deref(), Ok(expected));
+  }
 }
 
 #[test]
 fn footer_rendering_preserves_empty_values_and_callback_order() {
-  let context = crate::context::RouteContext {
+  let context = RouteContext {
     peer_address: None,
     url:          "gemini://localhost/footer".parse().unwrap(),
-    parameters:   crate::context::Parameters::default(),
+    parameters:   Parameters::default(),
     certificate:  None,
   };
 
   for values in [vec![], vec![""], vec!["", ""], vec!["a", "", "b\n"]] {
-    let calls = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
-    let partials: Vec<std::sync::Arc<dyn crate::handler::Partial>> = values
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let partials: Vec<Arc<dyn Partial>> = values
       .iter()
       .enumerate()
       .map(|(index, value)| {
         let calls = calls.clone();
         let value = (*value).to_owned();
 
-        std::sync::Arc::new(move |context: &crate::context::RouteContext| {
+        Arc::new(move |context: &RouteContext| {
           assert_eq!(context.url.path(), "/footer");
           calls.lock().unwrap().push(index);
           value.clone()
-        }) as std::sync::Arc<dyn crate::handler::Partial>
+        }) as Arc<dyn Partial>
       })
       .collect();
 
@@ -231,12 +183,9 @@ fn footer_rendering_preserves_empty_values_and_callback_order() {
 
 #[test]
 fn path_resolution_preserves_unicode_and_probe_order() {
-  let options = [
-    RouterOption::AllowCaseInsensitiveLookup,
-    RouterOption::AddMissingTrailingSlash,
-  ]
-  .into_iter()
-  .collect();
+  let options = [AllowCaseInsensitiveLookup, AddMissingTrailingSlash]
+    .into_iter()
+    .collect();
   let probes = std::cell::RefCell::new(Vec::new());
   let path = resolve_lookup_path(&options, "/Users/ÄLICE", |candidate| {
     probes.borrow_mut().push(candidate.to_owned());
@@ -266,7 +215,7 @@ fn response_assembly_preserves_publicly_constructible_states() {
       *bytes = vec![0, 0xff];
     }
 
-    let status_line = line(&response);
+    let status_line = default_status_line(&response).unwrap();
     let expected = [expected_line.as_bytes(), b"\r\n", expected_body].concat();
 
     assert_eq!(status_line, expected_line);
@@ -301,12 +250,12 @@ fn response_assembly_preserves_publicly_constructible_states() {
 
 #[test]
 fn case_insensitive_routes_preserve_parameter_names_and_values() {
-  let mut router = super::Router::new();
+  let mut router = Router::new();
 
   router.mount("/Users/{Name}/Files/{*FilePath}", |_| {
     Response::success("file")
   });
-  router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+  router.add_options(&[AllowCaseInsensitiveLookup]);
 
   let matched = router
     .routes
@@ -320,9 +269,9 @@ fn case_insensitive_routes_preserve_parameter_names_and_values() {
 
 #[test]
 fn case_insensitive_routes_preserve_static_priority_and_inline_parameters() {
-  let mut router = super::Router::new();
+  let mut router = Router::new();
 
-  router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+  router.add_options(&[AllowCaseInsensitiveLookup]);
   router.mount("/Users/{Name}", |_| Response::success("user"));
   router.mount("/Users/Me", |_| Response::success("profile"));
   router.mount("/Files/Prefix{Name}", |_| Response::success("file"));
@@ -342,7 +291,7 @@ fn legacy_parameter_syntax_is_rejected_with_the_braced_form() {
     ("/:first/static/:second/", "/{first}/static/{second}/"),
   ] {
     let panic = std::panic::catch_unwind(|| {
-      super::Router::new().mount(route, |_| Response::success("legacy"));
+      Router::new().mount(route, |_| Response::success("legacy"));
     })
     .unwrap_err();
     let message = panic.downcast_ref::<String>().unwrap();
@@ -356,13 +305,13 @@ fn legacy_parameter_syntax_is_rejected_with_the_braced_form() {
 
 #[test]
 fn literal_colons_and_escaped_braces_mount_as_static_text() {
-  let mut router = super::Router::new();
+  let mut router = Router::new();
 
   router.mount("/time/12:30", |_| Response::success("time"));
   router.mount("/Literal/{{Braces}}/{Name}.GMI", |_| {
     Response::success("braces")
   });
-  router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+  router.add_options(&[AllowCaseInsensitiveLookup]);
 
   let matched = router.routes.at("/literal/{braces}/ÄLICE.gmi").unwrap();
 
@@ -372,10 +321,10 @@ fn literal_colons_and_escaped_braces_mount_as_static_text() {
 
 #[test]
 fn case_insensitive_routes_restore_repeated_values_from_their_own_positions() {
-  let mut router = super::Router::new();
+  let mut router = Router::new();
 
   router.mount("/Same/{First}/{Second}", |_| Response::success("pair"));
-  router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+  router.add_options(&[AllowCaseInsensitiveLookup]);
 
   let matched = router.routes.at("/same/SAME/SaMe").unwrap();
 
@@ -385,40 +334,38 @@ fn case_insensitive_routes_restore_repeated_values_from_their_own_positions() {
 
 #[test]
 fn case_insensitive_matching_can_be_disabled_reenabled_and_cloned() {
-  let mut router = super::Router::new();
+  let mut router = Router::new();
 
   router.mount("/Mixed/{Name}", |_| Response::success("mixed"));
   assert!(!router.routes.contains("/mixed/Alice"));
-  router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+  router.add_options(&[AllowCaseInsensitiveLookup]);
   assert!(router.routes.contains("/mixed/Alice"));
 
   let cloned = router.clone();
 
-  router.toggle_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+  router.toggle_options(&[AllowCaseInsensitiveLookup]);
   assert!(!router.routes.contains("/mixed/Alice"));
   assert!(cloned.routes.contains("/mixed/Alice"));
-  router.toggle_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+  router.toggle_options(&[AllowCaseInsensitiveLookup]);
   assert!(router.routes.contains("/mixed/Alice"));
-  router.remove_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+  router.remove_options(&[AllowCaseInsensitiveLookup]);
   assert!(!router.routes.contains("/mixed/Alice"));
   assert!(router.routes.contains("/Mixed/Alice"));
 }
 
 #[test]
 fn enabling_case_insensitive_matching_rejects_existing_conflicts() {
-  let mut router = super::Router::new();
+  let mut router = Router::new();
 
   router.mount("/Foo", |_| Response::success("upper"));
   router.mount("/foo", |_| Response::success("lower"));
 
   let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-    router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+    router.add_options(&[AllowCaseInsensitiveLookup]);
   }));
 
   assert!(result.is_err());
-  assert!(!router
-    .options
-    .contains(&RouterOption::AllowCaseInsensitiveLookup));
+  assert!(!router.options.contains(&AllowCaseInsensitiveLookup));
   assert!(router.routes.contains("/Foo"));
   assert!(router.routes.contains("/foo"));
   assert!(!router.routes.contains("/FOO"));
@@ -426,9 +373,9 @@ fn enabling_case_insensitive_matching_rejects_existing_conflicts() {
 
 #[test]
 fn mounting_case_conflicts_preserves_existing_routes() {
-  let mut router = super::Router::new();
+  let mut router = Router::new();
 
-  router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+  router.add_options(&[AllowCaseInsensitiveLookup]);
   router.mount("/Users/{Name}", |_| Response::success("user"));
 
   let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -447,13 +394,10 @@ fn mounting_case_conflicts_preserves_existing_routes() {
 
 #[test]
 fn trailing_slash_fixes_preserve_case_insensitive_parameters() {
-  let mut router = super::Router::new();
+  let mut router = Router::new();
 
   router.mount("/Users/{Name}/", |_| Response::success("user"));
-  router.add_options(&[
-    RouterOption::AllowCaseInsensitiveLookup,
-    RouterOption::AddMissingTrailingSlash,
-  ]);
+  router.add_options(&[AllowCaseInsensitiveLookup, AddMissingTrailingSlash]);
 
   let path =
     resolve_lookup_path(&router.options, "/uSeRs/Alice", |candidate| {
@@ -467,87 +411,66 @@ fn trailing_slash_fixes_preserve_case_insensitive_parameters() {
 
 #[test]
 fn shared_synchronous_modules_allow_overlapping_invocations() {
-  struct SignalingModule(std::sync::mpsc::Sender<()>);
+  struct SignalingModule(mpsc::Sender<()>);
 
-  impl crate::module::Module for SignalingModule {
-    fn on_pre_route(&self, _: &crate::context::HookContext) {
-      self.0.send(()).unwrap();
-    }
+  impl Module for SignalingModule {
+    fn on_pre_route(&self, _: &HookContext) { self.0.send(()).unwrap(); }
   }
 
   struct BlockingModule {
-    entered: std::sync::mpsc::Sender<()>,
-    release: std::sync::Mutex<std::sync::mpsc::Receiver<()>>,
-    blocked: std::sync::atomic::AtomicBool,
+    entered: mpsc::Sender<()>,
+    release: Mutex<mpsc::Receiver<()>>,
+    blocked: AtomicBool,
   }
 
-  impl crate::module::Module for BlockingModule {
-    fn on_pre_route(&self, _: &crate::context::HookContext) {
-      if !self
-        .blocked
-        .swap(true, std::sync::atomic::Ordering::Relaxed)
-      {
+  impl Module for BlockingModule {
+    fn on_pre_route(&self, _: &HookContext) {
+      if !self.blocked.swap(true, Ordering::Relaxed) {
         self.entered.send(()).unwrap();
         self
           .release
           .lock()
           .unwrap()
-          .recv_timeout(std::time::Duration::from_secs(5))
+          .recv_timeout(HOOK_TIMEOUT)
           .unwrap();
       }
     }
   }
 
-  let (signal, progress) = std::sync::mpsc::channel();
-  let (entered, entry) = std::sync::mpsc::channel();
-  let (release, resume) = std::sync::mpsc::channel();
-  let mut router = super::Router::new();
+  let (signal, progress) = mpsc::channel();
+  let (entered, entry) = mpsc::channel();
+  let (release, resume) = mpsc::channel();
+  let mut router = Router::new();
 
   router.attach(SignalingModule(signal));
   router.attach(BlockingModule {
     entered,
-    release: std::sync::Mutex::new(resume),
-    blocked: std::sync::atomic::AtomicBool::new(false),
+    release: Mutex::new(resume),
+    blocked: AtomicBool::new(false),
   });
 
   let modules = router.modules.clone();
-  let scheduling = std::sync::Arc::new(super::ModuleScheduling::default());
+  let scheduling = Arc::new(ModuleScheduling::default());
   let first_scheduling = scheduling.clone();
   let first_modules = modules.clone();
 
-  scheduling
-    .concurrent
-    .store(true, std::sync::atomic::Ordering::Relaxed);
+  scheduling.concurrent.store(true, Ordering::Relaxed);
 
   let first = std::thread::spawn(move || {
-    super::call_modules(&first_modules, &first_scheduling, |module| {
-      module.on_pre_route(&crate::context::HookContext {
-        peer_address: None,
-        url:          url::Url::parse("gemini://localhost/").unwrap(),
-        parameters:   None,
-        certificate:  None,
-      });
+    call_modules(&first_modules, &first_scheduling, |module| {
+      module.on_pre_route(&hook_context());
     });
   });
 
-  progress
-    .recv_timeout(std::time::Duration::from_secs(5))
-    .unwrap();
-  entry
-    .recv_timeout(std::time::Duration::from_secs(5))
-    .unwrap();
+  progress.recv_timeout(HOOK_TIMEOUT).unwrap();
+  entry.recv_timeout(HOOK_TIMEOUT).unwrap();
 
   let second = std::thread::spawn(move || {
-    super::call_modules(&modules, &scheduling, |module| {
-      module.on_pre_route(&crate::context::HookContext {
-        peer_address: None,
-        url:          url::Url::parse("gemini://localhost/").unwrap(),
-        parameters:   None,
-        certificate:  None,
-      });
+    call_modules(&modules, &scheduling, |module| {
+      module.on_pre_route(&hook_context());
     });
   });
-  let advanced = progress.recv_timeout(std::time::Duration::from_secs(5));
+  let advanced = progress.recv_timeout(HOOK_TIMEOUT);
 
   second.join().unwrap();
   release.send(()).unwrap();
@@ -557,47 +480,31 @@ fn shared_synchronous_modules_allow_overlapping_invocations() {
 
 #[test]
 fn module_scheduling_options_are_shared_across_router_clones() {
-  let mut router = super::Router::new();
+  let mut router = Router::new();
   let mut cloned = router.clone();
-  let enabled = || {
-    router
-      .module_scheduling
-      .concurrent
-      .load(std::sync::atomic::Ordering::Relaxed)
-  };
+  let enabled = || router.module_scheduling.concurrent.load(Ordering::Relaxed);
 
   assert!(!enabled());
-  cloned
-    .add_options(&[crate::router_option::RouterOption::AllowConcurrentModules]);
+  cloned.add_options(&[AllowConcurrentModules]);
   assert!(enabled());
-  cloned.toggle_options(&[
-    crate::router_option::RouterOption::AllowConcurrentModules,
-  ]);
+  cloned.toggle_options(&[AllowConcurrentModules]);
   assert!(!enabled());
-  cloned.toggle_options(&[
-    crate::router_option::RouterOption::AllowConcurrentModules,
-  ]);
+  cloned.toggle_options(&[AllowConcurrentModules]);
   assert!(enabled());
-  router.remove_options(&[
-    crate::router_option::RouterOption::AllowConcurrentModules,
-  ]);
-  assert!(!cloned
-    .module_scheduling
-    .concurrent
-    .load(std::sync::atomic::Ordering::Relaxed));
+  router.remove_options(&[AllowConcurrentModules]);
+  assert!(!cloned.module_scheduling.concurrent.load(Ordering::Relaxed));
 }
 
 #[test]
 fn synchronous_hook_phases_take_exclusive_or_shared_permits() {
-  let mut router = super::Router::new();
+  let mut router = Router::new();
 
   router.attach(SchedulingProbe);
-  super::call_modules(&router.modules, &router.module_scheduling, |_| {
+  call_modules(&router.modules, &router.module_scheduling, |_| {
     assert!(router.module_scheduling.synchronous.try_read().is_err());
   });
-  router
-    .add_options(&[crate::router_option::RouterOption::AllowConcurrentModules]);
-  super::call_modules(&router.modules, &router.module_scheduling, |_| {
+  router.add_options(&[AllowConcurrentModules]);
+  call_modules(&router.modules, &router.module_scheduling, |_| {
     assert!(router.module_scheduling.synchronous.try_read().is_ok());
     assert!(router.module_scheduling.synchronous.try_write().is_err());
   });
@@ -605,29 +512,24 @@ fn synchronous_hook_phases_take_exclusive_or_shared_permits() {
 
 struct SchedulingProbe;
 
-impl crate::module::Module for SchedulingProbe {}
+impl Module for SchedulingProbe {}
 
 #[async_trait::async_trait]
-impl crate::module::AsyncModule for SchedulingProbe {}
+impl AsyncModule for SchedulingProbe {}
 
 #[cfg_attr(feature = "tokio", tokio::test(flavor = "current_thread"))]
 #[cfg_attr(feature = "async-std", async_std::test)]
 async fn exclusive_async_phases_wait_for_existing_concurrent_phases() {
   use std::{future::Future, pin::pin, task::Poll};
 
-  let mut router = super::Router::new();
-  let context = crate::context::HookContext {
-    peer_address: None,
-    url:          url::Url::parse("gemini://localhost/").unwrap(),
-    parameters:   None,
-    certificate:  None,
-  };
+  let mut router = Router::new();
+  let context = hook_context();
 
   router.attach_async(SchedulingProbe).await;
 
-  for phase in [super::HookPhase::PreRoute, super::HookPhase::PostRoute] {
+  for phase in [HookPhase::PreRoute, HookPhase::PostRoute] {
     let shared = router.module_scheduling.asynchronous.read().await;
-    let mut dispatch = pin!(super::call_async_modules(
+    let mut dispatch = pin!(call_async_modules(
       &router.async_modules,
       &router.module_scheduling,
       &context,
@@ -644,17 +546,16 @@ async fn exclusive_async_phases_wait_for_existing_concurrent_phases() {
     dispatch.await;
   }
 
-  router
-    .add_options(&[crate::router_option::RouterOption::AllowConcurrentModules]);
+  router.add_options(&[AllowConcurrentModules]);
 
   let scheduling = router.module_scheduling.clone();
   let modules = router.async_modules.clone();
   let shared = scheduling.asynchronous.read().await;
-  let mut concurrent = pin!(super::call_async_modules(
+  let mut concurrent = pin!(call_async_modules(
     &modules,
     &scheduling,
     &context,
-    super::HookPhase::PreRoute,
+    HookPhase::PreRoute,
   ));
 
   std::future::poll_fn(|context| {
@@ -662,15 +563,13 @@ async fn exclusive_async_phases_wait_for_existing_concurrent_phases() {
     Poll::Ready(())
   })
   .await;
-  router.remove_options(&[
-    crate::router_option::RouterOption::AllowConcurrentModules,
-  ]);
+  router.remove_options(&[AllowConcurrentModules]);
 
-  let mut exclusive = pin!(super::call_async_modules(
+  let mut exclusive = pin!(call_async_modules(
     &modules,
     &scheduling,
     &context,
-    super::HookPhase::PostRoute,
+    HookPhase::PostRoute,
   ));
 
   std::future::poll_fn(|context| {
@@ -688,12 +587,12 @@ async fn exclusive_async_phases_wait_for_existing_concurrent_phases() {
 async fn attached_modules_record_their_type_names() {
   struct Named;
 
-  impl crate::module::Module for Named {}
+  impl Module for Named {}
 
   #[async_trait::async_trait]
-  impl crate::module::AsyncModule for Named {}
+  impl AsyncModule for Named {}
 
-  let mut router = super::Router::new();
+  let mut router = Router::new();
 
   router.attach(Named);
   router.attach_async(Named).await;
@@ -756,16 +655,20 @@ fn response_headers_reject_invalid_statuses_and_metadata() {
     Response::binary_success([], "text/plain\r\ninjected"),
     Response::binary_success([], "invalid media type"),
   ] {
-    assert!(status_line(&response, "utf-8", "en").is_err());
+    assert!(default_status_line(&response).is_err());
   }
 
-  assert_eq!(line(&Response::temporary_failure("")), "40");
   assert_eq!(
-    line(&Response::temporary_redirect("../page#part")),
+    default_status_line(&Response::temporary_failure("")).unwrap(),
+    "40"
+  );
+  assert_eq!(
+    default_status_line(&Response::temporary_redirect("../page#part")).unwrap(),
     "30 ../page#part"
   );
   assert_eq!(
-    line(&Response::temporary_redirect("https://example.com/")),
+    default_status_line(&Response::temporary_redirect("https://example.com/"))
+      .unwrap(),
     "30 https://example.com/"
   );
 }
@@ -776,13 +679,16 @@ fn response_languages_support_private_tags_and_omission() {
 
   response.with_languages(["x-private", "zh-Hans-CN"]);
   assert_eq!(
-    line(&response),
+    default_status_line(&response).unwrap(),
     "20 text/gemini; charset=utf-8; lang=\"x-private,zh-Hans-CN\""
   );
   response.with_languages(Vec::<String>::new());
-  assert_eq!(line(&response), "20 text/gemini; charset=utf-8");
+  assert_eq!(
+    default_status_line(&response).unwrap(),
+    "20 text/gemini; charset=utf-8"
+  );
   response.with_languages(["en;injected=value"]);
-  assert!(status_line(&response, "utf-8", "en").is_err());
+  assert!(default_status_line(&response).is_err());
 }
 
 #[test]
@@ -836,7 +742,7 @@ fn credentials_load_complete_chains_and_use_the_last_setter() {
   std::fs::write(directory.join("chain.pem"), &chain).unwrap();
   std::fs::write(directory.join("key.pem"), &key_pem).unwrap();
 
-  let mut router = super::Router::new();
+  let mut router = Router::new();
 
   router.set_certificate("invalid");
   router.set_private_key("invalid");
@@ -866,10 +772,7 @@ fn credentials_load_complete_chains_and_use_the_last_setter() {
 #[test]
 fn redirects_validate_the_first_path_segment_without_restricting_schemes() {
   for target in ["1:foo", ":foo", "a_b:foo", "1:foo/bar"] {
-    assert!(
-      status_line(&Response::temporary_redirect(target), "utf-8", "en")
-        .is_err()
-    );
+    assert!(default_status_line(&Response::temporary_redirect(target)).is_err());
   }
 
   for target in [
@@ -881,9 +784,7 @@ fn redirects_validate_the_first_path_segment_without_restricting_schemes() {
     "https://example.com/",
     "mailto:user@example.com",
   ] {
-    assert!(
-      status_line(&Response::temporary_redirect(target), "utf-8", "en").is_ok()
-    );
+    assert!(default_status_line(&Response::temporary_redirect(target)).is_ok());
   }
 
   assert!(super::request::parse_uri("http:/user@example.org/").is_err());
@@ -905,8 +806,7 @@ fn redirects_validate_authorities_without_normalizing_the_target() {
     "//[v1.a@b]/",
   ] {
     assert!(
-      status_line(&Response::temporary_redirect(target), "utf-8", "en")
-        .is_err(),
+      default_status_line(&Response::temporary_redirect(target)).is_err(),
       "{target}"
     );
   }
@@ -922,8 +822,7 @@ fn redirects_validate_authorities_without_normalizing_the_target() {
     "//example.com/path@part?query@part#fragment@part",
   ] {
     assert_eq!(
-      status_line(&Response::temporary_redirect(target), "utf-8", "en")
-        .unwrap(),
+      default_status_line(&Response::temporary_redirect(target)).unwrap(),
       format!("30 {target}")
     );
   }
@@ -937,7 +836,8 @@ fn response_metadata_resolves_overrides_and_rejects_invalid_parameters() {
   response.with_character_set("utf-8");
   response.with_languages(["en", "de"]);
 
-  let metadata = line(&response)
+  let metadata = default_status_line(&response)
+    .unwrap()
     .strip_prefix("20 ")
     .unwrap()
     .parse::<mime::Mime>()
@@ -954,7 +854,7 @@ fn response_metadata_resolves_overrides_and_rejects_invalid_parameters() {
   assert_eq!(metadata.get_param("lang").unwrap(), "en,de");
   assert_eq!(metadata.get_param("note").unwrap(), "a b");
   response.with_languages(Vec::<String>::new());
-  assert!(!line(&response).contains("lang="));
+  assert!(!default_status_line(&response).unwrap().contains("lang="));
 
   for media_type in [
     "text/*",
@@ -965,8 +865,7 @@ fn response_metadata_resolves_overrides_and_rejects_invalid_parameters() {
     "text/plain; note=\"café\"",
   ] {
     assert!(
-      status_line(&Response::binary_success([], media_type), "utf-8", "en")
-        .is_err(),
+      default_status_line(&Response::binary_success([], media_type)).is_err(),
       "{media_type}"
     );
   }
@@ -977,9 +876,9 @@ fn character_sets_describe_bytes_without_transcoding_them() {
   let mut response = Response::success("café");
 
   response.with_character_set("iso-8859-1");
-  assert!(status_line(&response, "utf-8", "en").is_err());
+  assert!(default_status_line(&response).is_err());
   response.with_character_set("utf-16");
-  assert!(status_line(&response, "utf-8", "en").is_err());
+  assert!(default_status_line(&response).is_err());
 
   let mut response =
     Response::binary_success([0x63, 0x61, 0x66, 0xe9], "text/plain");
@@ -987,7 +886,7 @@ fn character_sets_describe_bytes_without_transcoding_them() {
   response.with_character_set("iso-8859-1");
   response.with_languages(["fr"]);
   assert_eq!(
-    line(&response),
+    default_status_line(&response).unwrap(),
     "20 text/plain; charset=iso-8859-1; lang=fr"
   );
   assert_eq!(response.serialize_body("", ""), [0x63, 0x61, 0x66, 0xe9]);
@@ -995,7 +894,7 @@ fn character_sets_describe_bytes_without_transcoding_them() {
 
 #[test]
 fn percent_equivalent_routes_preserve_original_captures_and_reserved_escapes() {
-  let mut router = super::Router::new();
+  let mut router = Router::new();
 
   router.mount("/caf%C3%A9/~user/{Name}/{*Rest}", |_| {
     Response::success("body")
@@ -1011,7 +910,7 @@ fn percent_equivalent_routes_preserve_original_captures_and_reserved_escapes() {
     assert_eq!(matched.parameters.get("Rest"), Some("Photo%2fone.PNG"));
   }
 
-  router.add_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+  router.add_options(&[AllowCaseInsensitiveLookup]);
 
   let matched = router
     .routes
@@ -1020,13 +919,13 @@ fn percent_equivalent_routes_preserve_original_captures_and_reserved_escapes() {
 
   assert_eq!(matched.parameters.get("Name"), Some("%41LiCe"));
   assert_eq!(matched.parameters.get("Rest"), Some("Ä%2fOne"));
-  router.remove_options(&[RouterOption::AllowCaseInsensitiveLookup]);
+  router.remove_options(&[AllowCaseInsensitiveLookup]);
   assert!(router.routes.at("/CAF%C3%A9/~USER/Alice/file").is_err());
 }
 
 #[test]
 fn equivalent_route_collisions_leave_registered_handlers_available() {
-  let mut router = super::Router::new();
+  let mut router = Router::new();
 
   router.mount("/%7euser", |_| Response::success("original"));
 
