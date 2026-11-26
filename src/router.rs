@@ -398,17 +398,11 @@ fn render_footer(
   partials: &[Arc<dyn Partial>],
   context: &RouteContext,
 ) -> String {
-  let mut footer = String::new();
-
-  for (index, partial) in partials.iter().enumerate() {
-    if index != 0 {
-      footer.push('\n');
-    }
-
-    footer.push_str(&partial.call(context));
-  }
-
-  footer
+  partials
+    .iter()
+    .map(|partial| partial.call(context))
+    .collect::<Vec<_>>()
+    .join("\n")
 }
 
 /// Build a protocol-valid response header from the handler's response.
