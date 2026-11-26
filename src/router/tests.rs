@@ -1,7 +1,10 @@
 use super::{
   call_async_modules,
   call_modules,
+  render_footer,
+  request::parse_uri,
   resolve_lookup_path,
+  serialize_response,
   status_line,
   HookPhase,
   ModuleScheduling,
@@ -23,6 +26,7 @@ use crate::{
 use matchit::Router as MatchRouter;
 use std::{
   collections::HashSet,
+  panic::{catch_unwind, AssertUnwindSafe},
   sync::{
     atomic::{AtomicBool, Ordering},
     mpsc,
@@ -173,7 +177,7 @@ fn footer_rendering_preserves_empty_values_and_callback_order() {
       })
       .collect();
 
-    assert_eq!(super::render_footer(&partials, &context), values.join("\n"));
+    assert_eq!(render_footer(&partials, &context), values.join("\n"));
     assert_eq!(
       *calls.lock().unwrap(),
       (0..values.len()).collect::<Vec<_>>()
@@ -224,7 +228,7 @@ fn response_assembly_preserves_publicly_constructible_states() {
       expected_body
     );
     assert_eq!(
-      super::serialize_response(response, &status_line, "HEADER", "FOOTER"),
+      serialize_response(response, &status_line, "HEADER", "FOOTER"),
       expected
     );
   }
@@ -237,7 +241,7 @@ fn response_assembly_preserves_publicly_constructible_states() {
       .serialize_body("HEADER", "FOOTER")
       .is_empty());
     assert_eq!(
-      super::serialize_response(
+      serialize_response(
         response,
         "20 application/octet-stream",
         "HEADER",
@@ -290,7 +294,7 @@ fn legacy_parameter_syntax_is_rejected_with_the_braced_form() {
     ("/files/*path", "/files/{*path}"),
     ("/:first/static/:second/", "/{first}/static/{second}/"),
   ] {
-    let panic = std::panic::catch_unwind(|| {
+    let panic = catch_unwind(|| {
       Router::new().mount(route, |_| Response::success("legacy"));
     })
     .unwrap_err();
@@ -360,7 +364,7 @@ fn enabling_case_insensitive_matching_rejects_existing_conflicts() {
   router.mount("/Foo", |_| Response::success("upper"));
   router.mount("/foo", |_| Response::success("lower"));
 
-  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+  let result = catch_unwind(AssertUnwindSafe(|| {
     router.add_options(&[AllowCaseInsensitiveLookup]);
   }));
 
@@ -378,7 +382,7 @@ fn mounting_case_conflicts_preserves_existing_routes() {
   router.add_options(&[AllowCaseInsensitiveLookup]);
   router.mount("/Users/{Name}", |_| Response::success("user"));
 
-  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+  let result = catch_unwind(AssertUnwindSafe(|| {
     router.mount("/users/{Other}", |_| Response::success("conflict"));
   }));
 
@@ -620,7 +624,7 @@ fn request_uris_reject_forbidden_syntax_before_normalization() {
     "gemini:///",
     "/relative",
   ] {
-    assert!(super::request::parse_uri(request).is_err(), "{request}");
+    assert!(parse_uri(request).is_err(), "{request}");
   }
 
   for request in [
@@ -634,7 +638,7 @@ fn request_uris_reject_forbidden_syntax_before_normalization() {
     "https://localhost/",
     "mailto:user@example.com",
   ] {
-    assert!(super::request::parse_uri(request).is_ok(), "{request}");
+    assert!(parse_uri(request).is_ok(), "{request}");
   }
 }
 
@@ -787,7 +791,7 @@ fn redirects_validate_the_first_path_segment_without_restricting_schemes() {
     assert!(default_status_line(&Response::temporary_redirect(target)).is_ok());
   }
 
-  assert!(super::request::parse_uri("http:/user@example.org/").is_err());
+  assert!(parse_uri("http:/user@example.org/").is_err());
 }
 
 #[test]
@@ -929,10 +933,9 @@ fn equivalent_route_collisions_leave_registered_handlers_available() {
 
   router.mount("/%7euser", |_| Response::success("original"));
 
-  let collision =
-    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-      router.mount("/~user", |_| Response::success("replacement"));
-    }));
+  let collision = catch_unwind(AssertUnwindSafe(|| {
+    router.mount("/~user", |_| Response::success("replacement"));
+  }));
 
   assert!(collision.is_err());
   assert!(router.routes.contains("/%7Euser"));
