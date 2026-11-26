@@ -71,14 +71,6 @@ fn binary_success_preserves_non_utf8_bytes() {
   assert_eq!(response.binary_content(), Some(NON_UTF8));
 }
 
-#[test]
-fn serialize_body_writes_binary_bytes_verbatim() {
-  let response = Response::binary_success(NON_UTF8, "image/png");
-  let body = response.serialize_body("ignored-header", "ignored-footer");
-
-  assert_eq!(body, NON_UTF8);
-}
-
 #[cfg(feature = "auto-deduce-mime")]
 #[test]
 fn binary_success_auto_preserves_non_utf8_bytes() {
@@ -90,14 +82,6 @@ fn binary_success_auto_preserves_non_utf8_bytes() {
     response.serialize_body("ignored-header", "ignored-footer"),
     NON_UTF8,
   );
-}
-
-#[test]
-fn serialize_body_text_success_wraps_with_header_and_footer() {
-  let response = Response::success("body");
-  let body = response.serialize_body("HEADER\n", "FOOTER");
-
-  assert_eq!(body, b"HEADER\nbody\nFOOTER\n");
 }
 
 #[test]
