@@ -11,12 +11,6 @@ cargo test --workspace --no-default-features --features windmark/async-std,windm
 The qualified runtime feature also selects the runtime for Rossweisse's
 Windmark development dependency.
 
-## Layout
-
-`router.rs` is loaded as a private unit-test module to exercise internal
-helpers without publishing them. Integration targets are explicitly listed in
-`Cargo.toml`, so Cargo does not also compile that file as a separate crate.
-
 ## Consumer Compatibility
 
 `consumer.rs` checks the independent crate in `consumer/`.
