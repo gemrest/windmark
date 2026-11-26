@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
 
-pub fn methods(item: &syn::ItemImpl) -> syn::Result<TokenStream> {
+pub fn expand(item: &syn::ItemImpl) -> syn::Result<TokenStream> {
   let mut mounts = Vec::new();
 
   for member in &item.items {

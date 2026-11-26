@@ -3,7 +3,7 @@ use quote::quote;
 use std::collections::HashSet;
 use syn::{parse::Parser, punctuated::Punctuated, Error, MetaNameValue, Token};
 
-pub fn fields(
+pub fn expand(
   arguments: TokenStream,
   mut item: syn::ItemStruct,
 ) -> syn::Result<TokenStream> {

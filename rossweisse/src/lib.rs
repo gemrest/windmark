@@ -10,8 +10,8 @@
   warnings
 )]
 
-mod fields;
-mod methods;
+mod router_implementation;
+mod router_struct;
 
 use proc_macro::TokenStream;
 use syn::{punctuated::Punctuated, Error, Item, Meta, Token};
@@ -47,8 +47,8 @@ pub fn router(arguments: TokenStream, item: TokenStream) -> TokenStream {
   syn::parse::<Item>(item)
     .and_then(|item| {
       match item {
-        Item::Struct(item) => fields::fields(arguments, item),
-        Item::Impl(item) => methods::methods(&item),
+        Item::Struct(item) => router_struct::expand(arguments, item),
+        Item::Impl(item) => router_implementation::expand(&item),
         item =>
           Err(Error::new_spanned(
             item,
